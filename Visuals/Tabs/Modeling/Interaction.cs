@@ -269,6 +269,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var resizeItem = new MenuItem { Header = "Resize..." };
             resizeItem.Click += (s, e) =>
             {
+                if (_activeEntity == null) return;
                 // 获取鼠标位置以显示弹窗
                 var mousePos = Mouse.GetPosition(_page); 
                 _page.ShowEditPopup(_activeEntity, mousePos);
