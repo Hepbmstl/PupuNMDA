@@ -69,8 +69,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public abstract string GetDimensionInfo();
 
         public abstract void AlignTo(Point3D position, Vector3D normal);
-        // gpt 检查一下逻辑
-        // Failed to get response: {"error":{"message":"Insufficient Balance","type":"unknown_error","param":null,"code":"invalid_request_error"}}
 
         protected abstract void UpdateGeometry();
     }

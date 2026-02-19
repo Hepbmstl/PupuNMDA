@@ -26,7 +26,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private InteractionState _currentState = InteractionState.Idle;
         private List<IVisualEntity> _entities = new List<IVisualEntity>();
-        private IVisualEntity _activeEntity; 
+        private IVisualEntity? _activeEntity; 
 
         private Point _mouseDownPos;
         private bool _isDraggingViewport = false;
