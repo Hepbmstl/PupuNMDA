@@ -10,11 +10,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     public partial class ModelingPage : UserControl
     {
-        private ViewportController _viewportController;
-        private InteractionController _interactionController;
+        private ViewportController _viewportController = null!;
+        private InteractionController _interactionController = null!;
 
         // 当前正在编辑的实体引用
-        private IVisualEntity _editingEntity;
+        private IVisualEntity? _editingEntity;
 
         public ModelingPage()
         {

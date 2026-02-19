@@ -26,7 +26,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private InteractionState _currentState = InteractionState.Idle;
         private List<IVisualEntity> _entities = new List<IVisualEntity>();
-        private IVisualEntity _activeEntity; 
+        private IVisualEntity? _activeEntity; 
 
         private Point _mouseDownPos;
         private bool _isDraggingViewport = false;
@@ -40,6 +40,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _viewportController = viewportController;
             _helixViewport = helixViewport;
         }
+
+        // a
 
         #region Public API
         public void StartPlacing(IVisualEntity newEntity)
@@ -300,6 +302,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var resizeItem = new MenuItem { Header = "Resize..." };
             resizeItem.Click += (s, e) =>
             {
+                if (_activeEntity == null) return;
                 // 获取鼠标位置以显示弹窗
                 var mousePos = Mouse.GetPosition(_page); 
                 _page.ShowEditPopup(_activeEntity, mousePos);

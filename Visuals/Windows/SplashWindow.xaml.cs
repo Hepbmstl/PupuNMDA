@@ -14,7 +14,7 @@ namespace NeuronCAD.Visuals.Windows
     {
         public SplashWindow()
         {
-            //InitializeComponent();
+            InitializeComponent();
         }
     }
 }
