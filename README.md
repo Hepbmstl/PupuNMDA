@@ -1,2 +1,2 @@
 # PupuNMDA
-Neuron Modeling and Dynamics Analysis
+Neuron Modeling and Dynamics Analysis XD
