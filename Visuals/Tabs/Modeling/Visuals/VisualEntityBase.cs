@@ -29,6 +29,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             MainModel.Material = _defaultMaterial;
             MainModel.BackMaterial = _defaultMaterial;
             Visual3D.Content = MainModel;
+
+            // Initialize transform so CombinedManipulator.Bind has a valid target
+            Visual3D.Transform = new System.Windows.Media.Media3D.MatrixTransform3D(Matrix3D.Identity);
         }
 
         public void SetSelected(bool isSelected)
