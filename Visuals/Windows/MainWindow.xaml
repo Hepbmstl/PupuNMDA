@@ -1,0 +1,77 @@
+﻿<Window x:Class="NeuronCAD.Visuals.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:modeling="clr-namespace:NeuronCAD.Visuals.Tabs.Modeling"
+        mc:Ignorable="d"
+        Title="NeuronCAD 2026" Height="768" Width="1280"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBackgroundBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- 菜单栏高度自适应 -->
+            <RowDefinition Height="*"/>
+            <!-- 内容区域填满剩余空间 -->
+        </Grid.RowDefinitions>
+
+        <!-- Menu Bar 区域 -->
+        <!-- 后续将替换为: <shell:MenuBarView Grid.Row="0"/> -->
+        <Border Grid.Row="0" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+            <Menu Background="Transparent" Foreground="#F1F1F1" Margin="5">
+                <Menu.Resources>
+                    <Style TargetType="MenuItem">
+                        <Setter Property="Foreground" Value="#F1F1F1"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="Padding" Value="10,5"/>
+                    </Style>
+                </Menu.Resources>
+
+                <MenuItem Header="File">
+                    <MenuItem Header="New Project"/>
+                    <MenuItem Header="Open..."/>
+                    <Separator/>
+                    <MenuItem Header="Exit"/>
+                </MenuItem>
+                <MenuItem Header="Edit"/>
+                <MenuItem Header="View"/>
+                <MenuItem Header="Help"/>
+            </Menu>
+        </Border>
+
+        <!-- Main Content Tabs -->
+        <TabControl Grid.Row="1" Margin="0" Padding="0">
+
+            <!-- Tab 1: Modeling -->
+            <TabItem Header="Modeling">
+                <!-- 挂载 ModelingPage -->
+                <modeling:ModelingPage/>
+            </TabItem>
+
+            <!-- Tab 2: Simulation (Placeholder) -->
+            <TabItem Header="Simulation">
+                <Grid Background="#1E1E1E">
+                    <TextBlock Text="Simulation Module" 
+                               Foreground="#555" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"/>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 3: Reporting (Placeholder) -->
+            <TabItem Header="Reporting">
+                <Grid Background="#1E1E1E">
+                    <TextBlock Text="Reporting Module" 
+                               Foreground="#555" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"
+                               FontSize="24"/>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</Window>
