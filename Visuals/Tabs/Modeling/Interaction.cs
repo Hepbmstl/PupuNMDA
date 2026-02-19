@@ -39,6 +39,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _helixViewport = helixViewport;
         }
 
+        // a
+
         #region Public API
         public void StartPlacing(IVisualEntity newEntity)
         {
