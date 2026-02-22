@@ -1,8 +1,11 @@
-﻿using System.Windows.Media;
+﻿using System.Data;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
+
+
     public interface IVisualEntity
     {
         string Id { get; }
@@ -12,7 +15,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         void SetSelected(bool isSelected);
         void SetColor(Color color);
-        
+        public void SetOpacity(double opacity);
+
         /// <summary>
         /// 对齐到指定位置和法线
         /// </summary>
@@ -23,11 +27,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         void SetHitTestVisible(bool isVisible);
 
+        void SetDisplayMode(VisualDisplayMode mode);
+
         // === 新增接口：尺寸获取与修改 ===
-        
+
         /// <summary>
         /// 获取当前的尺寸描述（用于在弹窗中显示，如 "Radius: 5" 或 "L: 10, R: 2"）
         /// </summary>
         string GetDimensionInfo();
+
+        IConnection<string> Connection { get; }
     }
 }

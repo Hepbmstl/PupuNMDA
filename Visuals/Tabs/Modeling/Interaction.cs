@@ -13,9 +13,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     public enum InteractionState
     {
-        Idle,
-        Placing,
-        Moving
+        Idle, // 空闲
+        Placing, // 放置中
+        Moving // 跟随鼠标中
+    }
+    public enum VisualDisplayMode
+    {
+        Normal,
+        Wireframe //透明 框架 万向轮
+
     }
 
     public class InteractionController
@@ -26,7 +32,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private InteractionState _currentState = InteractionState.Idle;
         private List<IVisualEntity> _entities = new List<IVisualEntity>();
-        private IVisualEntity? _activeEntity; 
+        private IVisualEntity? _activeEntity;
 
         private Point _mouseDownPos;
         private bool _isDraggingViewport = false;
@@ -49,12 +55,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             if (_currentState != InteractionState.Idle) return;
             _activeEntity = newEntity;
             // 放置时关闭自身HitTest，防止射线检测到自己
-            _activeEntity.SetHitTestVisible(false); 
+            _activeEntity.SetHitTestVisible(false);
             _helixViewport.Children.Add(_activeEntity.Visual3D);
+            // children加入场景
             _currentState = InteractionState.Placing;
             _activeEntity.SetSelected(true);
         }
-        
+
         public void DeleteSelected()
         {
             if (_activeEntity != null && _entities.Contains(_activeEntity))
@@ -65,7 +72,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _activeEntity = null;
             }
         }
-        
+
         public void StartMovingSelected()
         {
             if (_activeEntity != null && _entities.Contains(_activeEntity))
@@ -87,7 +94,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             if (_currentState == InteractionState.Placing || _currentState == InteractionState.Moving)
             {
-                e.Handled = true; 
+                e.Handled = true;
                 if (e.ChangedButton == MouseButton.Left) ConfirmAction();
                 else if (e.ChangedButton == MouseButton.Right) CancelAction();
             }
@@ -116,11 +123,19 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
             if (_currentState != InteractionState.Idle) return;
-            if (_isDraggingViewport) { _isDraggingViewport = false; return; }
+            if (_isDraggingViewport)
+            {
+                _isDraggingViewport = false;
+                return;
+            }
 
             if (e.ChangedButton == MouseButton.Left)
             {
-                if (_suppressNextHitTest) { _suppressNextHitTest = false; return; }
+                if (_suppressNextHitTest)
+                {
+                    _suppressNextHitTest = false;
+                    return;
+                }
                 PerformHitTest(e.GetPosition(_helixViewport));
             }
             else if (e.ChangedButton == MouseButton.Right)
@@ -139,15 +154,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         #region Core Logic
 
-        // 逻辑更新2：更新十字准星和 HUD
+        //更新十字准星和 HUD
         private void UpdateCrosshair(Point mousePos)
         {
             // 发射射线寻找最近的物体表面
             var hits = _helixViewport.Viewport.FindHits(mousePos);
-            
+
             // 排除正在放置的物体(如果有)
             var validHit = hits?.FirstOrDefault(h => _activeEntity == null || !IsSelfOrChild(h.Visual, _activeEntity.Visual3D));
-            
+
             Point3D? worldPos = null;
 
             if (validHit != null)
@@ -166,7 +181,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         private void UpdateObjectPosition(Point mousePos)
-        {
+        {//吸附 移动到命中点
             if (_activeEntity == null) return;
 
             var allHits = _helixViewport.Viewport.FindHits(mousePos);
@@ -192,7 +207,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private void ConfirmAction()
         {
             if (_activeEntity == null) return;
-            
+
             if (_currentState == InteractionState.Placing)
             {
                 _entities.Add(_activeEntity);
@@ -200,7 +215,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             // 恢复 HitTest 可见性
             _activeEntity.SetHitTestVisible(true);
-            
+
             // 自动放弃选中 (需求1)
             _activeEntity.SetSelected(false);
             HideGimbal();
@@ -220,23 +235,30 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else if (_currentState == InteractionState.Moving && _activeEntity != null)
             {
-                 // 移动取消时，也要恢复 HitTest
-                 _activeEntity.SetHitTestVisible(true);
-                 HideGimbal();
-                 // 暂时回到 Idle，位置可能没复原(需 Memento)
+                // 移动取消时，也要恢复 HitTest
+                _activeEntity.SetHitTestVisible(true);
+                HideGimbal();
+                // 暂时回到 Idle，位置可能没复原(需 Memento)
             }
             _currentState = InteractionState.Idle;
         }
-
         private void PerformHitTest(Point mousePos)
         {
-            // 先清空旧的选中并隐藏 gimbal
+            // 如果点到了 gimbal，交给 gimbal 自己处理（不要更改选中）
+            if (_gimbal != null)
+            {
+                var hits = _helixViewport.Viewport.FindHits(mousePos);
+                var gimbalHit = hits?.FirstOrDefault(h => IsSelfOrChild(h.Visual, _gimbal));
+                if (gimbalHit != null) return;
+            }
+
+            // 原逻辑：清空旧选中并隐藏 gimbal
             if (_activeEntity != null) { _activeEntity.SetSelected(false); HideGimbal(); _activeEntity = null; }
 
-            var hits = _helixViewport.Viewport.FindHits(mousePos);
-            if (hits != null && hits.Count > 0)
+            var hits2 = _helixViewport.Viewport.FindHits(mousePos);
+            if (hits2 != null && hits2.Count > 0)
             {
-                var nearest = hits.OrderBy(h => h.Distance).First();
+                var nearest = hits2.OrderBy(h => h.Distance).First();
                 foreach (var entity in _entities)
                 {
                     if (IsSelfOrChild(nearest.Visual, entity.Visual3D))
@@ -244,7 +266,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                         _activeEntity = entity;
                         _activeEntity.SetSelected(true);
                         ShowGimbal(_activeEntity);
-                        break; // 选中一个即可
+                        break;
                     }
                 }
             }
@@ -265,6 +287,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private void ShowGimbal(IVisualEntity entity)
         {
             HideGimbal();
+            entity.SetHitTestVisible(false);
+            //entity.SetOpacity(0.5);
+            entity.SetDisplayMode(VisualDisplayMode.Wireframe);
             _gimbal = new CombinedManipulator
             {
                 Diameter = 5,
@@ -287,24 +312,30 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _helixViewport.Children.Remove(_gimbal);
                 _gimbal = null;
             }
+            if (_activeEntity != null)
+            {
+                //_activeEntity.SetOpacity(1.0);
+                _activeEntity.SetDisplayMode(VisualDisplayMode.Normal);
+                _activeEntity.SetHitTestVisible(true);
+            }
         }
 
         // 逻辑更新3：右键菜单增加 Resize 选项
         private void ShowContextMenu()
         {
             var contextMenu = new ContextMenu();
-            
+
             // 移动
             var moveItem = new MenuItem { Header = "Move" };
             moveItem.Click += (s, e) => StartMovingSelected();
-            
+
             // 调整尺寸 (Resize)
             var resizeItem = new MenuItem { Header = "Resize..." };
             resizeItem.Click += (s, e) =>
             {
                 if (_activeEntity == null) return;
                 // 获取鼠标位置以显示弹窗
-                var mousePos = Mouse.GetPosition(_page); 
+                var mousePos = Mouse.GetPosition(_page);
                 _page.ShowEditPopup(_activeEntity, mousePos);
             };
 

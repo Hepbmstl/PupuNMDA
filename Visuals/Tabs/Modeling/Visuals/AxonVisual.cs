@@ -41,10 +41,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             UpdateGeometry();
             // Use a default direction when start == end to avoid normalizing a zero vector in AlignTo
             var alignNormal = direction.Length > 0 ? direction : new Vector3D(0, 0, 1);
-            AlignTo(start, alignNormal);
+            AlignTo(start, alignNormal); // 计算得到初始化的数据
         }
 
-        public override void AlignTo(Point3D position, Vector3D normal)
+        public override void AlignTo(Point3D position, Vector3D normal) // 添加入画板当中
         {
             normal.Normalize();
             var localZ = new Vector3D(0, 0, 1);
@@ -78,9 +78,17 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         protected override void UpdateGeometry()
         {
             // Geometry is built along local Z axis from (0,0,0) to (0,0,_length)
-            var builder = new MeshBuilder();
-            builder.AddCylinder(new Point3D(0, 0, 0), new Point3D(0, 0, _length), _radius * 2, 18);
+            var builder = new MeshBuilder(); // 添加一个圆柱
+            builder.AddCylinder(
+                new Point3D(0, 0, 0),
+                new Point3D(0, 0, _length),
+                _radius * 2, 18,
+                true,
+                true);
+            //AddCylinder(Point3D p1, Point3D p2, double diameter, int thetaDiv, bool cap1 = false, bool cap2 = false)
             MainModel.Geometry = builder.ToMesh();
+            MainModel.Geometry = builder.ToMesh();
+            NotifyGeometryChanged();
         }
     }
 }
