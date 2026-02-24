@@ -5,7 +5,7 @@ using HelixToolkit.Wpf;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
-    public class SomaVisual : VisualEntityBase
+    public class SomaVisual : VisualEntityBase, IAnchoredEntity
     {
         private double _radius;
 
@@ -48,6 +48,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             MainModel.Geometry = builder.ToMesh();
             MainModel.Geometry = builder.ToMesh();
             NotifyGeometryChanged();
+        }
+
+        public bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor)
+        {
+            anchor = new AnchorRef { Mode = AnchorMode.SomaUniform, AxialT = 0.5, Angle = 0.0 };
+            return true;
+        }
+
+        public bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint)
+        {
+            worldPoint = CenterPosition; // 简单版本
+            return true;
         }
     }
 }

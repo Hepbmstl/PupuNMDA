@@ -216,7 +216,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     public enum AnchorMode
     {
         AxonCylinder,
-        SomaCylinder
+        SomaCylinder,
+        SomaUniform
     }
 
     public sealed class AnchorRef

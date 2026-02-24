@@ -35,7 +35,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// 获取当前的尺寸描述（用于在弹窗中显示，如 "Radius: 5" 或 "L: 10, R: 2"）
         /// </summary>
         string GetDimensionInfo();
-
-        IConnection<string> Connection { get; }
+    }
+    public interface IAnchoredEntity
+    {
+        bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor);
+        bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint);
     }
 }
