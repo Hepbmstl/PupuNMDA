@@ -13,11 +13,12 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- 左侧 Panels -->
+        <!-- 左侧 Panels 容器区 -->
         <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Properties Panel" Foreground="#888888" FontSize="16" HorizontalAlignment="Center"/>
-            </StackPanel>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <!-- 动态属性面板注入点 -->
+                <StackPanel x:Name="PropertiesPanelContainer" Margin="5" />
+            </ScrollViewer>
         </Border>
 
         <!-- 右侧 Modeling 区域 -->
@@ -94,5 +95,17 @@
             </Border>
             
         </Grid>
+
+        <!-- 全局离子通道选择器 Popup -->
+        <Popup x:Name="ChannelSelectorPopup" StaysOpen="False" Placement="MousePoint">
+            <Border Background="#333333" BorderBrush="#555555" BorderThickness="1" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="Select Channel to Add:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                    <!-- 动态离子通道列表注入点 -->
+                    <StackPanel x:Name="ChannelSelectorList" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
     </Grid>
 </UserControl>

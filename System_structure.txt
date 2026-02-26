@@ -32,9 +32,11 @@ NeuronCad (Root)
         │    │   ├── IVisualEntity.cs    // 接口：定义所有可视化组件的公有行为
         │    │   ├── VisualEntityBase.cs // 基类：持有 Backward.Entities 的引用 + Helix 模型
         │    │   ├── SomaVisual.cs       // 具体的细胞体可视化类
-        │    │   └── AxonVisual.cs       // 具体的轴突可视化类
+        │    │   ├── AxonVisual.cs       // 具体的轴突可视化类
+        │    │   └── Connection.cs       // 负责连接的实现
         │    ├── Interaction.cs           // 负责鼠标操作，提供面板内的操作选项。
-        │    └── Panels.cs                // 负责左侧面板
+        │    ├── Panels.cs                // 负责左侧面板
+        │    └── Biophy.cs                // 负责生物物理的相关属性
         │
         │
         ├── Simulation                   // [Namespace: NeuronCad.UI.Tabs.Simulation]

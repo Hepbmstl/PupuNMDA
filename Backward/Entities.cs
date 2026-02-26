@@ -49,11 +49,7 @@ namespace NeuronCAD.Backward
         public class ChannelProperty
         {
             public int ID_Channel { get; set; }
-            //public string Color { get; set; } = " #ffffff00";
-            ///?///
-            /// 
-            public DistributionType Type { get; set; }
-
+            public string Color { get; set; } = " #ffffff00";
         }
 
         public Dictionary<string, ChannelProperty> Channels { get; set; }

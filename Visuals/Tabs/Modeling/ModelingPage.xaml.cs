@@ -5,6 +5,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
+//using Popup = NeuronCAD.Visuals.Tabs.Modeling.Visuals.Popup;
+using System.Windows.Controls.Primitives;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
@@ -13,7 +15,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private ViewportController _viewportController = null!;
         private InteractionController _interactionController = null!;
 
-        // 当前正在编辑的实体引用
+        // 声明左侧面板属性控制器，持有 UI 生命周期引用
+        private PropertiesPanelController _propertiesPanelController = null!;
+
+        // 快捷编辑弹窗追踪的实体状态
         private IVisualEntity? _editingEntity;
 
         public ModelingPage()
@@ -24,29 +29,33 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private void InitializeControllers()
         {
+            // 1. 初始化视口与交互控制器
             _viewportController = new ViewportController(MainViewport);
             _interactionController = new InteractionController(this, _viewportController, MainViewport);
+
+            // 2. 挂载左侧面板及 Popup 弹窗状态
+            // 将 XAML 中的容器组件实例传递给面板控制器，由其接管后续的 DOM 增删操作
+            _propertiesPanelController = new PropertiesPanelController(
+                PropertiesPanelContainer,
+                ChannelSelectorPopup,
+                ChannelSelectorList,
+                _interactionController
+            );
         }
 
-        #region HUD & Overlay API (供 InteractionController 调用)
+        #region HUD & Overlay API
 
-        /// <summary>
-        /// 更新十字准星和坐标显示
-        /// </summary>
         public void UpdateCursorInfo(Point mousePos, Point3D? worldPos)
         {
-            // 1. 移动十字准星
             Canvas.SetLeft(CrosshairPath, mousePos.X);
             Canvas.SetTop(CrosshairPath, mousePos.Y);
 
-            // 2. 更新坐标文本
             if (worldPos.HasValue)
             {
                 var p = worldPos.Value;
                 CoordText.Text = $"X:{p.X:F2} Y:{p.Y:F2} Z:{p.Z:F2}";
                 CoordHud.Visibility = Visibility.Visible;
-                
-                // HUD 放在鼠标右下角一点
+
                 Canvas.SetLeft(CoordHud, mousePos.X + 15);
                 Canvas.SetTop(CoordHud, mousePos.Y + 15);
             }
@@ -56,14 +65,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
-        /// <summary>
-        /// 显示编辑弹窗
-        /// </summary>
         public void ShowEditPopup(IVisualEntity entity, Point mousePos)
         {
             _editingEntity = entity;
-            
-            // 根据实体类型显示不同的输入框
+
             if (entity is AxonVisual axon)
             {
                 PanelAxonLength.Visibility = Visibility.Visible;
@@ -78,7 +83,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 TbRadius.Text = soma.Radius.ToString("F2");
             }
 
-            // 移动弹窗到鼠标附近 (防止超出边界的逻辑可后续添加)
             EditPopup.Margin = new Thickness(mousePos.X, mousePos.Y, 0, 0);
             EditPopup.Visibility = Visibility.Visible;
         }
@@ -89,6 +93,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             try
             {
+                // 写入数据将自动触发 UpdateGeometry，并级联触发 UpdateChannelVisuals
                 if (_editingEntity is AxonVisual axon)
                 {
                     if (double.TryParse(TbLength.Text, out double l)) axon.Length = l;
@@ -113,11 +118,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         #endregion
 
-        // ... 以下为事件转发，保持不变 ...
+        #region Viewport Input Routing
+
         private void OnViewportMouseDown(object sender, MouseButtonEventArgs e) => _interactionController.OnMouseDown(sender, e);
         private void OnViewportMouseMove(object sender, MouseEventArgs e) => _interactionController.OnMouseMove(sender, e);
         private void OnViewportMouseUp(object sender, MouseButtonEventArgs e) => _interactionController.OnMouseUp(sender, e);
         private void OnViewportMouseWheel(object sender, MouseWheelEventArgs e) => _interactionController.OnMouseWheel(sender, e);
+
+        #endregion
+
+        #region Toolbar Actions
 
         private void OnAddSomaClick(object sender, RoutedEventArgs e)
         {
@@ -132,5 +142,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var newAxon = new AxonVisual(start, end, 0.5, Colors.LimeGreen);
             _interactionController.StartPlacing(newAxon);
         }
+
+        #endregion
     }
 }

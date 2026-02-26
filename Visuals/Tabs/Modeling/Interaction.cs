@@ -4,7 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
-using System.Windows.Media; // <--- 添加此行
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
@@ -19,11 +19,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         DraggingConnectionEndpoint,
         SelectingConnectionTarget
     }
+    
     public enum VisualDisplayMode
     {
         Normal,
-        Wireframe //透明 框架 万向轮
-
+        Wireframe // 透明 框架 万向轮
     }
 
     public class InteractionController
@@ -50,11 +50,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         // 拖拽端点用
         private string? _dragConnId;
-        private bool _dragEndIsA; // true=拖A端，false=拖B端
+        private bool _dragEndIsA;
 
         // 右键 Connect 用
         private IVisualEntity? _connectSourceEntity;
         private SphereVisual3D? _dragSphere;
+
+        // ====== 状态变更事件总线 (新增) ======
+        public event Action<IVisualEntity> OnEntityAdded;
+        public event Action<IVisualEntity> OnEntityRemoved;
+        public event Action<IVisualEntity?> OnSelectionChanged;
 
         public InteractionController(ModelingPage page, ViewportController viewportController, HelixViewport3D helixViewport)
         {
@@ -65,17 +70,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _connectionController = new ConnectionController(_helixViewport);
         }
 
-        // a
-
         #region Public API
         public void StartPlacing(IVisualEntity newEntity)
         {
             if (_currentState != InteractionState.Idle) return;
             _activeEntity = newEntity;
-            // 放置时关闭自身HitTest，防止射线检测到自己
             _activeEntity.SetHitTestVisible(false);
             _helixViewport.Children.Add(_activeEntity.Visual3D);
-            // children加入场景
             _currentState = InteractionState.Placing;
             _activeEntity.SetSelected(true);
         }
@@ -84,10 +85,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         {
             if (_activeEntity != null && _entities.Contains(_activeEntity))
             {
+                var target = _activeEntity;
                 HideGimbal();
-                _helixViewport.Children.Remove(_activeEntity.Visual3D);
-                _entities.Remove(_activeEntity);
+                _helixViewport.Children.Remove(target.Visual3D);
+                _entities.Remove(target);
                 _activeEntity = null;
+                
+                // 触发数据流事件：通知实体移除并清空当前选中项
+                OnEntityRemoved?.Invoke(target);
+                OnSelectionChanged?.Invoke(null);
             }
         }
 
@@ -98,9 +104,31 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 HideGimbal();
                 _currentState = InteractionState.Moving;
                 _activeEntity.SetSelected(true);
-                // 移动时也要暂时忽略自身的 HitTest
                 _activeEntity.SetHitTestVisible(false);
             }
+        }
+
+        // ====== 新增：供面板反向调用的强行选中 API ======
+        public void ForceSelect(IVisualEntity? entity)
+        {
+            // 1. 清理旧状态
+            if (_activeEntity != null && _activeEntity != entity)
+            {
+                _activeEntity.SetSelected(false);
+                HideGimbal();
+            }
+
+            // 2. 挂载新状态
+            _activeEntity = entity;
+
+            if (_activeEntity != null)
+            {
+                _activeEntity.SetSelected(true);
+                ShowGimbal(_activeEntity);
+            }
+
+            // 3. 广播状态更新
+            OnSelectionChanged?.Invoke(_activeEntity);
         }
         #endregion
 
@@ -110,7 +138,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _mouseDownPos = e.GetPosition(_helixViewport);
             _isDraggingViewport = false;
 
-            // Idle + 左键：优先看是否点到了连接端点球
             if (_currentState == InteractionState.Idle && e.ChangedButton == MouseButton.Left)
             {
                 if (TryBeginDragConnectionEndpoint(_mouseDownPos))
@@ -120,7 +147,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 }
             }
 
-            // 你原来的 placing/moving confirm/cancel 逻辑...
             if (_currentState == InteractionState.Placing || _currentState == InteractionState.Moving)
             {
                 e.Handled = true;
@@ -143,7 +169,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             if (_currentState == InteractionState.Placing || _currentState == InteractionState.Moving)
             {
                 UpdateObjectPosition(mousePos);
-                _connectionController.UpdateAll(); // 实体在动，连接跟着更新（先用粗暴版）
+                _connectionController.UpdateAll();
             }
             else if (_currentState == InteractionState.Idle)
             {
@@ -156,7 +182,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
-            // 1) 拖拽端点：MouseUp 结束拖拽
             if (_currentState == InteractionState.DraggingConnectionEndpoint)
             {
                 if (_dragSphere != null)
@@ -169,7 +194,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 return;
             }
 
-            // 2) 选择连接目标：左键选择目标，右键取消
             if (_currentState == InteractionState.SelectingConnectionTarget)
             {
                 if (e.ChangedButton == MouseButton.Right)
@@ -199,16 +223,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                         }
                     }
 
-                    // 无论成功与否都退出，避免卡住
                     _connectSourceEntity = null;
                     _currentState = InteractionState.Idle;
-
                     e.Handled = true;
                     return;
                 }
             }
 
-            // 3) 其它状态：保持你原有逻辑
             if (_currentState != InteractionState.Idle) return;
             if (_isDraggingViewport) { _isDraggingViewport = false; return; }
 
@@ -248,37 +269,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             return hit?.Position;
         }
 
-        public void OnMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            // CTRL-based Z offset adjustment removed; use the gimbal for component translations
-        }
+        public void OnMouseWheel(object sender, MouseWheelEventArgs e) { }
         #endregion
 
         #region Core Logic
 
-        //更新十字准星和 HUD
         private void UpdateCrosshair(Point mousePos)
         {
-            // 发射射线寻找最近的物体表面
             var hits = _helixViewport.Viewport.FindHits(mousePos);
-
-            // 排除正在放置的物体(如果有)
             var validHit = hits?.FirstOrDefault(h => _activeEntity == null || !IsSelfOrChild(h.Visual, _activeEntity.Visual3D));
-
-            Point3D? worldPos = null;
-
-            if (validHit != null)
-            {
-                // 如果击中物体，显示接触点
-                worldPos = validHit.Position;
-            }
-            else
-            {
-                // 如果没击中，显示网格平面上的点 (Z=0)
-                // 注意：这里用 Z=0 而不是 _gridZOffset，因为准星是测量工具，通常测量绝对坐标
-                worldPos = _viewportController.UnProjectToZPlane(mousePos, 0);
-            }
-
+            Point3D? worldPos = validHit?.Position ?? _viewportController.UnProjectToZPlane(mousePos, 0);
             _page.UpdateCursorInfo(mousePos, worldPos);
         }
 
@@ -287,23 +287,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             if (_dragConnId == null) return;
             if (!_connectionController.ConnectionsById.TryGetValue(_dragConnId, out var conn)) return;
 
-            // 端点 A 只能落在 A 实体上；端点 B 只能落在 B 实体上
             var targetEntity = _dragEndIsA ? conn.A : conn.B;
-            if (targetEntity is not Visuals.IAnchoredEntity anchoredTarget)
-                return;
+            if (targetEntity is not Visuals.IAnchoredEntity anchoredTarget) return;
 
             var hits = _helixViewport.Viewport.FindHits(mousePos);
             if (hits == null || hits.Count == 0) return;
 
-            // 找到命中 targetEntity.Visual3D 的最近 hit
-            var hit = hits
-                .OrderBy(h => h.Distance)
-                .FirstOrDefault(h => IsSelfOrChild(h.Visual, targetEntity.Visual3D));
-
+            var hit = hits.OrderBy(h => h.Distance).FirstOrDefault(h => IsSelfOrChild(h.Visual, targetEntity.Visual3D));
             if (hit == null) return;
 
-            if (!anchoredTarget.TryWorldPointToAnchor(hit.Position, out var newAnchor))
-                return;
+            if (!anchoredTarget.TryWorldPointToAnchor(hit.Position, out var newAnchor)) return;
 
             if (_dragEndIsA) conn.AnchorA = newAnchor;
             else conn.AnchorB = newAnchor;
@@ -312,7 +305,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         private void UpdateObjectPosition(Point mousePos)
-        {//吸附 移动到命中点
+        {
             if (_activeEntity == null) return;
 
             var allHits = _helixViewport.Viewport.FindHits(mousePos);
@@ -340,7 +333,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
-        // 逻辑更新1：放置后自动放弃选中
         private void ConfirmAction()
         {
             if (_activeEntity == null) return;
@@ -348,6 +340,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             if (_currentState == InteractionState.Placing)
             {
                 _entities.Add(_activeEntity);
+                
+                // 触发数据流事件：通知面板新建节点
+                OnEntityAdded?.Invoke(_activeEntity);
 
                 if (_placingTargetEntity != null && _placingTargetPoint.HasValue)
                 {
@@ -370,17 +365,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _placingTargetPoint = null;
             }
 
-            // 恢复 HitTest 可见性
             _activeEntity.SetHitTestVisible(true);
-
-            // 自动放弃选中 (需求1)
             _activeEntity.SetSelected(false);
             HideGimbal();
-            _activeEntity = null; // 清空当前指针
+            _activeEntity = null;
 
             _currentState = InteractionState.Idle;
-            // Fix double-click: the second click of the double-click must not re-select the just-placed entity
             _suppressNextHitTest = true;
+            
+            // 放置完毕后，重置选中状态
+            OnSelectionChanged?.Invoke(null);
         }
 
         private void CancelAction()
@@ -392,16 +386,17 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else if (_currentState == InteractionState.Moving && _activeEntity != null)
             {
-                // 移动取消时，也要恢复 HitTest
                 _activeEntity.SetHitTestVisible(true);
                 HideGimbal();
-                // 暂时回到 Idle，位置可能没复原(需 Memento)
             }
             _currentState = InteractionState.Idle;
+            
+            // 取消操作后可能恢复或清空选中
+            OnSelectionChanged?.Invoke(_activeEntity);
         }
+
         private void PerformHitTest(Point mousePos)
         {
-            // 如果点到了 gimbal，交给 gimbal 自己处理（不要更改选中）
             if (_gimbal != null)
             {
                 var hits = _helixViewport.Viewport.FindHits(mousePos);
@@ -409,9 +404,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 if (gimbalHit != null) return;
             }
 
-            // 原逻辑：清空旧选中并隐藏 gimbal
-            if (_activeEntity != null) { _activeEntity.SetSelected(false); HideGimbal(); _activeEntity = null; }
-
+            IVisualEntity? hitEntity = null;
             var hits2 = _helixViewport.Viewport.FindHits(mousePos);
             if (hits2 != null && hits2.Count > 0)
             {
@@ -420,13 +413,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 {
                     if (IsSelfOrChild(nearest.Visual, entity.Visual3D))
                     {
-                        _activeEntity = entity;
-                        _activeEntity.SetSelected(true);
-                        ShowGimbal(_activeEntity);
+                        hitEntity = entity;
                         break;
                     }
                 }
             }
+
+            // 修改原逻辑：使用 ForceSelect 统一接管渲染状态变换与事件抛出
+            ForceSelect(hitEntity);
         }
 
         private bool IsSelfOrChild(Visual3D hitVisual, Visual3D selfVisual)
@@ -445,17 +439,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         {
             HideGimbal();
             entity.SetHitTestVisible(false);
-            //entity.SetOpacity(0.5);
             entity.SetDisplayMode(VisualDisplayMode.Wireframe);
             _gimbal = new CombinedManipulator
             {
                 Diameter = 5,
-                CanTranslateX = true,
-                CanTranslateY = true,
-                CanTranslateZ = true,
-                CanRotateX = true,
-                CanRotateY = true,
-                CanRotateZ = true
+                CanTranslateX = true, CanTranslateY = true, CanTranslateZ = true,
+                CanRotateX = true, CanRotateY = true, CanRotateZ = true
             };
             _gimbal.Bind(entity.Visual3D);
             _helixViewport.Children.Add(_gimbal);
@@ -471,34 +460,25 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             if (_activeEntity != null)
             {
-                //_activeEntity.SetOpacity(1.0);
                 _activeEntity.SetDisplayMode(VisualDisplayMode.Normal);
                 _activeEntity.SetHitTestVisible(true);
             }
         }
 
-        // 逻辑更新3：右键菜单增加 Resize 选项
         private void ShowContextMenu()
         {
             var contextMenu = new ContextMenu();
 
-            // 移动
             var moveItem = new MenuItem { Header = "Move" };
             moveItem.Click += (s, e) => StartMovingSelected();
 
-            // 调整尺寸 (Resize)
             var resizeItem = new MenuItem { Header = "Resize..." };
             resizeItem.Click += (s, e) =>
             {
                 if (_activeEntity == null) return;
-                // 获取鼠标位置以显示弹窗
                 var mousePos = Mouse.GetPosition(_page);
                 _page.ShowEditPopup(_activeEntity, mousePos);
             };
-
-            // 删除
-            var deleteItem = new MenuItem { Header = "Delete" };
-            deleteItem.Click += (s, e) => DeleteSelected();
 
             var connectItem = new MenuItem { Header = "Connect" };
             connectItem.Click += (s, e) =>
@@ -507,6 +487,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _connectSourceEntity = _activeEntity;
                 _currentState = InteractionState.SelectingConnectionTarget;
             };
+
+            var deleteItem = new MenuItem { Header = "Delete" };
+            deleteItem.Click += (s, e) => DeleteSelected();
 
             contextMenu.Items.Add(moveItem);
             contextMenu.Items.Add(resizeItem);
@@ -523,7 +506,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var hits = _helixViewport.Viewport.FindHits(mousePos);
             if (hits == null || hits.Count == 0) return false;
 
-            // 从近到远检查命中的是不是某个端点球
             foreach (var h in hits.OrderBy(x => x.Distance))
             {
                 foreach (var kv in _connectionController.VisualsById)
@@ -536,7 +518,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                         _dragConnId = id;
                         _dragEndIsA = true;
                         _dragSphere = vis.EndA;
-                        vis.EndA.Fill = System.Windows.Media.Brushes.OrangeRed; // 高亮色
+                        vis.EndA.Fill = System.Windows.Media.Brushes.OrangeRed;
                         _currentState = InteractionState.DraggingConnectionEndpoint;
                         return true;
                     }
