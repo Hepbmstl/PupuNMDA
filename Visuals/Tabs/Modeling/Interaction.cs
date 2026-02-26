@@ -34,27 +34,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private InteractionState _currentState = InteractionState.Idle;
         private List<IVisualEntity> _entities = new List<IVisualEntity>();
-        private IVisualEntity? _activeEntity;
+        private IVisualEntity? _activeEntity; 
 
         private Point _mouseDownPos;
         private bool _isDraggingViewport = false;
         private bool _suppressNextHitTest = false;
 
         private CombinedManipulator _gimbal;
-
-        private readonly ConnectionController _connectionController;
-
-        // placing 自动连线用：缓存“当前鼠标下命中的目标实体/接触点”
-        private IVisualEntity? _placingTargetEntity;
-        private Point3D? _placingTargetPoint;
-
-        // 拖拽端点用
-        private string? _dragConnId;
-        private bool _dragEndIsA; // true=拖A端，false=拖B端
-
-        // 右键 Connect 用
-        private IVisualEntity? _connectSourceEntity;
-        private SphereVisual3D? _dragSphere;
 
         public InteractionController(ModelingPage page, ViewportController viewportController, HelixViewport3D helixViewport)
         {
@@ -225,31 +211,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private IVisualEntity? HitTestEntity(Point mousePos)
         {
-            var hits = _helixViewport.Viewport.FindHits(mousePos);
-            if (hits == null || hits.Count == 0) return null;
-
-            var nearest = hits.OrderBy(h => h.Distance).First();
-            foreach (var entity in _entities)
-            {
-                if (IsSelfOrChild(nearest.Visual, entity.Visual3D))
-                    return entity;
-            }
-            return null;
-        }
-
-        private Point3D? HitTestPointOnEntity(Point mousePos, IVisualEntity entity)
-        {
-            var hits = _helixViewport.Viewport.FindHits(mousePos);
-            if (hits == null || hits.Count == 0) return null;
-
-            var hit = hits.OrderBy(h => h.Distance)
-                          .FirstOrDefault(h => IsSelfOrChild(h.Visual, entity.Visual3D));
-
-            return hit?.Position;
-        }
-
-        public void OnMouseWheel(object sender, MouseWheelEventArgs e)
-        {
             // CTRL-based Z offset adjustment removed; use the gimbal for component translations
         }
         #endregion
@@ -327,8 +288,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else
             {
-                _placingTargetEntity = null;
-                _placingTargetPoint = null;
                 Vector3D planeNormal = new Vector3D(0, 0, 1);
                 var hitPoint = _viewportController.UnProjectToZPlane(mousePos, 0);
 
@@ -392,22 +351,17 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else if (_currentState == InteractionState.Moving && _activeEntity != null)
             {
-                // 移动取消时，也要恢复 HitTest
-                _activeEntity.SetHitTestVisible(true);
-                HideGimbal();
-                // 暂时回到 Idle，位置可能没复原(需 Memento)
+                 // 移动取消时，也要恢复 HitTest
+                 _activeEntity.SetHitTestVisible(true);
+                 HideGimbal();
+                 // 暂时回到 Idle，位置可能没复原(需 Memento)
             }
             _currentState = InteractionState.Idle;
         }
         private void PerformHitTest(Point mousePos)
         {
-            // 如果点到了 gimbal，交给 gimbal 自己处理（不要更改选中）
-            if (_gimbal != null)
-            {
-                var hits = _helixViewport.Viewport.FindHits(mousePos);
-                var gimbalHit = hits?.FirstOrDefault(h => IsSelfOrChild(h.Visual, _gimbal));
-                if (gimbalHit != null) return;
-            }
+            // 先清空旧的选中并隐藏 gimbal
+            if (_activeEntity != null) { _activeEntity.SetSelected(false); HideGimbal(); _activeEntity = null; }
 
             // 原逻辑：清空旧选中并隐藏 gimbal
             if (_activeEntity != null) { _activeEntity.SetSelected(false); HideGimbal(); _activeEntity = null; }
@@ -423,7 +377,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                         _activeEntity = entity;
                         _activeEntity.SetSelected(true);
                         ShowGimbal(_activeEntity);
-                        break;
+                        break; // 选中一个即可
                     }
                 }
             }
@@ -444,9 +398,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private void ShowGimbal(IVisualEntity entity)
         {
             HideGimbal();
-            entity.SetHitTestVisible(false);
-            //entity.SetOpacity(0.5);
-            entity.SetDisplayMode(VisualDisplayMode.Wireframe);
             _gimbal = new CombinedManipulator
             {
                 Diameter = 5,
@@ -468,12 +419,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _gimbal.UnBind();
                 _helixViewport.Children.Remove(_gimbal);
                 _gimbal = null;
-            }
-            if (_activeEntity != null)
-            {
-                //_activeEntity.SetOpacity(1.0);
-                _activeEntity.SetDisplayMode(VisualDisplayMode.Normal);
-                _activeEntity.SetHitTestVisible(true);
             }
         }
 
