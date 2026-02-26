@@ -161,7 +161,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             _channelVisuals.Clear();
 
             // 2. 拦截空数据
-            if (MainModel.Geometry is not MeshGeometry3D mesh || 
+            if (MainModel.Geometry is not MeshGeometry3D mesh ||
                 mesh.Positions == null || mesh.TriangleIndices == null || mesh.Positions.Count == 0)
                 return;
 
@@ -182,7 +182,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 Vector3D v1 = p1 - p0;
                 Vector3D v2 = p2 - p0;
                 double area = Vector3D.CrossProduct(v1, v2).Length * 0.5;
-                
+
                 totalArea += area;
                 cumulativeAreas[i] = totalArea;
             }
@@ -278,7 +278,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 EnsureWireframe();
                 RebuildWireframeFromCurrentMesh();
             }
-            
+
             // 当尺寸（半径、长度）修改触发网格变更时，必须强制同步点云数据
             UpdateChannelVisuals();
         }
@@ -329,7 +329,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         protected abstract void UpdateGeometry();
     }
 
-    public enum AnchorMode { AxonCylinder, SomaCylinder, SomaUniform }
+    public enum AnchorMode
+    {
+        AxonCylinder,
+        SomaCylinder,
+        SomaUniform,
+        AxonCapStart,
+        AxonCapEnd
+    }
 
     public sealed class AnchorRef
     {

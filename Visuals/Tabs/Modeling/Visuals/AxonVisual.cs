@@ -9,6 +9,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     {
         private double _length;
         private double _radius;
+        private double _lastAnchorAngle = 0.0;
 
         // Length is stored directly; geometry is along local Z axis
         public double Length
@@ -78,10 +79,63 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         protected override void UpdateGeometry()
         {
-            // Geometry is built along local Z axis from (0,0,0) to (0,0,_length)
             var builder = new MeshBuilder();
+            // 先构建圆柱侧面
             builder.AddCylinder(new Point3D(0, 0, 0), new Point3D(0, 0, _length), _radius * 2, 18);
-            MainModel.Geometry = builder.ToMesh();
+            
+            // 获取生成的网格结构并进行盖板面的硬拓扑追加
+            var mesh = builder.ToMesh();
+            bool hasNormals = mesh.Normals != null && mesh.Normals.Count > 0;
+
+            int startIndex = mesh.Positions.Count;
+            
+            // 压入顶/底面中心点
+            mesh.Positions.Add(new Point3D(0, 0, 0));
+            if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
+
+            mesh.Positions.Add(new Point3D(0, 0, _length));
+            if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
+
+            // 压入顶/底面边缘点
+            int capVertsStart = startIndex + 2;
+            for (int i = 0; i < 18; i++)
+            {
+                double angle = 2 * Math.PI * i / 18;
+                double x = _radius * Math.Cos(angle);
+                double y = _radius * Math.Sin(angle);
+                mesh.Positions.Add(new Point3D(x, y, 0));
+                if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
+            }
+
+            int capVertsEnd = mesh.Positions.Count;
+            for (int i = 0; i < 18; i++)
+            {
+                double angle = 2 * Math.PI * i / 18;
+                double x = _radius * Math.Cos(angle);
+                double y = _radius * Math.Sin(angle);
+                mesh.Positions.Add(new Point3D(x, y, _length));
+                if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
+            }
+
+            // 压入三角面索引，基于顶点序列进行缠绕
+            int centerStartIdx = startIndex;
+            int centerEndIdx = startIndex + 1;
+
+            for (int i = 0; i < 18; i++)
+            {
+                int next = (i + 1) % 18;
+                // 底面 (Z=0)：朝向 -Z
+                mesh.TriangleIndices.Add(centerStartIdx);
+                mesh.TriangleIndices.Add(capVertsStart + next);
+                mesh.TriangleIndices.Add(capVertsStart + i);
+
+                // 顶面 (Z=Length)：朝向 +Z
+                mesh.TriangleIndices.Add(centerEndIdx);
+                mesh.TriangleIndices.Add(capVertsEnd + i);
+                mesh.TriangleIndices.Add(capVertsEnd + next);
+            }
+
+            MainModel.Geometry = mesh;
             NotifyGeometryChanged();
         }
 
@@ -89,7 +143,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         {
             anchor = new AnchorRef { Mode = AnchorMode.AxonCylinder, AxialT = 0.5, Angle = 0.0 };
 
-            // Transform 可能为空或不可逆，做保护
             if (Visual3D.Transform == null) return false;
             var inv = Visual3D.Transform.Value;
             if (!inv.HasInverse) return false;
@@ -97,15 +150,29 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             var local = inv.Transform(worldPoint);
 
-            // 轴向参数：local.Z / Length
+            // 接触域阈值判定：一旦击中点逼近 Z=0 或 Z=Length 阈值内，直接定义为盖板模式并强制吸附到轴心
+            if (local.Z <= 1e-3)
+            {
+                anchor.Mode = AnchorMode.AxonCapStart;
+                anchor.AxialT = 0.0;
+                anchor.Angle = 0.0;
+                return true;
+            }
+            if (local.Z >= _length - 1e-3)
+            {
+                anchor.Mode = AnchorMode.AxonCapEnd;
+                anchor.AxialT = 1.0;
+                anchor.Angle = 0.0;
+                return true;
+            }
+
+            // 余下按圆柱侧面状态集计算处理
             var t = _length <= 1e-9 ? 0.5 : local.Z / _length;
             t = Math.Clamp(t, 0.0, 1.0);
 
-            // 圆周角：atan2(y,x)
             double angle;
             double r2 = local.X * local.X + local.Y * local.Y;
 
-            // 在圆柱轴线附近 angle 不稳定：用上一次角度，避免跳到“里面/另一侧”
             if (r2 < 1e-6)
             {
                 angle = _lastAnchorAngle;
@@ -116,7 +183,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 _lastAnchorAngle = angle;
             }
 
-
             anchor.Mode = AnchorMode.AxonCylinder;
             anchor.AxialT = t;
             anchor.Angle = angle;
@@ -126,16 +192,29 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint)
         {
             worldPoint = new Point3D();
-
             if (Visual3D.Transform == null) return false;
 
-            double r = GetMeshRadiusFallbackToField();
-            // 落在表面：x = r cos, y = r sin, z = t*Length
-            double z = Math.Clamp(anchor.AxialT, 0.0, 1.0) * _length;
-            double x = r * Math.Cos(anchor.Angle);
-            double y = r * Math.Sin(anchor.Angle);
+            Point3D local;
 
-            var local = new Point3D(x, y, z);
+            // 坐标还原：根据已存储的模式流分配正确的相对坐标
+            if (anchor.Mode == AnchorMode.AxonCapStart)
+            {
+                local = new Point3D(0, 0, 0); // 固定返回底部中心
+            }
+            else if (anchor.Mode == AnchorMode.AxonCapEnd)
+            {
+                local = new Point3D(0, 0, _length); // 固定返回顶部中心
+            }
+            else
+            {
+                // 圆柱侧面状态下恢复柱坐标
+                double r = GetMeshRadiusFallbackToField();
+                double z = Math.Clamp(anchor.AxialT, 0.0, 1.0) * _length;
+                double x = r * Math.Cos(anchor.Angle);
+                double y = r * Math.Sin(anchor.Angle);
+                local = new Point3D(x, y, z);
+            }
+
             worldPoint = Visual3D.Transform.Transform(local);
             return true;
         }
