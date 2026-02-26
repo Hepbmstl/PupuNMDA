@@ -34,7 +34,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private InteractionState _currentState = InteractionState.Idle;
         private List<IVisualEntity> _entities = new List<IVisualEntity>();
-        private IVisualEntity? _activeEntity;
+        private IVisualEntity? _activeEntity; 
 
         private Point _mouseDownPos;
         private bool _isDraggingViewport = false;
@@ -50,16 +50,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         // 拖拽端点用
         private string? _dragConnId;
-        private bool _dragEndIsA;
+        private bool _dragEndIsA; // true=拖A端，false=拖B端
 
         // 右键 Connect 用
         private IVisualEntity? _connectSourceEntity;
         private SphereVisual3D? _dragSphere;
-
-        // ====== 状态变更事件总线 (新增) ======
-        public event Action<IVisualEntity> OnEntityAdded;
-        public event Action<IVisualEntity> OnEntityRemoved;
-        public event Action<IVisualEntity?> OnSelectionChanged;
 
         public InteractionController(ModelingPage page, ViewportController viewportController, HelixViewport3D helixViewport)
         {
@@ -269,7 +264,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             return hit?.Position;
         }
 
-        public void OnMouseWheel(object sender, MouseWheelEventArgs e) { }
+        public void OnMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            // CTRL-based Z offset adjustment removed; use the gimbal for component translations
+        }
         #endregion
 
         #region Core Logic
@@ -320,8 +318,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else
             {
-                _placingTargetEntity = null;
-                _placingTargetPoint = null;
                 Vector3D planeNormal = new Vector3D(0, 0, 1);
                 var hitPoint = _viewportController.UnProjectToZPlane(mousePos, 0);
 
@@ -386,8 +382,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             else if (_currentState == InteractionState.Moving && _activeEntity != null)
             {
+                // 移动取消时，也要恢复 HitTest
                 _activeEntity.SetHitTestVisible(true);
                 HideGimbal();
+                // 暂时回到 Idle，位置可能没复原(需 Memento)
             }
             _currentState = InteractionState.Idle;
             
@@ -397,6 +395,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private void PerformHitTest(Point mousePos)
         {
+            // 如果点到了 gimbal，交给 gimbal 自己处理（不要更改选中）
             if (_gimbal != null)
             {
                 var hits = _helixViewport.Viewport.FindHits(mousePos);
@@ -413,7 +412,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 {
                     if (IsSelfOrChild(nearest.Visual, entity.Visual3D))
                     {
-                        hitEntity = entity;
+                        _activeEntity = entity;
+                        _activeEntity.SetSelected(true);
+                        ShowGimbal(_activeEntity);
                         break;
                     }
                 }
@@ -439,6 +440,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         {
             HideGimbal();
             entity.SetHitTestVisible(false);
+            //entity.SetOpacity(0.5);
             entity.SetDisplayMode(VisualDisplayMode.Wireframe);
             _gimbal = new CombinedManipulator
             {
@@ -460,6 +462,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             if (_activeEntity != null)
             {
+                //_activeEntity.SetOpacity(1.0);
                 _activeEntity.SetDisplayMode(VisualDisplayMode.Normal);
                 _activeEntity.SetHitTestVisible(true);
             }
