@@ -5,7 +5,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
-//using Popup = NeuronCAD.Visuals.Tabs.Modeling.Visuals.Popup;
 using System.Windows.Controls.Primitives;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling
@@ -14,11 +13,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
     {
         private ViewportController _viewportController = null!;
         private InteractionController _interactionController = null!;
-
-        // 声明左侧面板属性控制器，持有 UI 生命周期引用
         private PropertiesPanelController _propertiesPanelController = null!;
-
-        // 快捷编辑弹窗追踪的实体状态
         private IVisualEntity? _editingEntity;
 
         public ModelingPage()
@@ -29,12 +24,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private void InitializeControllers()
         {
-            // 1. 初始化视口与交互控制器
             _viewportController = new ViewportController(MainViewport);
             _interactionController = new InteractionController(this, _viewportController, MainViewport);
 
-            // 2. 挂载左侧面板及 Popup 弹窗状态
-            // 将 XAML 中的容器组件实例传递给面板控制器，由其接管后续的 DOM 增删操作
             _propertiesPanelController = new PropertiesPanelController(
                 PropertiesPanelContainer,
                 ChannelSelectorPopup,
@@ -69,17 +61,26 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         {
             _editingEntity = entity;
 
+            var panelTopRadius = this.FindName("PanelTopRadius") as FrameworkElement;
+            var tbTopRadius = this.FindName("TbTopRadius") as TextBox;
+
+            // 由于 DendVisual 继承自 AxonVisual，此判定依然涵盖两种物体
             if (entity is AxonVisual axon)
             {
                 PanelAxonLength.Visibility = Visibility.Visible;
                 PanelRadius.Visibility = Visibility.Visible;
+                if (panelTopRadius != null) panelTopRadius.Visibility = Visibility.Visible;
+
                 TbLength.Text = axon.Length.ToString("F2");
-                TbRadius.Text = axon.Radius.ToString("F2");
+                TbRadius.Text = axon.BaseRadius.ToString("F2"); 
+                if (tbTopRadius != null) tbTopRadius.Text = axon.TopRadius.ToString("F2");
             }
             else if (entity is SomaVisual soma)
             {
                 PanelAxonLength.Visibility = Visibility.Collapsed;
                 PanelRadius.Visibility = Visibility.Visible;
+                if (panelTopRadius != null) panelTopRadius.Visibility = Visibility.Collapsed;
+
                 TbRadius.Text = soma.Radius.ToString("F2");
             }
 
@@ -93,11 +94,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             try
             {
-                // 写入数据将自动触发 UpdateGeometry，并级联触发 UpdateChannelVisuals
+                var tbTopRadius = this.FindName("TbTopRadius") as TextBox;
+
                 if (_editingEntity is AxonVisual axon)
                 {
                     if (double.TryParse(TbLength.Text, out double l)) axon.Length = l;
-                    if (double.TryParse(TbRadius.Text, out double r)) axon.Radius = r;
+                    if (double.TryParse(TbRadius.Text, out double br)) axon.BaseRadius = br;
+                    
+                    if (tbTopRadius != null && double.TryParse(tbTopRadius.Text, out double tr)) 
+                        axon.TopRadius = tr;
                 }
                 else if (_editingEntity is SomaVisual soma)
                 {
@@ -139,8 +144,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         {
             var start = new Point3D(0, 0, 0);
             var end = new Point3D(0, 0, 5);
-            var newAxon = new AxonVisual(start, end, 0.5, Colors.LimeGreen);
+            var newAxon = new AxonVisual(start, end, 0.5, Colors.LimeGreen); 
             _interactionController.StartPlacing(newAxon);
+        }
+
+        // 新增的添加 Dend 的按键绑定函数
+        private void OnAddDendClick(object sender, RoutedEventArgs e)
+        {
+            var start = new Point3D(0, 0, 0);
+            var end = new Point3D(0, 0, 5);
+            // 这里我们使用 DendVisual 套壳类，可以给它分配一个紫色以便做视觉区分
+            var newDend = new DendVisual(start, end, 0.5, Colors.MediumPurple); 
+            _interactionController.StartPlacing(newDend);
         }
 
         #endregion

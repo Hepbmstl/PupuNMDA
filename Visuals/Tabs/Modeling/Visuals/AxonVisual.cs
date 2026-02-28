@@ -7,24 +7,32 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
     public class AxonVisual : VisualEntityBase, IAnchoredEntity
     {
+        // 新增类别标识字段
+        public string VisualType { get; private set; }
+
         private double _length;
-        private double _radius;
+        private double _baseRadius;
+        private double _topRadius;
         private double _lastAnchorAngle = 0.0;
 
-        // Length is stored directly; geometry is along local Z axis
         public double Length
         {
             get => _length;
             set { _length = value; UpdateGeometry(); }
         }
 
-        public double Radius
+        public double BaseRadius
         {
-            get => _radius;
-            set { _radius = value; UpdateGeometry(); }
+            get => _baseRadius;
+            set { _baseRadius = value; UpdateGeometry(); }
         }
 
-        // CenterPosition is the midpoint of the local Z-axis cylinder, transformed to world space
+        public double TopRadius
+        {
+            get => _topRadius;
+            set { _topRadius = value; UpdateGeometry(); }
+        }
+
         public override Point3D CenterPosition
         {
             get
@@ -34,24 +42,27 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             }
         }
 
-        public AxonVisual(Point3D start, Point3D end, double radius, Color color) : base()
+        // 构造函数新增 visualType 传入变量
+        public AxonVisual(Point3D start, Point3D end, double radius, Color color, string visualType = "Axon") : base()
         {
+            VisualType = visualType;
             var direction = end - start;
             _length = direction.Length > 0 ? direction.Length : 1.0;
-            _radius = radius;
+            _baseRadius = radius;
+            _topRadius = radius;
+            
             SetColor(color);
             UpdateGeometry();
-            // Use a default direction when start == end to avoid normalizing a zero vector in AlignTo
+            
             var alignNormal = direction.Length > 0 ? direction : new Vector3D(0, 0, 1);
             AlignTo(start, alignNormal);
         }
 
-        public override void AlignTo(Point3D position, Vector3D normal) // 添加入画板当中
+        public override void AlignTo(Point3D position, Vector3D normal)
         {
             normal.Normalize();
             var localZ = new Vector3D(0, 0, 1);
 
-            // Build a rotation matrix that aligns local Z with the desired normal
             var matrix = Matrix3D.Identity;
             var axis = Vector3D.CrossProduct(localZ, normal);
             if (axis.LengthSquared > 1e-10)
@@ -62,74 +73,112 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             }
             else if (Vector3D.DotProduct(localZ, normal) < 0)
             {
-                // 180-degree flip
                 matrix.Rotate(new Quaternion(new Vector3D(1, 0, 0), 180));
             }
 
-            // Apply translation so the cylinder starts at 'position'
             matrix.Translate(new Vector3D(position.X, position.Y, position.Z));
             Visual3D.Transform = new MatrixTransform3D(matrix);
         }
 
-        // 实现抽象成员：使用 override
         public override string GetDimensionInfo()
         {
-            return $"Length: {_length:F2}, Radius: {_radius:F2}";
+            return $"L: {_length:F2}, BaseR: {_baseRadius:F2}, TopR: {_topRadius:F2}";
         }
 
         protected override void UpdateGeometry()
         {
-            var builder = new MeshBuilder();
-            // 先构建圆柱侧面
-            builder.AddCylinder(new Point3D(0, 0, 0), new Point3D(0, 0, _length), _radius * 2, 18);
-            
-            // 获取生成的网格结构并进行盖板面的硬拓扑追加
-            var mesh = builder.ToMesh();
-            bool hasNormals = mesh.Normals != null && mesh.Normals.Count > 0;
+            var mesh = new MeshGeometry3D();
+            bool hasNormals = true;
+            int segments = 18;
+
+            for (int i = 0; i < segments; i++)
+            {
+                double angle = 2 * Math.PI * i / segments;
+                double cos = Math.Cos(angle);
+                double sin = Math.Sin(angle);
+
+                mesh.Positions.Add(new Point3D(_baseRadius * cos, _baseRadius * sin, 0));
+                mesh.Positions.Add(new Point3D(_topRadius * cos, _topRadius * sin, _length));
+
+                double dz = _baseRadius - _topRadius;
+                double slopeLen = Math.Sqrt(dz * dz + _length * _length);
+                double nz = slopeLen > 0 ? dz / slopeLen : 0;
+                double nxy = slopeLen > 0 ? _length / slopeLen : 1;
+
+                mesh.Normals.Add(new Vector3D(cos * nxy, sin * nxy, nz));
+                mesh.Normals.Add(new Vector3D(cos * nxy, sin * nxy, nz));
+            }
+
+            for (int i = 0; i < segments; i++)
+            {
+                int next_i = (i + 1) % segments;
+                int b0 = i * 2;
+                int t0 = i * 2 + 1;
+                int b1 = next_i * 2;
+                int t1 = next_i * 2 + 1;
+
+                mesh.TriangleIndices.Add(b0);
+                mesh.TriangleIndices.Add(b1);
+                mesh.TriangleIndices.Add(t0);
+
+                mesh.TriangleIndices.Add(t0);
+                mesh.TriangleIndices.Add(b1);
+                mesh.TriangleIndices.Add(t1);
+            }
 
             int startIndex = mesh.Positions.Count;
             
-            // 压入顶/底面中心点
             mesh.Positions.Add(new Point3D(0, 0, 0));
             if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
 
             mesh.Positions.Add(new Point3D(0, 0, _length));
             if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
 
-            // 压入顶/底面边缘点
             int capVertsStart = startIndex + 2;
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < segments; i++)
             {
-                double angle = 2 * Math.PI * i / 18;
-                double x = _radius * Math.Cos(angle);
-                double y = _radius * Math.Sin(angle);
+                double angle = 2 * Math.PI * i / segments;
+                double x = _baseRadius * Math.Cos(angle);
+                double y = _baseRadius * Math.Sin(angle);
                 mesh.Positions.Add(new Point3D(x, y, 0));
                 if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
             }
 
             int capVertsEnd = mesh.Positions.Count;
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < segments; i++)
             {
-                double angle = 2 * Math.PI * i / 18;
-                double x = _radius * Math.Cos(angle);
-                double y = _radius * Math.Sin(angle);
+                double angle = 2 * Math.PI * i / segments;
+                double x = _topRadius * Math.Cos(angle);
+                double y = _topRadius * Math.Sin(angle);
                 mesh.Positions.Add(new Point3D(x, y, _length));
                 if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
             }
 
-            // 压入三角面索引，基于顶点序列进行缠绕
             int centerStartIdx = startIndex;
             int centerEndIdx = startIndex + 1;
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < segments; i++)
             {
-                int next = (i + 1) % 18;
-                // 底面 (Z=0)：朝向 -Z
+                int next = (i + 1) % segments;
                 mesh.TriangleIndices.Add(centerStartIdx);
                 mesh.TriangleIndices.Add(capVertsStart + next);
                 mesh.TriangleIndices.Add(capVertsStart + i);
 
-                // 顶面 (Z=Length)：朝向 +Z
+                mesh.TriangleIndices.Add(centerEndIdx);
+                mesh.TriangleIndices.Add(capVertsEnd + i);
+                mesh.TriangleIndices.Add(capVertsEnd + next);
+            }
+            
+            // 修正上方一点语法小错，替换成正确变量名：
+            for (int i = 0; i < segments; i++)
+            {
+                int next = (i + 1) % segments;
+                // 底面 (Z=0)
+                mesh.TriangleIndices.Add(centerStartIdx);
+                mesh.TriangleIndices.Add(capVertsStart + next);
+                mesh.TriangleIndices.Add(capVertsStart + i);
+
+                // 顶面 (Z=Length)
                 mesh.TriangleIndices.Add(centerEndIdx);
                 mesh.TriangleIndices.Add(capVertsEnd + i);
                 mesh.TriangleIndices.Add(capVertsEnd + next);
@@ -150,7 +199,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             var local = inv.Transform(worldPoint);
 
-            // 接触域阈值判定：一旦击中点逼近 Z=0 或 Z=Length 阈值内，直接定义为盖板模式并强制吸附到轴心
             if (local.Z <= 1e-3)
             {
                 anchor.Mode = AnchorMode.AxonCapStart;
@@ -166,7 +214,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 return true;
             }
 
-            // 余下按圆柱侧面状态集计算处理
             var t = _length <= 1e-9 ? 0.5 : local.Z / _length;
             t = Math.Clamp(t, 0.0, 1.0);
 
@@ -183,7 +230,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 _lastAnchorAngle = angle;
             }
 
-            anchor.Mode = AnchorMode.AxonCylinder;
+            anchor.Mode = AnchorMode.AxonCylinder; 
             anchor.AxialT = t;
             anchor.Angle = angle;
             return true;
@@ -196,20 +243,20 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             Point3D local;
 
-            // 坐标还原：根据已存储的模式流分配正确的相对坐标
             if (anchor.Mode == AnchorMode.AxonCapStart)
             {
-                local = new Point3D(0, 0, 0); // 固定返回底部中心
+                local = new Point3D(0, 0, 0);
             }
             else if (anchor.Mode == AnchorMode.AxonCapEnd)
             {
-                local = new Point3D(0, 0, _length); // 固定返回顶部中心
+                local = new Point3D(0, 0, _length);
             }
             else
             {
-                // 圆柱侧面状态下恢复柱坐标
-                double r = GetMeshRadiusFallbackToField();
-                double z = Math.Clamp(anchor.AxialT, 0.0, 1.0) * _length;
+                double t = Math.Clamp(anchor.AxialT, 0.0, 1.0);
+                double z = t * _length;
+                double r = _baseRadius + (_topRadius - _baseRadius) * t; 
+
                 double x = r * Math.Cos(anchor.Angle);
                 double y = r * Math.Sin(anchor.Angle);
                 local = new Point3D(x, y, z);
@@ -218,24 +265,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             worldPoint = Visual3D.Transform.Transform(local);
             return true;
         }
+    }
 
-        private double GetMeshRadiusFallbackToField()
+    // ====== 简单的 Dend 类套壳 ======
+    // 直接继承自 AxonVisual，在初始化时自动向父类注入 "Dend" 字符串
+    public class DendVisual : AxonVisual
+    {
+        public DendVisual(Point3D start, Point3D end, double radius, Color color) 
+            : base(start, end, radius, color, "Dend")
         {
-            if (MainModel.Geometry is MeshGeometry3D mesh && mesh.Positions != null && mesh.Positions.Count > 0)
-            {
-                double maxR2 = 0.0;
-                foreach (var p in mesh.Positions)
-                {
-                    double r2 = p.X * p.X + p.Y * p.Y;
-                    if (r2 > maxR2) maxR2 = r2;
-                }
-                var r = Math.Sqrt(maxR2);
-                if (r > 1e-9) return r;
-            }
-
-            return _radius;
         }
-
-
     }
 }

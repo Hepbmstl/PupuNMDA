@@ -16,10 +16,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private readonly Popup _channelPopup;
         private readonly StackPanel _channelSelectorList;
 
-        // UI 缓存字典：通过实体 ID 映射对应的 Expander 控件，实现 O(1) 的状态查找与销毁
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
-
-        // 状态缓存：记录当前正在执行“添加离子通道”操作的目标实体
         private IVisualEntity _currentOperatingEntity;
 
         public PropertiesPanelController(StackPanel container, Popup popup, StackPanel popupList, InteractionController interaction)
@@ -29,7 +26,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _channelSelectorList = popupList;
             _interaction = interaction;
 
-            // 挂载 Interaction 事件总线
             _interaction.OnEntityAdded += HandleEntityAdded;
             _interaction.OnEntityRemoved += HandleEntityRemoved;
             _interaction.OnSelectionChanged += HandleSelectionChanged;
@@ -37,7 +33,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             InitializeChannelSelector();
         }
 
-        // 初始化全局弹窗菜单：读取 GlobalBiophysics 字典，生成待选按钮
         private void InitializeChannelSelector()
         {
             _channelSelectorList.Children.Clear();
@@ -49,7 +44,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                     Background = new SolidColorBrush(Color.FromArgb(255, 60, 60, 60)),
                     Foreground = Brushes.White,
                     Margin = new Thickness(0, 2, 0, 2),
-                    Tag = kvp.Value // 将具体的 ChannelProperty 存入 Tag 传递给回调函数
+                    Tag = kvp.Value 
                 };
 
                 btn.Click += (s, e) =>
@@ -57,15 +52,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                     var ch = (ChannelProperty)((Button)s).Tag;
                     if (_currentOperatingEntity != null)
                     {
-                        // 校验该实体是否已存在同名通道
                         if (!_currentOperatingEntity.Channels.ContainsKey(ch.Name))
                         {
                             _currentOperatingEntity.Channels.Add(ch.Name, ch);
-                            _currentOperatingEntity.UpdateChannelVisuals(); // 触发 3D 视口重绘点云
-                            RefreshChannelList(_currentOperatingEntity);    // 触发面板 UI 列表刷新
+                            _currentOperatingEntity.UpdateChannelVisuals(); 
+                            RefreshChannelList(_currentOperatingEntity);    
                         }
                     }
-                    _channelPopup.IsOpen = false; // 关闭弹窗
+                    _channelPopup.IsOpen = false; 
                 };
                 _channelSelectorList.Children.Add(btn);
             }
@@ -89,7 +83,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         private void HandleSelectionChanged(IVisualEntity? selectedEntity)
         {
-            // 遍历所有 UI 节点，比对 ID，同步折叠/展开与高亮状态
             foreach (var kvp in _uiNodes)
             {
                 var entId = kvp.Key;
@@ -109,10 +102,19 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
-        // 核心装配：动态构建单个实体的控制面板
         private Expander BuildEntityNode(IVisualEntity entity)
         {
-            string entityType = entity is AxonVisual ? "Axon" : "Soma";
+            // 通过多态提取 VisualType（无论是 Axon 还是 Dend 都会正确返回自身定义的类别字符串）
+            string entityType = "Unknown";
+            if (entity is AxonVisual axon)
+            {
+                entityType = axon.VisualType; 
+            }
+            else if (entity is SomaVisual)
+            {
+                entityType = "Soma";
+            }
+
             var expander = new Expander
             {
                 Header = $"{entityType} [{entity.Id.Substring(0, 4)}]",
@@ -120,12 +122,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 Margin = new Thickness(0, 0, 0, 5)
             };
 
-            // 逆向同步：当用户手动展开面板时，强行让 3D 视口选中该物体
             expander.Expanded += (s, e) => _interaction.ForceSelect(entity);
 
             var panel = new StackPanel { Margin = new Thickness(10, 5, 0, 5) };
 
-            // 1. 颜色修改状态注入
             panel.Children.Add(new TextBlock { Text = "Color (Hex):", Foreground = Brushes.Gray });
             var tbColor = new TextBox { Text = entity.CurrentColor.ToString(), Background = Brushes.DarkGray, Foreground = Brushes.White };
             tbColor.LostFocus += (s, e) =>
@@ -139,17 +139,22 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             };
             panel.Children.Add(tbColor);
 
-            // 2. 尺寸修改状态注入 (模式匹配提取派生类特有属性)
-            if (entity is AxonVisual axon)
+            // AxonVisual 基类适配器 (包含了 Axon 与 Dend 的共有处理)
+            if (entity is AxonVisual axonEntity)
             {
-                panel.Children.Add(new TextBlock { Text = "Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbRadius = new TextBox { Text = axon.Radius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
-                tbRadius.LostFocus += (s, e) => { if (double.TryParse(tbRadius.Text, out double v)) axon.Radius = v; };
-                panel.Children.Add(tbRadius);
+                panel.Children.Add(new TextBlock { Text = "Base Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbBaseRadius = new TextBox { Text = axonEntity.BaseRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbBaseRadius.LostFocus += (s, e) => { if (double.TryParse(tbBaseRadius.Text, out double v)) axonEntity.BaseRadius = v; };
+                panel.Children.Add(tbBaseRadius);
+
+                panel.Children.Add(new TextBlock { Text = "Top Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbTopRadius = new TextBox { Text = axonEntity.TopRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbTopRadius.LostFocus += (s, e) => { if (double.TryParse(tbTopRadius.Text, out double v)) axonEntity.TopRadius = v; };
+                panel.Children.Add(tbTopRadius);
 
                 panel.Children.Add(new TextBlock { Text = "Length:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbLength = new TextBox { Text = axon.Length.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
-                tbLength.LostFocus += (s, e) => { if (double.TryParse(tbLength.Text, out double v)) axon.Length = v; };
+                var tbLength = new TextBox { Text = axonEntity.Length.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbLength.LostFocus += (s, e) => { if (double.TryParse(tbLength.Text, out double v)) axonEntity.Length = v; };
                 panel.Children.Add(tbLength);
             }
             else if (entity is SomaVisual soma)
@@ -160,7 +165,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 panel.Children.Add(tbRadius);
             }
 
-            // 3. 离子通道容器区状态构建
             var channelHeader = new TextBlock { Text = "Ion Channels:", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) };
             panel.Children.Add(channelHeader);
 
@@ -170,21 +174,19 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var btnAddChannel = new Button { Content = "+ Add Channel", Margin = new Thickness(0, 5, 0, 0), Background = Brushes.DarkSlateGray, Foreground = Brushes.White };
             btnAddChannel.Click += (s, e) =>
             {
-                _currentOperatingEntity = entity; // 记录当前目标
-                _channelPopup.IsOpen = true;      // 呼出弹窗
+                _currentOperatingEntity = entity; 
+                _channelPopup.IsOpen = true;      
             };
             panel.Children.Add(btnAddChannel);
 
             expander.Content = panel;
 
-            // 将内部的 Channel StackPanel 存入 Expander 的 Tag，方便局部刷新时提取
             expander.Tag = channelListPanel;
             RefreshChannelList(entity, channelListPanel);
 
             return expander;
         }
 
-        // 局部刷新某个实体的离子通道列表 UI
         private void RefreshChannelList(IVisualEntity entity, StackPanel listPanel = null)
         {
             if (listPanel == null && _uiNodes.TryGetValue(entity.Id, out var expander))
@@ -208,7 +210,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 var btnDel = new Button { Content = "-", Width = 20, Background = Brushes.Maroon, Foreground = Brushes.White };
                 btnDel.Click += (s, e) =>
                 {
-                    // 状态移除序列：清理内存 -> 重算 3D 渲染面 -> 销毁 UI 节点
                     entity.Channels.Remove(chName);
                     entity.UpdateChannelVisuals();
                     RefreshChannelList(entity, listPanel);

@@ -13,18 +13,14 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- 左侧 Panels 容器区 -->
         <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <!-- 动态属性面板注入点 -->
                 <StackPanel x:Name="PropertiesPanelContainer" Margin="5" />
             </ScrollViewer>
         </Border>
 
-        <!-- 右侧 Modeling 区域 -->
         <Grid Grid.Column="1" ClipToBounds="True">
             
-            <!-- 1. 3D 视口 -->
             <helix:HelixViewport3D x:Name="MainViewport"
                                    ShowCoordinateSystem="True"
                                    CoordinateSystemLabelForeground="White"
@@ -36,10 +32,7 @@
                                    MouseWheel="OnViewportMouseWheel">
             </helix:HelixViewport3D>
 
-            <!-- 2. UI 覆盖层 (Overlay) -->
             <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False">
-                
-                <!-- 十字准星 (Crosshair) -->
                 <Path x:Name="CrosshairPath" Stroke="#88FFFFFF" StrokeThickness="1" SnapsToDevicePixels="True">
                     <Path.Data>
                         <GeometryGroup>
@@ -49,14 +42,11 @@
                     </Path.Data>
                 </Path>
 
-                <!-- 坐标 HUD (跟随鼠标) -->
                 <Border x:Name="CoordHud" Background="#CC000000" CornerRadius="4" Padding="5,2" Canvas.Left="0" Canvas.Top="0">
                     <TextBlock x:Name="CoordText" Text="X:0 Y:0 Z:0" Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
                 </Border>
             </Canvas>
 
-            <!-- 3. 尺寸修改弹窗 (Edit Popup) - 默认隐藏 -->
-            <!-- IsHitTestVisible="True" 允许输入 -->
             <Grid x:Name="EditPopup" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top" Width="220">
                 <Border Background="#DD333333" BorderBrush="#555" BorderThickness="1" CornerRadius="8" Padding="10">
                     <Border.Effect>
@@ -65,16 +55,19 @@
                     <StackPanel>
                         <TextBlock Text="Edit Dimensions" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
                         
-                        <!-- 圆柱体: 长度 -->
                         <StackPanel x:Name="PanelAxonLength" Visibility="Collapsed" Margin="0,0,0,5">
                             <TextBlock Text="Length:" Foreground="#CCC" FontSize="11"/>
                             <TextBox x:Name="TbLength" Background="#222" Foreground="White" BorderBrush="#555"/>
                         </StackPanel>
 
-                        <!-- 通用: 半径 -->
-                        <StackPanel x:Name="PanelRadius" Visibility="Collapsed" Margin="0,0,0,10">
-                            <TextBlock Text="Radius:" Foreground="#CCC" FontSize="11"/>
+                        <StackPanel x:Name="PanelRadius" Visibility="Collapsed" Margin="0,0,0,5">
+                            <TextBlock Text="Base / Soma Radius:" Foreground="#CCC" FontSize="11"/>
                             <TextBox x:Name="TbRadius" Background="#222" Foreground="White" BorderBrush="#555"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="PanelTopRadius" Visibility="Collapsed" Margin="0,0,0,10">
+                            <TextBlock Text="Top Radius:" Foreground="#CCC" FontSize="11"/>
+                            <TextBox x:Name="TbTopRadius" Background="#222" Foreground="White" BorderBrush="#555"/>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -85,23 +78,22 @@
                 </Border>
             </Grid>
 
-            <!-- 4. 底部工具栏 -->
             <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
                     Background="#CC333333" CornerRadius="8" Padding="10" Margin="0,0,0,20">
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Add Soma" Click="OnAddSomaClick" Padding="10,5" Margin="5"/>
                     <Button Content="Add Axon" Click="OnAddAxonClick" Padding="10,5" Margin="5"/>
+                    <!-- 增加并绑定新的 Add Dend 按钮 -->
+                    <Button Content="Add Dend" Click="OnAddDendClick" Padding="10,5" Margin="5"/>
                 </StackPanel>
             </Border>
             
         </Grid>
 
-        <!-- 全局离子通道选择器 Popup -->
         <Popup x:Name="ChannelSelectorPopup" StaysOpen="False" Placement="MousePoint">
             <Border Background="#333333" BorderBrush="#555555" BorderThickness="1" Padding="10">
                 <StackPanel>
                     <TextBlock Text="Select Channel to Add:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
-                    <!-- 动态离子通道列表注入点 -->
                     <StackPanel x:Name="ChannelSelectorList" />
                 </StackPanel>
             </Border>
