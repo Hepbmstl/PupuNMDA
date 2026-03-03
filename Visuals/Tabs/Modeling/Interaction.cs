@@ -13,11 +13,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     public enum InteractionState
     {
+        // --- Modeling 模式状态 ---
         Idle, // 空闲
         Placing, // 放置中
         Moving, // 跟随鼠标中
         DraggingConnectionEndpoint,
-        SelectingConnectionTarget
+        SelectingConnectionTarget,
+
+        // --- Simulation 模式状态 ---
+        SimulationIdle,      // 仿真模式空闲
+        PlacingStimulation,  // 正在放置刺激点
+        PlacingProbe,        // 正在放置探针
+        DraggingDevice       // 正在滑动附属设备
     }
     
     public enum VisualDisplayMode
@@ -56,10 +63,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         private IVisualEntity? _connectSourceEntity;
         private SphereVisual3D? _dragSphere;
 
-        // ====== 状态变更事件总线 (新增) ======
+        // ====== 状态变更事件总线 (Modeling) ======
         public event Action<IVisualEntity> OnEntityAdded;
         public event Action<IVisualEntity> OnEntityRemoved;
         public event Action<IVisualEntity?> OnSelectionChanged;
+
+        // ====== 状态变更事件总线 (Simulation) ======
+        private List<IAttachedDevice> _devices = new List<IAttachedDevice>();
+        private IAttachedDevice? _placingDevice;
+        private IAttachedDevice? _dragDevice;
+        
+        public event Action<IAttachedDevice> OnDeviceAdded;
+        public event Action<IAttachedDevice> OnDeviceRemoved;
 
         public InteractionController(ModelingPage page, ViewportController viewportController, HelixViewport3D helixViewport)
         {
@@ -77,7 +92,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             };
         }
 
-        #region Public API
+        #region Public API (Modeling)
         public void StartPlacing(IVisualEntity newEntity)
         {
             if (_currentState != InteractionState.Idle) return;
@@ -98,7 +113,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 _entities.Remove(target);
                 _activeEntity = null;
                 
-                // 触发数据流事件：通知实体移除并清空当前选中项
                 OnEntityRemoved?.Invoke(target);
                 OnSelectionChanged?.Invoke(null);
             }
@@ -115,17 +129,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
-        // ====== 新增：供面板反向调用的强行选中 API ======
         public void ForceSelect(IVisualEntity? entity)
         {
-            // 1. 清理旧状态
+            if (_currentState == InteractionState.SimulationIdle) return; // 仿真模式下禁止选中组件
+
             if (_activeEntity != null && _activeEntity != entity)
             {
                 _activeEntity.SetSelected(false);
                 HideGimbal();
             }
 
-            // 2. 挂载新状态
             _activeEntity = entity;
 
             if (_activeEntity != null)
@@ -134,9 +147,34 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 ShowGimbal(_activeEntity);
             }
 
-            // 3. 广播状态更新
             OnSelectionChanged?.Invoke(_activeEntity);
         }
+        #endregion
+
+        #region Public API (Simulation)
+        
+        /// <summary>
+        /// 切换工作模式：Modeling <-> Simulation
+        /// </summary>
+        public void SetSimulationMode(bool isSimulation)
+        {
+            CancelAction(); // 强制取消当前所有放置/移动操作
+            ForceSelect(null); // 清空选中状态
+
+            _currentState = isSimulation ? InteractionState.SimulationIdle : InteractionState.Idle;
+        }
+
+        /// <summary>
+        /// 启动添加探针或刺激的操作
+        /// </summary>
+        public void StartPlacingDevice(DeviceType type)
+        {
+            if (_currentState != InteractionState.SimulationIdle) return;
+            
+            _currentState = type == DeviceType.Stimulation ? InteractionState.PlacingStimulation : InteractionState.PlacingProbe;
+            _placingDevice = null; // 鼠标悬浮到组件上时才实例化
+        }
+        
         #endregion
 
         #region Input Handlers
@@ -145,6 +183,55 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _mouseDownPos = e.GetPosition(_helixViewport);
             _isDraggingViewport = false;
 
+            // ===== Simulation 模式拦截 =====
+            if (_currentState == InteractionState.SimulationIdle)
+            {
+                var hitDevice = HitTestDevice(_mouseDownPos);
+                
+                if (e.ChangedButton == MouseButton.Left && hitDevice != null)
+                {
+                    // 左键点击已有设备，准备滑动
+                    _dragDevice = hitDevice;
+                    _currentState = InteractionState.DraggingDevice;
+                    e.Handled = true;
+                }
+                else if (e.ChangedButton == MouseButton.Right && hitDevice != null)
+                {
+                    // 右键点击已有设备，删除
+                    _devices.Remove(hitDevice);
+                    _helixViewport.Children.Remove(hitDevice.Visual3D);
+                    OnDeviceRemoved?.Invoke(hitDevice);
+                    e.Handled = true;
+                }
+                return;
+            }
+
+            if (_currentState == InteractionState.PlacingStimulation || _currentState == InteractionState.PlacingProbe)
+            {
+                e.Handled = true;
+                if (e.ChangedButton == MouseButton.Left)
+                {
+                    if (_placingDevice != null)
+                    {
+                        _devices.Add(_placingDevice);
+                        OnDeviceAdded?.Invoke(_placingDevice); // 触发左侧面板更新
+                        _placingDevice = null;
+                    }
+                    _currentState = InteractionState.SimulationIdle;
+                }
+                else if (e.ChangedButton == MouseButton.Right)
+                {
+                    if (_placingDevice != null)
+                    {
+                        _helixViewport.Children.Remove(_placingDevice.Visual3D);
+                        _placingDevice = null;
+                    }
+                    _currentState = InteractionState.SimulationIdle;
+                }
+                return;
+            }
+
+            // ===== 原有的 Modeling 模式 =====
             if (_currentState == InteractionState.Idle && e.ChangedButton == MouseButton.Left)
             {
                 if (TryBeginDragConnectionEndpoint(_mouseDownPos))
@@ -167,6 +254,20 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var mousePos = e.GetPosition(_helixViewport);
             UpdateCrosshair(mousePos);
 
+            // ===== Simulation 模式: 滑动与放置设备 =====
+            if (_currentState == InteractionState.DraggingDevice && _dragDevice != null)
+            {
+                UpdateDraggingDevice(mousePos);
+                return;
+            }
+
+            if (_currentState == InteractionState.PlacingStimulation || _currentState == InteractionState.PlacingProbe)
+            {
+                UpdatePlacingDevice(mousePos);
+                return;
+            }
+
+            // ===== 原有的 Modeling 模式 =====
             if (_currentState == InteractionState.DraggingConnectionEndpoint)
             {
                 UpdateDraggingConnectionEndpoint(mousePos);
@@ -178,7 +279,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 UpdateObjectPosition(mousePos);
                 _connectionController.UpdateAll();
             }
-            else if (_currentState == InteractionState.Idle)
+            else if (_currentState == InteractionState.Idle || _currentState == InteractionState.SimulationIdle)
             {
                 if (e.LeftButton == MouseButtonState.Pressed || e.RightButton == MouseButtonState.Pressed)
                 {
@@ -189,6 +290,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
+            // ===== Simulation 模式: 结束滑动设备 =====
+            if (_currentState == InteractionState.DraggingDevice)
+            {
+                _dragDevice = null;
+                _currentState = InteractionState.SimulationIdle;
+                e.Handled = true;
+                return;
+            }
+
+            // ===== 原有的 Modeling 模式 =====
             if (_currentState == InteractionState.DraggingConnectionEndpoint)
             {
                 if (_dragSphere != null)
@@ -251,6 +362,27 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
+        #endregion
+
+        #region Core Logic & Hit Testing
+        
+        private IAttachedDevice? HitTestDevice(Point mousePos)
+        {
+            var hits = _helixViewport.Viewport.FindHits(mousePos);
+            if (hits == null || hits.Count == 0) return null;
+
+            var nearest = hits.OrderBy(h => h.Distance).FirstOrDefault();
+            if (nearest != null)
+            {
+                foreach (var device in _devices)
+                {
+                    if (IsSelfOrChild(nearest.Visual, device.Visual3D))
+                        return device;
+                }
+            }
+            return null;
+        }
+
         private IVisualEntity? HitTestEntity(Point mousePos)
         {
             var hits = _helixViewport.Viewport.FindHits(mousePos);
@@ -279,7 +411,57 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         public void OnMouseWheel(object sender, MouseWheelEventArgs e) { }
         #endregion
 
-        #region Core Logic
+        #region Position Updates (Modeling & Simulation)
+
+        private void UpdatePlacingDevice(Point mousePos)
+        {
+            var targetEntity = HitTestEntity(mousePos);
+            if (targetEntity is IAnchoredEntity anchoredTarget)
+            {
+                var hitPoint = HitTestPointOnEntity(mousePos, targetEntity) ?? targetEntity.CenterPosition;
+                
+                if (anchoredTarget.TryWorldPointToAnchor(hitPoint, out var anchor))
+                {
+                    if (_placingDevice == null || _placingDevice.TargetEntity != targetEntity)
+                    {
+                        // 目标发生了改变或者第一次创建，重新实例化
+                        if (_placingDevice != null) 
+                            _helixViewport.Children.Remove(_placingDevice.Visual3D);
+
+                        if (_currentState == InteractionState.PlacingStimulation)
+                            _placingDevice = new StimulationDevice(targetEntity, anchor);
+                        else
+                            _placingDevice = new ProbeDevice(targetEntity, anchor);
+
+                        _helixViewport.Children.Add(_placingDevice.Visual3D);
+                    }
+                    else
+                    {
+                        // 只是在同一个实体表面滑动，更新锚点并重算三维位置和法线
+                        _placingDevice.Anchor = anchor;
+                        _placingDevice.UpdatePosition();
+                    }
+                }
+            }
+        }
+
+        private void UpdateDraggingDevice(Point mousePos)
+        {
+            if (_dragDevice == null) return;
+
+            // 为了合乎逻辑，仅允许在设备原有的归属实体表面滑动
+            var hits = _helixViewport.Viewport.FindHits(mousePos);
+            var hit = hits?.OrderBy(h => h.Distance).FirstOrDefault(h => IsSelfOrChild(h.Visual, _dragDevice.TargetEntity.Visual3D));
+            
+            if (hit != null && _dragDevice.TargetEntity is IAnchoredEntity anchored)
+            {
+                if (anchored.TryWorldPointToAnchor(hit.Position, out var anchor))
+                {
+                    _dragDevice.Anchor = anchor;
+                    _dragDevice.UpdatePosition();
+                }
+            }
+        }
 
         private void UpdateCrosshair(Point mousePos)
         {
@@ -322,6 +504,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             {
                 _activeEntity.AlignTo(validHit.Position, validHit.Normal);
                 _connectionController.UpdateAll();
+                
+                // 【联动】：如果组件移动了，让附着在它上面的所有设备(箭头)跟着动
+                foreach (var device in _devices.Where(d => d.TargetEntity == _activeEntity))
+                {
+                    device.UpdatePosition();
+                }
+
                 _placingTargetPoint = validHit.Position;
                 _placingTargetEntity = _entities.FirstOrDefault(ent => IsSelfOrChild(validHit.Visual, ent.Visual3D));
             }
@@ -336,10 +525,17 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 {
                     _activeEntity.AlignTo(hitPoint.Value, planeNormal);
                     _connectionController.UpdateAll();
+                    
+                    foreach (var device in _devices.Where(d => d.TargetEntity == _activeEntity))
+                    {
+                        device.UpdatePosition();
+                    }
                 }
             }
         }
+        #endregion
 
+        #region Validation & Utilities
         private void ConfirmAction()
         {
             if (_activeEntity == null) return;
@@ -398,7 +594,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
             _currentState = InteractionState.Idle;
             
-            // 取消操作后可能恢复或清空选中
             OnSelectionChanged?.Invoke(_activeEntity);
         }
 

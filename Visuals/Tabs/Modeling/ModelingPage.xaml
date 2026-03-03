@@ -13,12 +13,19 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
+        <!-- 左侧属性面板区域 -->
         <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="PropertiesPanelContainer" Margin="5" />
+                <StackPanel Margin="5">
+                    <!-- 建模模式专属属性容器 -->
+                    <StackPanel x:Name="PropertiesPanelContainer" Visibility="Visible" />
+                    <!-- 仿真模式专属属性容器 -->
+                    <StackPanel x:Name="SimulationPanelContainer" Visibility="Collapsed" />
+                </StackPanel>
             </ScrollViewer>
         </Border>
 
+        <!-- 右侧 3D 视口与浮层区域 -->
         <Grid Grid.Column="1" ClipToBounds="True">
             
             <helix:HelixViewport3D x:Name="MainViewport"
@@ -47,6 +54,7 @@
                 </Border>
             </Canvas>
 
+            <!-- 节点参数编辑弹窗 (建模模式专属) -->
             <Grid x:Name="EditPopup" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top" Width="220">
                 <Border Background="#DD333333" BorderBrush="#555" BorderThickness="1" CornerRadius="8" Padding="10">
                     <Border.Effect>
@@ -78,18 +86,33 @@
                 </Border>
             </Grid>
 
-            <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+            <!-- 建模模式底部工具栏 -->
+            <Border x:Name="ModelingToolbar" Visibility="Visible" VerticalAlignment="Bottom" HorizontalAlignment="Center" 
                     Background="#CC333333" CornerRadius="8" Padding="10" Margin="0,0,0,20">
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Add Soma" Click="OnAddSomaClick" Padding="10,5" Margin="5"/>
                     <Button Content="Add Axon" Click="OnAddAxonClick" Padding="10,5" Margin="5"/>
-                    <!-- 增加并绑定新的 Add Dend 按钮 -->
                     <Button Content="Add Dend" Click="OnAddDendClick" Padding="10,5" Margin="5"/>
                 </StackPanel>
             </Border>
+
+            <!-- 仿真模式底部工具栏 -->
+            <Border x:Name="SimulationToolbar" Visibility="Collapsed" VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+                    Background="#CC333333" CornerRadius="8" Padding="10" Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Add Stimulation" Click="OnAddStimulationClick" Background="DarkGoldenrod" Foreground="White" Padding="10,5" Margin="5"/>
+                    <Button Content="Add Probe" Click="OnAddProbeClick" Background="DarkCyan" Foreground="White" Padding="10,5" Margin="5"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 测试/调试用：强制模式切换开关 -->
+            <ToggleButton x:Name="ModeToggleButton" Content="Switch to Simulation Mode" 
+                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="10,5"
+                          Click="OnModeToggleClick" Background="#444" Foreground="White"/>
             
         </Grid>
 
+        <!-- 离子通道添加弹窗 -->
         <Popup x:Name="ChannelSelectorPopup" StaysOpen="False" Placement="MousePoint">
             <Border Background="#333333" BorderBrush="#555555" BorderThickness="1" Padding="10">
                 <StackPanel>

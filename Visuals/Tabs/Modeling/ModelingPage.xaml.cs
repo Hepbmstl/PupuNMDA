@@ -13,7 +13,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
     {
         private ViewportController _viewportController = null!;
         private InteractionController _interactionController = null!;
+        
+        // 双控制器分离管理左右侧面板状态
         private PropertiesPanelController _propertiesPanelController = null!;
+        private SimulationPanelController _simulationPanelController = null!;
+        
         private IVisualEntity? _editingEntity;
 
         public ModelingPage()
@@ -27,13 +31,53 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _viewportController = new ViewportController(MainViewport);
             _interactionController = new InteractionController(this, _viewportController, MainViewport);
 
+            // 初始化建模属性面板控制器
             _propertiesPanelController = new PropertiesPanelController(
                 PropertiesPanelContainer,
                 ChannelSelectorPopup,
                 ChannelSelectorList,
                 _interactionController
             );
+
+            // 初始化仿真属性面板控制器
+            _simulationPanelController = new SimulationPanelController(
+                SimulationPanelContainer,
+                _interactionController
+            );
         }
+
+        #region Mode Switching API (核心数据流控)
+
+        /// <summary>
+        /// 供外部 (如 MainWindow 标签页切换时) 调用的模式切换接口
+        /// </summary>
+        public void SwitchMode(bool isSimulation)
+        {
+            // 1. 切换交互控制器的状态机分支
+            _interactionController.SetSimulationMode(isSimulation);
+
+            // 2. 切换左侧面板的可见性
+            PropertiesPanelContainer.Visibility = isSimulation ? Visibility.Collapsed : Visibility.Visible;
+            SimulationPanelContainer.Visibility = isSimulation ? Visibility.Visible : Visibility.Collapsed;
+
+            // 3. 切换底部操作工具栏的可见性
+            ModelingToolbar.Visibility = isSimulation ? Visibility.Collapsed : Visibility.Visible;
+            SimulationToolbar.Visibility = isSimulation ? Visibility.Visible : Visibility.Collapsed;
+
+            // 4. 关闭可能遗留的浮窗
+            EditPopup.Visibility = Visibility.Collapsed;
+            ChannelSelectorPopup.IsOpen = false;
+        }
+
+        // 仅供测试调试用的 UI 按钮回调
+        private void OnModeToggleClick(object sender, RoutedEventArgs e)
+        {
+            bool isSimulation = ModeToggleButton.IsChecked == true;
+            ModeToggleButton.Content = isSimulation ? "Switch to Modeling Mode" : "Switch to Simulation Mode";
+            SwitchMode(isSimulation);
+        }
+
+        #endregion
 
         #region HUD & Overlay API
 
@@ -64,7 +108,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var panelTopRadius = this.FindName("PanelTopRadius") as FrameworkElement;
             var tbTopRadius = this.FindName("TbTopRadius") as TextBox;
 
-            // 由于 DendVisual 继承自 AxonVisual，此判定依然涵盖两种物体
             if (entity is AxonVisual axon)
             {
                 PanelAxonLength.Visibility = Visibility.Visible;
@@ -132,7 +175,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
         #endregion
 
-        #region Toolbar Actions
+        #region Toolbar Actions (Modeling)
 
         private void OnAddSomaClick(object sender, RoutedEventArgs e)
         {
@@ -148,14 +191,28 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _interactionController.StartPlacing(newAxon);
         }
 
-        // 新增的添加 Dend 的按键绑定函数
         private void OnAddDendClick(object sender, RoutedEventArgs e)
         {
             var start = new Point3D(0, 0, 0);
             var end = new Point3D(0, 0, 5);
-            // 这里我们使用 DendVisual 套壳类，可以给它分配一个紫色以便做视觉区分
             var newDend = new DendVisual(start, end, 0.5, Colors.MediumPurple); 
             _interactionController.StartPlacing(newDend);
+        }
+
+        #endregion
+
+        #region Toolbar Actions (Simulation)
+
+        private void OnAddStimulationClick(object sender, RoutedEventArgs e)
+        {
+            // 向交互控制器下发“准备放置刺激设备”的指令
+            _interactionController.StartPlacingDevice(DeviceType.Stimulation);
+        }
+
+        private void OnAddProbeClick(object sender, RoutedEventArgs e)
+        {
+            // 向交互控制器下发“准备放置探针设备”的指令
+            _interactionController.StartPlacingDevice(DeviceType.Probe);
         }
 
         #endregion

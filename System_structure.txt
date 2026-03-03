@@ -1,14 +1,14 @@
-NeuronCad (Root)
+NeuronCAD (Root)
 ├── App.xaml                // 程序的启动与资源入口
 ├── App.xaml.cs
 │
-├── Backward                // [Namespace: NeuronCad.Backward]
+├── Backward                // [Namespace: NeuronCAD.Backward]
 │   ├── IOService.cs        // 负责 C++ DLL Import 或 Python 进程通信
 │   ├── DataManager.cs      // 内存中数据的持有者
 │   ├── ExportUtils.cs      // 数据转换逻辑
 │   └── Entities.cs         // 纯数据类，供 UI 和后端共享
 │
-└── Visuals                         // [Namespace: NeuronCad.Visuals]
+└── Visuals                         // [Namespace: NeuronCAD.Visuals]
     ├── Windows                     // 独立的顶级窗口
     │   ├── MainWindow.xaml        // 主程序外壳
     │   ├── MainWindow.xaml.cs
@@ -16,7 +16,7 @@ NeuronCad (Root)
     │   └── SplashWindow.xaml.cs
     │
     ├── Shell                       // 依附于 MainWindow 的全局组件
-    │   └── MainMenu               // [Namespace: NeuronCad.Visuals.Shell.MainMenu]
+    │   └── MainMenu               // [Namespace: NeuronCAD.Visuals.Shell.MainMenu]
     │       ├── MenuBarView.xaml   // 顶部菜单的视图
     │       ├── MenuBarView.xaml.cs
     │       ├── MenuFile.cs      // 处理文件的“打开”、“保存”等逻辑
@@ -24,11 +24,11 @@ NeuronCad (Root)
     │       └── ...                 // 其他全局组件，如工具栏、状态栏等
     │
     └── Tabs                               // 所有的标签页，互不干扰
-        ├── Modeling                       // [Namespace: NeuronCad.Visuals.Tabs.Modeling]
+        ├── Modeling                       // [Namespace: NeuronCAD.Visuals.Tabs.Modeling]
         │    ├── ModelingPage.xaml        // 聚合 Viewport 和 Panels 的总容器
         │    ├── ModelingPage.xaml.cs     // 负责初始化 SceneContext
         │    ├── Viewport.cs              // 负责网格，吸附，空间位置计算，视角移动转换
-        │    ├── Visuals                  // [Namespace: NeuronCad.Visuals.Tabs.Modeling.Visuals]
+        │    ├── Visuals                  // [Namespace: NeuronCAD.Visuals.Tabs.Modeling.Visuals]
         │    │   ├── IVisualEntity.cs    // 接口：定义所有可视化组件的公有行为
         │    │   ├── VisualEntityBase.cs // 基类：持有 Backward.Entities 的引用 + Helix 模型
         │    │   ├── SomaVisual.cs       // 具体的细胞体可视化类
@@ -39,11 +39,11 @@ NeuronCad (Root)
         │    └── Biophy.cs                // 负责生物物理的相关属性
         │
         │
-        ├── Simulation                   // [Namespace: NeuronCad.UI.Tabs.Simulation]
+        ├── Simulation                   // [Namespace: Namespace: NeuronCAD.Visuals.Tabs.Modeling]
         │   ├── SimulationPage.xaml     // 仿真页主视图
         │   ├── SimulationPage.xaml.cs
         │   └── ConfigPanel.xaml        // 仿真参数配置面板
         │
-        └── Reporting                    // [Namespace: NeuronCad.UI.Tabs.Reporting]
+        └── Reporting                    // [Namespace: NeuronCAD.UI.Tabs.Reporting]
             ├── ReportPage.xaml
             └── ...
