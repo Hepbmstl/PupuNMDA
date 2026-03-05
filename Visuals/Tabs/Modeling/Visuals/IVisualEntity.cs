@@ -4,6 +4,12 @@ using System.Windows.Media.Media3D;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
+    public enum VisualDisplayMode
+    {
+        Normal,
+        Wireframe // 透明 框架 万向轮
+    }
+
     public interface IVisualEntity
     {
         string Id { get; }
