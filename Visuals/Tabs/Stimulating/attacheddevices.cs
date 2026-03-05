@@ -5,39 +5,74 @@ using HelixToolkit.Wpf;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
+    /// <summary>
+    /// 仿真设备类型枚举，区分刺激和探针。
+    /// 由 SimulationInteractionController.StartPlacingDevice 和 IAttachedDevice.Type 使用。
+    /// </summary>
     public enum DeviceType
     {
+        /// <summary>刺激设备（黄色箭头）</summary>
         Stimulation,
+        /// <summary>探针设备（青色箭头）</summary>
         Probe
     }
 
     /// <summary>
-    /// 附属设备接口定义
+    /// 附属设备接口定义，所有仿真设备（刺激/探针）必须实现。
+    /// 被 SharedSceneState.Devices 列表持有，被 SimulationInteractionController/SimulationPanelController 操作。
     /// </summary>
     public interface IAttachedDevice
     {
+        /// <summary>设备唯一标识符 (GUID)。</summary>
         string Id { get; }
+
+        /// <summary>设备类型（刺激/探针）。</summary>
         DeviceType Type { get; }
+
+        /// <summary>设备依附的目标实体。</summary>
         IVisualEntity TargetEntity { get; }
+
+        /// <summary>设备在目标实体表面的锚点引用。</summary>
         AnchorRef Anchor { get; set; }
+
+        /// <summary>设备的 3D 可视化对象。</summary>
         ModelVisual3D Visual3D { get; }
 
+        /// <summary>更新设备在 3D 空间中的位置和姿态。被 SimulationInteractionController 和 InteractionController.UpdateObjectPosition 调用。</summary>
         void UpdatePosition();
     }
 
     /// <summary>
-    /// 附属设备抽象基类，负责处理箭头几何体的生成与法线对齐逻辑
+    /// 附属设备抽象基类，负责处理箭头几何体的生成与法线对齐逻辑。
+    /// 由 StimulationDevice 和 ProbeDevice 继承。
     /// </summary>
     public abstract class AttachedDeviceBase : IAttachedDevice
     {
+        /// <summary>设备唯一标识符 (GUID)，创建时自动生成。</summary>
         public string Id { get; } = Guid.NewGuid().ToString();
-        public abstract DeviceType Type { get; }
+
+        /// <summary>设备类型，由子类实现。</summary>
+        public abstract DeviceType Type { get; };
+
+        /// <summary>设备依附的目标实体。由构造函数设置。</summary>
         public IVisualEntity TargetEntity { get; }
+
+        /// <summary>设备在目标实体表面的锚点引用，拖拽时可更新。</summary>
         public AnchorRef Anchor { get; set; }
 
+        /// <summary>设备的 3D 可视化对象容器。</summary>
         public ModelVisual3D Visual3D { get; } = new ModelVisual3D();
+
+        /// <summary>箭头可视化对象，显示设备方向。</summary>
         protected ArrowVisual3D Arrow { get; }
 
+        /// <summary>
+        /// 构造函数。初始化箭头可视化对象并调用 UpdatePosition 设置初始位置。
+        /// 由 StimulationDevice/ProbeDevice 构造函数调用。
+        /// </summary>
+        /// <param name="target">目标实体</param>
+        /// <param name="anchor">初始锚点</param>
+        /// <param name="color">箭头颜色</param>
         protected AttachedDeviceBase(IVisualEntity target, AnchorRef anchor, Color color)
         {
             TargetEntity = target;
@@ -56,7 +91,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 更新箭头在三维空间中的位置和姿态
+        /// 更新箭头在三维空间中的位置和姿态，由锚点和法线计算箭尾/箭尖。
+        /// 被 SimulationInteractionController（放置/拖拽时）和 InteractionController.UpdateObjectPosition（移动实体时同步更新）调用。
         /// </summary>
         public void UpdatePosition()
         {
@@ -78,8 +114,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 逆向计算目标实体在特定 Anchor 处的表面法线
+        /// 逆向计算目标实体在特定 Anchor 处的表面法线（世界坐标系）。
+        /// 对 AxonVisual 使用圆台几何计算，对 SomaVisual 等球体使用球心指向表面向量。
+        /// 由 UpdatePosition 内部调用。
         /// </summary>
+        /// <returns>世界坐标系下的单位法线向量</returns>
         private Vector3D CalculateWorldNormal()
         {
             Vector3D normal = new Vector3D(0, 0, 1);
@@ -134,17 +173,28 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 刺激设备实体，持有刺激参数与黄色箭头外观
+    /// 刺激设备实体，持有刺激电压、开始时间和持续时间参数，黄色箭头外观。
+    /// 由 SimulationInteractionController.UpdatePlacingDevice 创建，被 SimulationPanelController.BuildDeviceNode 构建参数卡片。
     /// </summary>
     public class StimulationDevice : AttachedDeviceBase
     {
+        /// <summary>设备类型：刺激。</summary>
         public override DeviceType Type => DeviceType.Stimulation;
 
-        // 刺激的业务属性
+        /// <summary>刺激电压 (mV)，默认 10.0。由 SimulationPanelController 参数卡片编辑。</summary>
         public double Voltage { get; set; } = 10.0;
+
+        /// <summary>刺激开始时间 (ms)，默认 0.0。由 SimulationPanelController 参数卡片编辑。</summary>
         public double StartTime { get; set; } = 0.0;
+
+        /// <summary>刺激持续时间 (ms)，默认 5.0。由 SimulationPanelController 参数卡片编辑。</summary>
         public double Duration { get; set; } = 5.0;
 
+        /// <summary>
+        /// 构造函数。由 SimulationInteractionController.UpdatePlacingDevice 创建。
+        /// </summary>
+        /// <param name="target">目标实体</param>
+        /// <param name="anchor">初始锚点</param>
         public StimulationDevice(IVisualEntity target, AnchorRef anchor)
             : base(target, anchor, Colors.Yellow)
         {
@@ -152,15 +202,22 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 探针设备实体，持有探针参数与青色箭头外观
+    /// 探针设备实体，持有探测阈值参数，青色箭头外观。
+    /// 由 SimulationInteractionController.UpdatePlacingDevice 创建，被 SimulationPanelController.BuildDeviceNode 构建参数卡片。
     /// </summary>
     public class ProbeDevice : AttachedDeviceBase
     {
+        /// <summary>设备类型：探针。</summary>
         public override DeviceType Type => DeviceType.Probe;
 
-        // 探针的业务属性
+        /// <summary>探测阈值 (mV)，默认 -55.0。由 SimulationPanelController 参数卡片编辑。</summary>
         public double Threshold { get; set; } = -55.0;
 
+        /// <summary>
+        /// 构造函数。由 SimulationInteractionController.UpdatePlacingDevice 创建。
+        /// </summary>
+        /// <param name="target">目标实体</param>
+        /// <param name="anchor">初始锚点</param>
         public ProbeDevice(IVisualEntity target, AnchorRef anchor)
             : base(target, anchor, Colors.Cyan)
         {

@@ -8,16 +8,26 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Simulation
 {
     /// <summary>
-    /// 仿真模式下的属性面板控制器
-    /// 职责：管理左侧面板中 Stimulation/Probe 设备的参数配置卡片
+    /// 仿真模式下的属性面板控制器。
+    /// 职责：管理左侧面板中 Stimulation/Probe 设备的参数配置卡片。
+    /// 由 MainWindow.InitializeControllers 创建，订阅 SimulationInteractionController 的事件总线。
     /// </summary>
     public class SimulationPanelController
     {
+        /// <summary>仿真属性面板容器（左侧栏 StackPanel）。</summary>
         private readonly StackPanel _container;
+
+        /// <summary>仿真交互控制器引用，用于订阅设备增删事件。</summary>
         private readonly SimulationInteractionController _interaction;
 
+        /// <summary>设备 ID 到属性卡片 Expander 的映射字典。</summary>
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
 
+        /// <summary>
+        /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器并订阅事件。
+        /// </summary>
+        /// <param name="container">仿真属性面板 StackPanel</param>
+        /// <param name="interaction">仿真交互控制器</param>
         public SimulationPanelController(StackPanel container, SimulationInteractionController interaction)
         {
             _container = container;
@@ -27,6 +37,10 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             _interaction.OnDeviceRemoved += HandleDeviceRemoved;
         }
 
+        /// <summary>
+        /// 处理设备添加事件：为新设备创建参数卡片并添加到面板。
+        /// 被 SimulationInteractionController.OnDeviceAdded 事件触发调用。
+        /// </summary>
         private void HandleDeviceAdded(IAttachedDevice device)
         {
             var expander = BuildDeviceNode(device);
@@ -34,6 +48,10 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             _container.Children.Add(expander);
         }
 
+        /// <summary>
+        /// 处理设备删除事件：移除对应的参数卡片。
+        /// 被 SimulationInteractionController.OnDeviceRemoved 事件触发调用。
+        /// </summary>
         private void HandleDeviceRemoved(IAttachedDevice device)
         {
             if (_uiNodes.TryGetValue(device.Id, out var expander))
@@ -43,6 +61,13 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             }
         }
 
+        /// <summary>
+        /// 构建设备参数卡片 Expander，包含目标实体信息和类型特定参数输入框。
+        /// StimulationDevice：Voltage、StartTime、Duration；ProbeDevice：Threshold。
+        /// 由 HandleDeviceAdded 调用。
+        /// </summary>
+        /// <param name="device">目标设备</param>
+        /// <returns>构建完成的 Expander 控件</returns>
         private Expander BuildDeviceNode(IAttachedDevice device)
         {
             string devType = device.Type == DeviceType.Stimulation ? "Stimulation" : "Probe";

@@ -4,10 +4,16 @@ using NeuronCAD.Visuals.Windows;
 namespace NeuronCAD
 {
     /// <summary>
-    /// Interaction logic for App.xaml
+    /// WPF 应用程序入口类，负责应用级别的生命周期管理。
+    /// 启动 URI 在 App.xaml 中指向 MainWindow.xaml。
     /// </summary>
     public partial class App : Application
     {
+        /// <summary>
+        /// 应用程序启动时回调。当前仅调用基类逻辑。
+        /// 预留了 DataManager 初始化和 SplashWindow 显示的扩展点。
+        /// 被 WPF 框架在程序启动时自动调用。
+        /// </summary>
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);

@@ -9,19 +9,38 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
-    // ==========================================
-    // 建模模式下的属性面板控制器 (原逻辑保留)
-    // ==========================================
+    /// <summary>
+    /// 建模模式下的属性面板控制器。
+    /// 职责：管理左侧属性面板中实体卡片的创建/删除/选中高亮，以及离子通道选择弹窗。
+    /// 由 MainWindow.InitializeControllers 创建，订阅 InteractionController 的事件总线。
+    /// </summary>
     public class PropertiesPanelController
     {
+        /// <summary>属性面板容器（左侧栏 StackPanel），由构造函数注入。</summary>
         private readonly StackPanel _container;
+
+        /// <summary>建模交互控制器引用，用于订阅实体增删/选中事件及调用 ForceSelect。</summary>
         private readonly InteractionController _interaction;
+
+        /// <summary>离子通道选择弹窗引用（MainWindow.xaml 中定义）。</summary>
         private readonly Popup _channelPopup;
+
+        /// <summary>离子通道弹窗内部按钮列表容器。</summary>
         private readonly StackPanel _channelSelectorList;
 
+        /// <summary>实体 ID 到属性卡片 Expander 的映射字典，用于快速查找和移除 UI 节点。</summary>
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
+
+        /// <summary>当前正在操作“添加通道”的目标实体，由 btnAddChannel.Click 设置。</summary>
         private IVisualEntity _currentOperatingEntity;
 
+        /// <summary>
+        /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器和交互控制器，并订阅事件。
+        /// </summary>
+        /// <param name="container">左侧属性面板 StackPanel</param>
+        /// <param name="popup">离子通道选择弹窗</param>
+        /// <param name="popupList">弹窗内按钮列表容器</param>
+        /// <param name="interaction">建模交互控制器（用于订阅事件）</param>
         public PropertiesPanelController(StackPanel container, Popup popup, StackPanel popupList, InteractionController interaction)
         {
             _container = container;
@@ -36,6 +55,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             InitializeChannelSelector();
         }
 
+        /// <summary>
+        /// 初始化离子通道选择器：为 GlobalBiophysics.GlobalChannels 中每个通道创建按钮，
+        /// 点击后为当前操作实体添加该通道并刷新可视化。
+        /// 由构造函数调用。
+        /// </summary>
         private void InitializeChannelSelector()
         {
             _channelSelectorList.Children.Clear();
@@ -68,6 +92,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
+        /// <summary>
+        /// 处理实体添加事件：为新实体创建属性卡片并添加到面板。
+        /// 被 InteractionController.OnEntityAdded 事件触发调用。
+        /// </summary>
         private void HandleEntityAdded(IVisualEntity entity)
         {
             var expander = BuildEntityNode(entity);
@@ -75,6 +103,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _container.Children.Add(expander);
         }
 
+        /// <summary>
+        /// 处理实体删除事件：移除对应的属性卡片。
+        /// 被 InteractionController.OnEntityRemoved 事件触发调用。
+        /// </summary>
         private void HandleEntityRemoved(IVisualEntity entity)
         {
             if (_uiNodes.TryGetValue(entity.Id, out var expander))
@@ -84,6 +116,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
+        /// <summary>
+        /// 处理选中实体变更事件：展开对应卡片并橙色高亮边框，折叠其他卡片。
+        /// 被 InteractionController.OnSelectionChanged 事件触发调用。
+        /// </summary>
         private void HandleSelectionChanged(IVisualEntity? selectedEntity)
         {
             foreach (var kvp in _uiNodes)
@@ -105,6 +141,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
+        /// <summary>
+        /// 构建实体属性卡片 Expander，包含颜色、尺寸参数输入框和离子通道列表。
+        /// 由 HandleEntityAdded 调用。展开时会调用 InteractionController.ForceSelect 同步选中。
+        /// </summary>
+        /// <param name="entity">目标实体</param>
+        /// <returns>构建完成的 Expander 控件</returns>
         private Expander BuildEntityNode(IVisualEntity entity)
         {
             string entityType = "Unknown";
@@ -188,6 +230,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             return expander;
         }
 
+        /// <summary>
+        /// 刷新实体卡片中的离子通道列表，显示当前已添加的通道名称和删除按钮。
+        /// 由 BuildEntityNode（初始构建）和通道增删操作后调用。
+        /// </summary>
+        /// <param name="entity">目标实体</param>
+        /// <param name="listPanel">通道列表容器（可选，null 时从 _uiNodes 查找）</param>
         private void RefreshChannelList(IVisualEntity entity, StackPanel listPanel = null)
         {
             if (listPanel == null && _uiNodes.TryGetValue(entity.Id, out var expander))
