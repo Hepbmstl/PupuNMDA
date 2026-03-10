@@ -52,7 +52,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public string Id { get; } = Guid.NewGuid().ToString();
 
         /// <summary>设备类型，由子类实现。</summary>
-        public abstract DeviceType Type { get; };
+        public abstract DeviceType Type { get; }
 
         /// <summary>设备依附的目标实体。由构造函数设置。</summary>
         public IVisualEntity TargetEntity { get; }
@@ -173,7 +173,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 刺激设备实体，持有刺激电压、开始时间和持续时间参数，黄色箭头外观。
+    /// 刺激设备实体，持有刺激电流、开始时间和持续时间参数，黄色箭头外观。
+    /// 对应 Hines_method.py: insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration)
     /// 由 SimulationInteractionController.UpdatePlacingDevice 创建，被 SimulationPanelController.BuildDeviceNode 构建参数卡片。
     /// </summary>
     public class StimulationDevice : AttachedDeviceBase
@@ -181,14 +182,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>设备类型：刺激。</summary>
         public override DeviceType Type => DeviceType.Stimulation;
 
-        /// <summary>刺激电压 (mV)，默认 10.0。由 SimulationPanelController 参数卡片编辑。</summary>
-        public double Voltage { get; set; } = 10.0;
+        /// <summary>刺激电流强度 (µA)，默认 0.1。由 SimulationPanelController 参数卡片编辑。</summary>
+        public double Stimulation_uA { get; set; } = 0.1;
 
         /// <summary>刺激开始时间 (ms)，默认 0.0。由 SimulationPanelController 参数卡片编辑。</summary>
-        public double StartTime { get; set; } = 0.0;
+        public double StimStart { get; set; } = 0.0;
 
         /// <summary>刺激持续时间 (ms)，默认 5.0。由 SimulationPanelController 参数卡片编辑。</summary>
-        public double Duration { get; set; } = 5.0;
+        public double StimDuration { get; set; } = 5.0;
 
         /// <summary>
         /// 构造函数。由 SimulationInteractionController.UpdatePlacingDevice 创建。
@@ -202,7 +203,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 探针设备实体，持有探测阈值参数，青色箭头外观。
+    /// 探针设备实体，持有采样起始时间与持续时间参数（单位 ms），青色箭头外观。
+    /// 对应 Hines_method.py: insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms)
     /// 由 SimulationInteractionController.UpdatePlacingDevice 创建，被 SimulationPanelController.BuildDeviceNode 构建参数卡片。
     /// </summary>
     public class ProbeDevice : AttachedDeviceBase
@@ -210,8 +212,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>设备类型：探针。</summary>
         public override DeviceType Type => DeviceType.Probe;
 
-        /// <summary>探测阈值 (mV)，默认 -55.0。由 SimulationPanelController 参数卡片编辑。</summary>
-        public double Threshold { get; set; } = -55.0;
+        /// <summary>探针采样开始时间（ms）。按照 Hines_method 约定传入 insert_probe 的 probe_start_ms。</summary>
+        public double StartMs { get; set; } = 0.0;
+
+        /// <summary>探针采样持续时间（ms）。按照 Hines_method 约定传入 insert_probe 的 probe_duration_ms。</summary>
+        public double DurationMs { get; set; } = 1.0;
 
         /// <summary>
         /// 构造函数。由 SimulationInteractionController.UpdatePlacingDevice 创建。

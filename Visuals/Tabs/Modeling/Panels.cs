@@ -185,28 +185,40 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             if (entity is AxonVisual axonEntity)
             {
-                panel.Children.Add(new TextBlock { Text = "Base Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "Base Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbBaseRadius = new TextBox { Text = axonEntity.BaseRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbBaseRadius.LostFocus += (s, e) => { if (double.TryParse(tbBaseRadius.Text, out double v)) axonEntity.BaseRadius = v; };
                 panel.Children.Add(tbBaseRadius);
 
-                panel.Children.Add(new TextBlock { Text = "Top Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "Top Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbTopRadius = new TextBox { Text = axonEntity.TopRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbTopRadius.LostFocus += (s, e) => { if (double.TryParse(tbTopRadius.Text, out double v)) axonEntity.TopRadius = v; };
                 panel.Children.Add(tbTopRadius);
 
-                panel.Children.Add(new TextBlock { Text = "Length:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "Length (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbLength = new TextBox { Text = axonEntity.Length.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbLength.LostFocus += (s, e) => { if (double.TryParse(tbLength.Text, out double v)) axonEntity.Length = v; };
                 panel.Children.Add(tbLength);
             }
             else if (entity is SomaVisual soma)
             {
-                panel.Children.Add(new TextBlock { Text = "Radius:", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbRadius = new TextBox { Text = soma.Radius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbRadius.LostFocus += (s, e) => { if (double.TryParse(tbRadius.Text, out double v)) soma.Radius = v; };
                 panel.Children.Add(tbRadius);
             }
+
+            // Cm (µF/cm²)
+            panel.Children.Add(new TextBlock { Text = "Cm (µF/cm²):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+            var tbCm = new TextBox { Text = entity.Cm.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+            tbCm.LostFocus += (s, e) => { if (double.TryParse(tbCm.Text, out double v) && v > 0) entity.Cm = v; else tbCm.Text = entity.Cm.ToString("F2"); };
+            panel.Children.Add(tbCm);
+
+            // Ra (Ω·cm)
+            panel.Children.Add(new TextBlock { Text = "Ra (Ω·cm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+            var tbRa = new TextBox { Text = entity.Ra.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+            tbRa.LostFocus += (s, e) => { if (double.TryParse(tbRa.Text, out double v) && v > 0) entity.Ra = v; else tbRa.Text = entity.Ra.ToString("F2"); };
+            panel.Children.Add(tbRa);
 
             var channelHeader = new TextBlock { Text = "Ion Channels:", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) };
             panel.Children.Add(channelHeader);

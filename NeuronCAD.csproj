@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="HelixToolkit.Wpf" Version="2.25.0" />
+    <PackageReference Include="pythonnet" Version="3.0.5" />
   </ItemGroup>
 
 </Project>

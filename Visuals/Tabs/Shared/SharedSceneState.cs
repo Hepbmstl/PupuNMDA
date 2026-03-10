@@ -6,6 +6,7 @@ using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
 using NeuronCAD.Visuals.Tabs.Modeling;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
+using NeuronCAD.Visuals.Tabs.Simulation;
 
 namespace NeuronCAD.Visuals.Tabs.Shared
 {
@@ -24,6 +25,9 @@ namespace NeuronCAD.Visuals.Tabs.Shared
 
         /// <summary>连接控制器，负责管理实体间连接线的增删查改和可视化更新。</summary>
         public ConnectionController ConnectionController { get; }
+
+        /// <summary>仿真注册表，负责管理建模组件的全局登记和区室化切分。</summary>
+        public SimulationRegistry SimulationRegistry { get; }
 
         /// <summary>
         /// 建模实体列表 (Soma, Axon, Dend)。
@@ -47,6 +51,7 @@ namespace NeuronCAD.Visuals.Tabs.Shared
             HelixViewport = helixViewport;
             ViewportController = new ViewportController(helixViewport);
             ConnectionController = new ConnectionController(helixViewport);
+            SimulationRegistry = new SimulationRegistry();
         }
     }
 

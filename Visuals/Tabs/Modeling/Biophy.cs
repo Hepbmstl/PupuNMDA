@@ -5,7 +5,7 @@ using System.Windows.Media;
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
     /// <summary>
-    /// 离子通道属性数据类，描述单个离子通道的名称、颜色和浓度/密度。
+    /// 离子通道属性数据类，描述单个离子通道的名称、颜色和电导密度。
     /// 被 IVisualEntity.Channels 字典持有，由 PropertiesPanelController 的通道选择器创建引用。
     /// 全局实例在 GlobalBiophysics.GlobalChannels 中定义。
     /// </summary>
@@ -21,23 +21,24 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public Color Color { get; set; }
 
         /// <summary>
-        /// 离子通道表面浓度/密度 (每单位面积的点数)。
-        /// 被 VisualEntityBase.UpdateChannelVisuals 用于计算散点数量：pointCount = totalArea * C_ion_channel。
+        /// 离子通道电导密度（单位：µS/cm²）。
+        /// 在仿真中用于电导相关计算；在渲染时通过 GlobalBiophysics.ConductanceToRenderDensity 转换为视觉散点密度。
+        /// 注意：渲染密度仅具有视觉意义，不代表物理点数。
         /// </summary>
-        public float C_ion_channel { get; set; }
+        public float G_ion_channel { get; set; }
 
         /// <summary>
         /// 构造函数。
         /// </summary>
         /// <param name="name">通道名称</param>
         /// <param name="color">渲染颜色</param>
-        /// <param name="C">表面浓度/密度</param>
-        public ChannelProperty(string name, Color color, float C)
+        /// <param name="G">电导密度 (µS/cm²)</param>
+        public ChannelProperty(string name, Color color, float G)
         {
             Name = name;
             Id = Guid.NewGuid().ToString();
             Color = color;
-            C_ion_channel = C;
+            G_ion_channel = G;
         }
     }
 
@@ -49,8 +50,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     public static class GlobalBiophysics
     {
         /// <summary>
-        /// 全局离子通道字典，Key 为通道名称。
-        /// 在静态构造函数中预置 Na+、K+、Leak 三种通道。
+        /// 全局离子通道字典，Key 为通道名称（与 Hines_method 中使用的键对齐："Na","K","L"）。
+        /// 在静态构造函数中预置 Na、K、L 三种通道。
         /// </summary>
         public static Dictionary<string, ChannelProperty> GlobalChannels { get; } = new Dictionary<string, ChannelProperty>();
 
@@ -59,13 +60,28 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         static GlobalBiophysics()
         {
-            var naChannel = new ChannelProperty("Na+ (Sodium)", Colors.Red, 50.0f);
-            var kChannel = new ChannelProperty("K+ (Potassium)", Colors.Blue, 30.0f);
-            var leakChannel = new ChannelProperty("Leak", Colors.LightGreen, 10.0f);
+            // 名称使用短键以与 Hines_method 的键名一致
+            var naChannel = new ChannelProperty("Na", Colors.Red, 50.0f);
+            var kChannel = new ChannelProperty("K", Colors.Blue, 30.0f);
+            var leakChannel = new ChannelProperty("L", Colors.LightGreen, 10.0f);
 
             GlobalChannels.Add(naChannel.Name, naChannel);
             GlobalChannels.Add(kChannel.Name, kChannel);
             GlobalChannels.Add(leakChannel.Name, leakChannel);
+        }
+
+        /// <summary>
+        /// 将电导密度（µS/cm²）转换为用于渲染的点云密度（无物理意义，仅用于视觉效果）。
+        /// 该转换函数统一渲染尺度到微级量纲，返回值为每单位面积的渲染点密度。
+        /// </summary>
+        public static float ConductanceToRenderDensity(double g_uS_per_cm2)
+        {
+            // 简单线性缩放并截断，比例因子可根据视觉效果调整。
+            const double scale = 0.1; // 每 µS/cm² 对应的视觉密度比例
+            double v = g_uS_per_cm2 * scale;
+            if (v < 0) v = 0;
+            if (v > 10000) v = 10000;
+            return (float)v;
         }
     }
 }

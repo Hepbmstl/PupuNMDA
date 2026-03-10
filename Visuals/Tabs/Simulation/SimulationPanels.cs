@@ -91,47 +91,57 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
             if (device is StimulationDevice stim)
             {
-                // Voltage
-                panel.Children.Add(new TextBlock { Text = "Voltage (mV):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbVoltage = new TextBox { Text = stim.Voltage.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
-                tbVoltage.LostFocus += (s, e) =>
+                // Stimulation_uA
+                panel.Children.Add(new TextBlock { Text = "Current (µA):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbCurrent = new TextBox { Text = stim.Stimulation_uA.ToString("F4"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbCurrent.LostFocus += (s, e) =>
                 {
-                    if (double.TryParse(tbVoltage.Text, out double v)) stim.Voltage = v;
-                    else tbVoltage.Text = stim.Voltage.ToString("F2");
+                    if (double.TryParse(tbCurrent.Text, out double v)) stim.Stimulation_uA = v;
+                    else tbCurrent.Text = stim.Stimulation_uA.ToString("F4");
                 };
-                panel.Children.Add(tbVoltage);
+                panel.Children.Add(tbCurrent);
 
-                // StartTime
+                // StimStart
                 panel.Children.Add(new TextBlock { Text = "Start Time (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbStart = new TextBox { Text = stim.StartTime.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                var tbStart = new TextBox { Text = stim.StimStart.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbStart.LostFocus += (s, e) =>
                 {
-                    if (double.TryParse(tbStart.Text, out double v)) stim.StartTime = v;
-                    else tbStart.Text = stim.StartTime.ToString("F2");
+                    if (double.TryParse(tbStart.Text, out double v)) stim.StimStart = v;
+                    else tbStart.Text = stim.StimStart.ToString("F2");
                 };
                 panel.Children.Add(tbStart);
 
-                // Duration
+                // StimDuration
                 panel.Children.Add(new TextBlock { Text = "Duration (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbDuration = new TextBox { Text = stim.Duration.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                var tbDuration = new TextBox { Text = stim.StimDuration.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbDuration.LostFocus += (s, e) =>
                 {
-                    if (double.TryParse(tbDuration.Text, out double v)) stim.Duration = v;
-                    else tbDuration.Text = stim.Duration.ToString("F2");
+                    if (double.TryParse(tbDuration.Text, out double v)) stim.StimDuration = v;
+                    else tbDuration.Text = stim.StimDuration.ToString("F2");
                 };
                 panel.Children.Add(tbDuration);
             }
             else if (device is ProbeDevice probe)
             {
-                // Threshold
-                panel.Children.Add(new TextBlock { Text = "Threshold (mV):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbThreshold = new TextBox { Text = probe.Threshold.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
-                tbThreshold.LostFocus += (s, e) =>
+                // Start time (ms)
+                panel.Children.Add(new TextBlock { Text = "Start Time (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbStart = new TextBox { Text = probe.StartMs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbStart.LostFocus += (s, e) =>
                 {
-                    if (double.TryParse(tbThreshold.Text, out double v)) probe.Threshold = v;
-                    else tbThreshold.Text = probe.Threshold.ToString("F2");
+                    if (double.TryParse(tbStart.Text, out double v) && v >= 0) probe.StartMs = v;
+                    else tbStart.Text = probe.StartMs.ToString("F2");
                 };
-                panel.Children.Add(tbThreshold);
+                panel.Children.Add(tbStart);
+
+                // Duration (ms)
+                panel.Children.Add(new TextBlock { Text = "Duration (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbDur = new TextBox { Text = probe.DurationMs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbDur.LostFocus += (s, e) =>
+                {
+                    if (double.TryParse(tbDur.Text, out double v) && v >= 0) probe.DurationMs = v;
+                    else tbDur.Text = probe.DurationMs.ToString("F2");
+                };
+                panel.Children.Add(tbDur);
             }
 
             expander.Content = panel;

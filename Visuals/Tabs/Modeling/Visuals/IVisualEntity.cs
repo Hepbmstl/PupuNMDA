@@ -42,6 +42,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         Dictionary<string, ChannelProperty> Channels { get; }
 
+        /// <summary>比膜电容 (µF/cm²)，标准值 1.0。用于仿真区室化计算。</summary>
+        double Cm { get; set; }
+
+        /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4~100。用于仿真区室化计算。</summary>
+        double Ra { get; set; }
+
         /// <summary>当前实体颜色，供 PropertiesPanelController 面板读取显示。</summary>
         Color CurrentColor { get; }
 

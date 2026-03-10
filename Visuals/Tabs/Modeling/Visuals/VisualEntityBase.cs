@@ -65,8 +65,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>散点随机数生成器（全局共享），用于 UpdateChannelVisuals 中的蒙特卡洛采样。</summary>
         private static readonly Random Rnd = new Random();
 
-        /// <summary>膜电容参数，预留用于仿真计算。</summary>
-        public float capacitance;
+        /// <summary>比膜电容 (µF/cm²)，标准值 1.0。</summary>
+        public double Cm { get; set; } = 1.0;
+
+        /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4。</summary>
+        public double Ra { get; set; } = 35.4;
 
         /// <summary>
         /// 基类构造函数，初始化 GUID、Visual3D 容器、主几何模型和默认材质。
@@ -217,7 +220,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>
         /// 刷新离子通道表面散点可视化。
         /// 根据 Channels 字典中的每个通道，使用蒙特卡洛方法在网格表面按面积加权随机采样生成散点。
-        /// 散点数量 = 三角面总面积 × 通道 C_ion_channel 密度值。
+        /// 散点数量 = 三角面总面积 × GlobalBiophysics.ConductanceToRenderDensity(通道电导 G_ion_channel)（渲染专用转换）。
         /// 被 PropertiesPanelController 中添加/删除通道后调用，以及 NotifyGeometryChanged 在几何变更时调用。
         /// </summary>
         public void UpdateChannelVisuals()
@@ -262,7 +265,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             foreach (var kvp in Channels)
             {
                 var channel = kvp.Value;
-                int pointCount = (int)(totalArea * channel.C_ion_channel);
+                int pointCount = (int)(totalArea * GlobalBiophysics.ConductanceToRenderDensity(channel.G_ion_channel));
                 if (pointCount <= 0) continue;
 
                 var points = new Point3DCollection(pointCount);

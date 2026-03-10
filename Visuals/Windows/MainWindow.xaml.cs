@@ -83,6 +83,10 @@ namespace NeuronCAD.Visuals.Windows
                 SimulationPanelContainer,
                 _simulationInteraction);
 
+            // 将建模实体的创建/删除同步登记到仿真注册表
+            _modelingInteraction.OnEntityAdded += entity => _scene.SimulationRegistry.Register(entity);
+            _modelingInteraction.OnEntityRemoved += entity => _scene.SimulationRegistry.Unregister(entity.Id);
+
             _activeHandler = _modelingInteraction;
 
             // 每帧更新所有连接线位置，确保实体移动后连接线跟随
@@ -207,8 +211,42 @@ namespace NeuronCAD.Visuals.Windows
         /// </summary>
         private void OnBeginSimulationClick(object sender, RoutedEventArgs e)
         {
-            // Interface reserved for future implementation.
-            // Parameters can be read from TbVInit, TbDt, TbSteps, TbENa, TbEK, TbELeak.
+            var registry = _scene.SimulationRegistry;
+
+            // 读取区室化模式和参数
+            if (RbNSeg.IsChecked == true)
+            {
+                registry.Mode = SegmentationMode.NSeg;
+                if (int.TryParse(TbNSeg.Text, out int n) && n > 0)
+                    registry.NSeg = n;
+            }
+            else
+            {
+                registry.Mode = SegmentationMode.LSeg;
+                if (double.TryParse(TbLSeg.Text, out double l) && l > 0)
+                    registry.LSeg = l;
+            }
+
+            // 一次性构建完整仿真数据：区室化 + 设备绑定
+            var simData = registry.BuildSimulationData(
+                _scene.ConnectionController.ConnectionsById,
+                _scene.Devices);
+
+            // TODO: 连接 Hines_method.py 后端，调用：
+            //   set_env(V_init, dt, steps, n_node=simData.Compartments.Count)
+            //   对每个 Compartment: init_segment(uid, Ra, D, L, Cm, id) + add_connection
+            //   对每个 SimStimulation: insert_stimulation(id, segment_id, uA, start, dur)
+            //   对每个 SimProbe: insert_probe(id, segment_id, probe_start_ms, probe_duration_ms)
+            //   start_simulation()
+
+            MessageBox.Show(
+                $"仿真数据构建完成：\n" +
+                $"  区室数: {simData.Compartments.Count}\n" +
+                $"  刺激数: {simData.Stimulations.Count}\n" +
+                $"  探针数: {simData.Probes.Count}",
+                "Simulation",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         #endregion
