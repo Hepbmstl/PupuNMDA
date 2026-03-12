@@ -347,6 +347,10 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 }
 
                 entityCompartmentMap[entity.Id] = ids;
+
+                // 将区室信息写回实体
+                entity.CompartmentCount = ids.Count;
+                entity.CompartmentIds = new List<int>(ids);
             }
 
             // 实体间连接

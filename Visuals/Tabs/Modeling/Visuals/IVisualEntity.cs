@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
@@ -47,6 +48,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4~100。用于仿真区室化计算。</summary>
         double Ra { get; set; }
+
+        /// <summary>仿真后该实体被切分的区室数量。未仿真时为 0。</summary>
+        int CompartmentCount { get; set; }
+
+        /// <summary>仿真后该实体拥有的区室全局 ID 列表。未仿真时为空。</summary>
+        List<int> CompartmentIds { get; set; }
 
         /// <summary>当前实体颜色，供 PropertiesPanelController 面板读取显示。</summary>
         Color CurrentColor { get; }

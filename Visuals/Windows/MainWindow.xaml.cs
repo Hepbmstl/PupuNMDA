@@ -3,10 +3,13 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
+using NeuronCAD.Backward;
 using NeuronCAD.Visuals.Tabs.Shared;
 using NeuronCAD.Visuals.Tabs.Modeling;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 using NeuronCAD.Visuals.Tabs.Simulation;
+using NeuronCAD.Visuals.Tabs.Reporting;
 
 namespace NeuronCAD.Visuals.Windows
 {
@@ -31,6 +34,11 @@ namespace NeuronCAD.Visuals.Windows
         /// <summary>仿真模式左侧面板控制器，管理刺激/探针设备的参数配置卡片。由 InitializeControllers 创建。</summary>
         private SimulationPanelController _simulationPanelController = null!;
 
+        /// <summary>Reporting 模式交互控制器，处理区室分块显示与悬停高亮。由 InitializeControllers 创建。</summary>
+        private ReportingInteractionController _reportingInteraction = null!;
+        /// <summary>Reporting 模式左侧面板控制器，按实体分组展示区室列表。由 InitializeControllers 创建。</summary>
+        private ReportingPanelController _reportingPanelController = null!;
+
         /// <summary>当前活跃的视口交互处理器，根据标签页切换在 _modelingInteraction 和 _simulationInteraction 之间切换。</summary>
         private IViewportInteractionHandler _activeHandler = null!;
 
@@ -41,6 +49,15 @@ namespace NeuronCAD.Visuals.Windows
 
         /// <summary>当前正在编辑尺寸的实体引用，用于 EditPopup 弹窗。由 ShowEditPopup 设置，OnApplyEdit/OnCancelEdit 清除。</summary>
         private IVisualEntity? _editingEntity;
+
+        /// <summary>仿真运行器实例，管理 Python 互操作和仿真执行。</summary>
+        private SimulationRunner? _simulationRunner;
+
+        /// <summary>仿真进度轮询定时器，每 100ms 从 SimulationRunner 读取当前步数并更新 UI。</summary>
+        private DispatcherTimer? _simProgressTimer;
+
+        /// <summary>是否正在仿真中。为 true 时禁止所有建模/仿真交互操作。</summary>
+        private bool _isSimulating;
 
         /// <summary>
         /// 构造函数，初始化 XAML 组件并在窗口 Loaded 后初始化控制器。
@@ -77,11 +94,24 @@ namespace NeuronCAD.Visuals.Windows
                 ModelingPanelContainer,
                 ChannelSelectorPopup,
                 ChannelSelectorList,
-                _modelingInteraction);
+                _modelingInteraction,
+                NavigateToPoint);
 
             _simulationPanelController = new SimulationPanelController(
                 SimulationPanelContainer,
-                _simulationInteraction);
+                _simulationInteraction,
+                NavigateToPoint);
+
+            _reportingInteraction = new ReportingInteractionController(
+                _scene,
+                UpdateCursorInfo);
+
+            _reportingPanelController = new ReportingPanelController(
+                ReportComponentsContainer,
+                ReportProbesContainer,
+                _reportingInteraction,
+                _scene,
+                NavigateToPoint);
 
             // 将建模实体的创建/删除同步登记到仿真注册表
             _modelingInteraction.OnEntityAdded += entity => _scene.SimulationRegistry.Register(entity);
@@ -140,6 +170,8 @@ namespace NeuronCAD.Visuals.Windows
                 _modelingInteraction.Deactivate();
             else if (_activeTab == ActiveTab.Simulating)
                 _simulationInteraction.Deactivate();
+            else if (_activeTab == ActiveTab.Reporting)
+                _reportingInteraction.Deactivate();
 
             _activeTab = target;
 
@@ -167,7 +199,9 @@ namespace NeuronCAD.Visuals.Windows
                     break;
                 case ActiveTab.Reporting:
                     ReportingPanelRoot.Visibility = Visibility.Visible;
-                    _activeHandler = _modelingInteraction; // 报告模式下使用建模交互作为只读回退
+                    _activeHandler = _reportingInteraction;
+                    _reportingInteraction.Activate();
+                    _reportingPanelController.Rebuild();
                     break;
             }
         }
@@ -205,12 +239,15 @@ namespace NeuronCAD.Visuals.Windows
         #region Simulation Begin
 
         /// <summary>
-        /// 点击 "Begin" 按钮时触发仿真运行（预留接口，尚未实现）。
-        /// 可从 TbVInit, TbDt, TbSteps, TbENa, TbEK, TbELeak 读取参数。
+        /// 点击 "Begin" 按钮时触发仿真运行。
+        /// 读取 UI 参数 → 构建仿真数据 → 通过 SimulationRunner 调用 Hines_method.py。
+        /// 仿真期间禁止所有修改操作，显示实时进度。
         /// 由 XAML 按钮 Click 绑定。
         /// </summary>
-        private void OnBeginSimulationClick(object sender, RoutedEventArgs e)
+        private async void OnBeginSimulationClick(object sender, RoutedEventArgs e)
         {
+            if (_isSimulating) return;
+
             var registry = _scene.SimulationRegistry;
 
             // 读取区室化模式和参数
@@ -232,21 +269,128 @@ namespace NeuronCAD.Visuals.Windows
                 _scene.ConnectionController.ConnectionsById,
                 _scene.Devices);
 
-            // TODO: 连接 Hines_method.py 后端，调用：
-            //   set_env(V_init, dt, steps, n_node=simData.Compartments.Count)
-            //   对每个 Compartment: init_segment(uid, Ra, D, L, Cm, id) + add_connection
-            //   对每个 SimStimulation: insert_stimulation(id, segment_id, uA, start, dur)
-            //   对每个 SimProbe: insert_probe(id, segment_id, probe_start_ms, probe_duration_ms)
-            //   start_simulation()
+            if (simData.Compartments.Count == 0)
+            {
+                MessageBox.Show("没有可仿真的区室，请先添加建模实体。", "Simulation",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-            MessageBox.Show(
-                $"仿真数据构建完成：\n" +
-                $"  区室数: {simData.Compartments.Count}\n" +
-                $"  刺激数: {simData.Stimulations.Count}\n" +
-                $"  探针数: {simData.Probes.Count}",
-                "Simulation",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            // 读取仿真参数
+            if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -65.0;
+            if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.025;
+            if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
+            if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 50.0;
+            if (!double.TryParse(TbEK.Text, out double eK)) eK = -77.0;
+            if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.387;
+
+            // ── 进入仿真状态：禁用交互，显示进度面板 ──
+            _isSimulating = true;
+            SetSimulationLockUI(true);
+
+            SimProgressPanel.Visibility = Visibility.Visible;
+            SimStatusText.Text = "Simulating...";
+            SimStepText.Text = $"Step: 0 / {steps}";
+            SimProgressBar.Maximum = steps;
+            SimProgressBar.Value = 0;
+
+            // 创建运行器
+            _simulationRunner = new SimulationRunner();
+
+            // 启动进度轮询定时器
+            _simProgressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _simProgressTimer.Tick += (s2, e2) =>
+            {
+                if (_simulationRunner == null) return;
+                int cur = _simulationRunner.CurrentStep;
+                int total = _simulationRunner.TotalSteps;
+                SimStepText.Text = $"Step: {cur} / {total}";
+                SimProgressBar.Value = cur;
+            };
+            _simProgressTimer.Start();
+
+            try
+            {
+                await _simulationRunner.RunAsync(simData, vInit, dt, steps, eNa, eK, eLeak);
+
+                // ── 仿真完成 ──
+                SimStatusText.Text = "Simulation Complete";
+                SimStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
+                SimStepText.Text = $"Step: {steps} / {steps}";
+                SimProgressBar.Value = steps;
+
+                // 存储仿真数据供 Reporting 面板使用
+                _scene.LastSimulationData = simData;
+
+                MessageBox.Show(
+                    $"仿真完成：\n" +
+                    $"  区室数: {simData.Compartments.Count}\n" +
+                    $"  刺激数: {simData.Stimulations.Count}\n" +
+                    $"  探针数: {simData.Probes.Count}\n" +
+                    $"  总步数: {steps}",
+                    "Simulation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                // pythonnet 将回调中抛出的 OperationCanceledException 包装为 PythonException，
+                // 所以直接检查 WasAborted 标志更可靠。
+                bool aborted = _simulationRunner?.WasAborted == true
+                            || ex.InnerException is OperationCanceledException
+                            || ex is OperationCanceledException;
+                if (aborted)
+                {
+                    SimStatusText.Text = "Simulation Aborted";
+                    SimStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                    MessageBox.Show("仿真已被用户终止。", "Simulation Aborted",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    SimStatusText.Text = "Simulation Failed";
+                    SimStatusText.Foreground = new SolidColorBrush(Colors.Red);
+                    MessageBox.Show($"仿真失败：\n{ex.Message}", "Simulation Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            finally
+            {
+                _simProgressTimer?.Stop();
+                _simProgressTimer = null;
+                _simulationRunner = null;
+                _isSimulating = false;
+                SetSimulationLockUI(false);
+                BtnAbortSimulation.IsEnabled = true;
+            }
+        }
+
+        /// <summary>
+        /// 切换仿真锁定状态：禁用/启用工具栏、标签页切换和 Begin 按钮。
+        /// </summary>
+        private void SetSimulationLockUI(bool locked)
+        {
+            BtnBeginSimulation.IsEnabled = !locked;
+            TabModeling.IsEnabled = !locked;
+            TabSimulation.IsEnabled = !locked;
+            TabReporting.IsEnabled = !locked;
+            ModelingToolbar.IsEnabled = !locked;
+            SimulationToolbar.IsEnabled = !locked;
+        }
+
+        /// <summary>
+        /// 点击 "Abort" 按钮时强制终止仿真。
+        /// 通过 SimulationRunner.Abort() 在下一次 Python 回调时中断执行。
+        /// </summary>
+        private void OnAbortSimulationClick(object sender, RoutedEventArgs e)
+        {
+            if (_simulationRunner != null && _simulationRunner.IsRunning)
+            {
+                _simulationRunner.Abort();
+                BtnAbortSimulation.IsEnabled = false;
+                SimStatusText.Text = "Aborting...";
+                SimStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            }
         }
 
         #endregion
@@ -255,23 +399,44 @@ namespace NeuronCAD.Visuals.Windows
 
         /// <summary>将视口 MouseDown 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseDown 绑定。</summary>
         private void OnViewportMouseDown(object sender, MouseButtonEventArgs e)
-            => _activeHandler?.OnMouseDown(sender, e);
+        {
+            if (_isSimulating) return;
+            _activeHandler?.OnMouseDown(sender, e);
+        }
 
         /// <summary>将视口 MouseMove 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseMove 绑定。</summary>
         private void OnViewportMouseMove(object sender, MouseEventArgs e)
-            => _activeHandler?.OnMouseMove(sender, e);
+        {
+            if (_isSimulating) return;
+            _activeHandler?.OnMouseMove(sender, e);
+        }
 
         /// <summary>将视口 MouseUp 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseUp 绑定。</summary>
         private void OnViewportMouseUp(object sender, MouseButtonEventArgs e)
-            => _activeHandler?.OnMouseUp(sender, e);
+        {
+            if (_isSimulating) return;
+            _activeHandler?.OnMouseUp(sender, e);
+        }
 
         /// <summary>将视口 MouseWheel 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseWheel 绑定。</summary>
         private void OnViewportMouseWheel(object sender, MouseWheelEventArgs e)
-            => _activeHandler?.OnMouseWheel(sender, e);
+        {
+            if (_isSimulating) return;
+            _activeHandler?.OnMouseWheel(sender, e);
+        }
 
         #endregion
 
         #region HUD and Overlay
+
+        /// <summary>
+        /// 平滑将相机视角对准指定世界坐标点（500ms 动画过渡）。
+        /// 被 PropertiesPanelController 和 SimulationPanelController 的面板展开事件调用。
+        /// </summary>
+        private void NavigateToPoint(Point3D target)
+        {
+            MainViewport.LookAt(target, 500);
+        }
 
         /// <summary>
         /// 更新准星位置和世界坐标 HUD 显示。
@@ -425,6 +590,26 @@ namespace NeuronCAD.Visuals.Windows
         private void OnAddProbeClick(object sender, RoutedEventArgs e)
         {
             _simulationInteraction.StartPlacingDevice(DeviceType.Probe);
+        }
+
+        #endregion
+
+        #region Reporting Sub-tab Switching
+
+        private void OnReportSubTabComponentsClick(object sender, RoutedEventArgs e)
+        {
+            ReportSubTabComponents.IsChecked = true;
+            ReportSubTabProbes.IsChecked = false;
+            ReportComponentsScroll.Visibility = Visibility.Visible;
+            ReportProbesScroll.Visibility = Visibility.Collapsed;
+        }
+
+        private void OnReportSubTabProbesClick(object sender, RoutedEventArgs e)
+        {
+            ReportSubTabComponents.IsChecked = false;
+            ReportSubTabProbes.IsChecked = true;
+            ReportComponentsScroll.Visibility = Visibility.Collapsed;
+            ReportProbesScroll.Visibility = Visibility.Visible;
         }
 
         #endregion

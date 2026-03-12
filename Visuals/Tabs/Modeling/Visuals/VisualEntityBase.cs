@@ -71,6 +71,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4。</summary>
         public double Ra { get; set; } = 35.4;
 
+        /// <summary>仿真后该实体被切分的区室数量。未仿真时为 0。</summary>
+        public int CompartmentCount { get; set; } = 0;
+
+        /// <summary>仿真后该实体拥有的区室全局 ID 列表。未仿真时为空。</summary>
+        public List<int> CompartmentIds { get; set; } = new List<int>();
+
         /// <summary>
         /// 基类构造函数，初始化 GUID、Visual3D 容器、主几何模型和默认材质。
         /// 由派生类构造函数通过 base() 调用。

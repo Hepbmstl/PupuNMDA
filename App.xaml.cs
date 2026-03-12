@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using NeuronCAD.Backward;
 using NeuronCAD.Visuals.Windows;
 
 namespace NeuronCAD
@@ -28,6 +29,12 @@ namespace NeuronCAD
             // MainWindow 已在 XAML 的 StartupUri 中定义，也可以在此处手动启动：
             //MainWindow mainWindow = new MainWindow();
             //mainWindow.Show();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            PythonWorker.Shutdown();
+            base.OnExit(e);
         }
     }
 }

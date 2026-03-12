@@ -11,500 +11,582 @@
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBackgroundBrush}">
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid>
+                <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <!-- Row 0: Menu Bar -->
-        <Border Grid.Row="0"
-                Background="#2D2D30"
-                BorderBrush="#3F3F46"
-                BorderThickness="0,0,0,1">
-            <Menu Background="Transparent"
-                    Foreground="#F1F1F1"
-                    Margin="5">
-                <Menu.Resources>
-                    <Style TargetType="MenuItem">
-                        <Setter Property="Foreground"
-                                Value="#F1F1F1"/>
-                        <Setter Property="FontSize"
-                                Value="12"/>
-                        <Setter Property="Padding"
-                                Value="10,5"/>
-                    </Style>
-                </Menu.Resources>
-                <MenuItem Header="File">
-                    <MenuItem Header="New Project"/>
-                    <MenuItem Header="Open..."/>
-                    <Separator/>
-                    <MenuItem Header="Exit"/>
-                </MenuItem>
-                <MenuItem Header="Edit"/>
-                <MenuItem Header="View"/>
-                <MenuItem Header="Help"/>
-            </Menu>
-        </Border>
+                <!-- Row 0: Menu Bar -->
+                <Border Grid.Row="0"
+                        Background="#2D2D30"
+                        BorderBrush="#3F3F46"
+                        BorderThickness="0,0,0,1">
+                        <Menu Background="Transparent"
+                              Foreground="#F1F1F1"
+                              Margin="5">
+                                <Menu.Resources>
+                                        <Style TargetType="MenuItem">
+                                                <Setter Property="Foreground"
+                                                        Value="#F1F1F1"/>
+                                                <Setter Property="FontSize"
+                                                        Value="12"/>
+                                                <Setter Property="Padding"
+                                                        Value="10,5"/>
+                                        </Style>
+                                </Menu.Resources>
+                                <MenuItem Header="File">
+                                        <MenuItem Header="New Project"/>
+                                        <MenuItem Header="Open..."/>
+                                        <Separator/>
+                                        <MenuItem Header="Exit"/>
+                                </MenuItem>
+                                <MenuItem Header="Edit"/>
+                                <MenuItem Header="View"/>
+                                <MenuItem Header="Help"/>
+                        </Menu>
+                </Border>
 
-        <!-- Row 1: Top-level tab bar (Modeling / Simulating / Reporting) -->
-        <Border Grid.Row="1"
-                Background="#2D2D30"
-                BorderBrush="#3F3F46"
-                BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal"
-                    Margin="5,0,0,0">
-                <ToggleButton x:Name="TabModeling"
-                        Content="Modeling"
-                        IsChecked="True"
-                              Click="OnTabModelingClick"
-                        Padding="18,7"
-                        MinWidth="90"
-                              Background="#3E3E42"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Margin="0,0,2,0"/>
-                <ToggleButton x:Name="TabSimulation"
-                        Content="Simulating"
-                              Click="OnTabSimulationClick"
-                        Padding="18,7"
-                        MinWidth="90"
-                              Background="#3E3E42"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Margin="0,0,2,0"/>
-                <ToggleButton x:Name="TabReporting"
-                        Content="Reporting"
-                              Click="OnTabReportingClick"
-                        Padding="18,7"
-                        MinWidth="90"
-                              Background="#3E3E42"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Margin="0,0,2,0"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Row 2: Tab content (panel + viewport) -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Left sidebar panel -->
-            <Border Grid.Column="0"
-                    Background="#252526"
-                    BorderBrush="#3F3F46"
-                    BorderThickness="0,0,1,0">
-                <Grid>
-                    <!-- Modeling panel -->
-                    <ScrollViewer x:Name="ModelingPanelScroll"
-                            VerticalScrollBarVisibility="Auto"
-                            Visibility="Visible">
-                        <StackPanel x:Name="ModelingPanelContainer"
-                                Margin="5"/>
-                    </ScrollViewer>
-
-                    <!-- Simulating panel (with Insert / Simulate sub-tabs) -->
-                    <Grid x:Name="SimulatingPanelRoot"
-                            Visibility="Collapsed">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Sub-tab buttons -->
-                        <StackPanel Grid.Row="0"
-                                Orientation="Horizontal"
-                                Background="#1E1E1E"
-                                Margin="0,0,0,1">
-                            <ToggleButton x:Name="SubTabInsert"
-                                    Content="Insert"
-                                    IsChecked="True"
-                                          Click="OnSubTabInsertClick"
-                                    Padding="14,5"
-                                    MinWidth="70"
-                                          Background="#333337"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Margin="4,4,2,4"/>
-                            <ToggleButton x:Name="SubTabSimulate"
-                                    Content="Simulate"
-                                          Click="OnSubTabSimulateClick"
-                                    Padding="14,5"
-                                    MinWidth="70"
-                                          Background="#333337"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Margin="0,4,4,4"/>
+                <!-- Row 1: Top-level tab bar (Modeling / Simulating / Reporting) -->
+                <Border Grid.Row="1"
+                        Background="#2D2D30"
+                        BorderBrush="#3F3F46"
+                        BorderThickness="0,0,0,1">
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="5,0,0,0">
+                                <ToggleButton x:Name="TabModeling"
+                                              Content="Modeling"
+                                              IsChecked="True"
+                                              Click="OnTabModelingClick"
+                                              Padding="18,7"
+                                              MinWidth="90"
+                                              Background="#3E3E42"
+                                              Foreground="White"
+                                              BorderThickness="0"
+                                              Margin="0,0,2,0"/>
+                                <ToggleButton x:Name="TabSimulation"
+                                              Content="Simulating"
+                                              Click="OnTabSimulationClick"
+                                              Padding="18,7"
+                                              MinWidth="90"
+                                              Background="#3E3E42"
+                                              Foreground="White"
+                                              BorderThickness="0"
+                                              Margin="0,0,2,0"/>
+                                <ToggleButton x:Name="TabReporting"
+                                              Content="Reporting"
+                                              Click="OnTabReportingClick"
+                                              Padding="18,7"
+                                              MinWidth="90"
+                                              Background="#3E3E42"
+                                              Foreground="White"
+                                              BorderThickness="0"
+                                              Margin="0,0,2,0"/>
                         </StackPanel>
+                </Border>
 
-                        <!-- Insert sub-tab content: devices list -->
-                        <ScrollViewer x:Name="InsertPanelScroll"
-                                Grid.Row="1"
-                                VerticalScrollBarVisibility="Auto"
-                                Visibility="Visible">
-                            <StackPanel x:Name="SimulationPanelContainer"
-                                    Margin="5"/>
-                        </ScrollViewer>
+                <!-- Row 2: Tab content (panel + viewport) -->
+                <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="280"/>
+                                <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                        <!-- Simulate sub-tab content: parameter inputs + Begin button -->
-                        <ScrollViewer x:Name="SimulatePanelScroll"
-                                Grid.Row="1"
-                                VerticalScrollBarVisibility="Auto"
-                                Visibility="Collapsed">
-                            <StackPanel Margin="10">
-                                <TextBlock Text="Simulation Parameters"
-                                        Foreground="White"
-                                        FontWeight="Bold"
-                                        FontSize="14"
-                                        Margin="0,0,0,12"/>
+                        <!-- Left sidebar panel -->
+                        <Border Grid.Column="0"
+                                Background="#252526"
+                                BorderBrush="#3F3F46"
+                                BorderThickness="0,0,1,0">
+                                <Grid>
+                                        <!-- Modeling panel -->
+                                        <ScrollViewer x:Name="ModelingPanelScroll"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      Visibility="Visible">
+                                                <StackPanel x:Name="ModelingPanelContainer"
+                                                            Margin="5"/>
+                                        </ScrollViewer>
 
-                                <TextBlock Text="V_init (mV):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbVInit"
-                                        Text="-65"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                        <!-- Simulating panel (with Insert / Simulate sub-tabs) -->
+                                        <Grid x:Name="SimulatingPanelRoot"
+                                              Visibility="Collapsed">
+                                                <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
 
-                                <TextBlock Text="dt (ms):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbDt"
-                                        Text="0.025"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                                <!-- Sub-tab buttons -->
+                                                <StackPanel Grid.Row="0"
+                                                            Orientation="Horizontal"
+                                                            Background="#1E1E1E"
+                                                            Margin="0,0,0,1">
+                                                        <ToggleButton x:Name="SubTabInsert"
+                                                                      Content="Insert"
+                                                                      IsChecked="True"
+                                                                      Click="OnSubTabInsertClick"
+                                                                      Padding="14,5"
+                                                                      MinWidth="70"
+                                                                      Background="#333337"
+                                                                      Foreground="White"
+                                                                      BorderThickness="0"
+                                                                      Margin="4,4,2,4"/>
+                                                        <ToggleButton x:Name="SubTabSimulate"
+                                                                      Content="Simulate"
+                                                                      Click="OnSubTabSimulateClick"
+                                                                      Padding="14,5"
+                                                                      MinWidth="70"
+                                                                      Background="#333337"
+                                                                      Foreground="White"
+                                                                      BorderThickness="0"
+                                                                      Margin="0,4,4,4"/>
+                                                </StackPanel>
 
-                                <TextBlock Text="Steps:"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbSteps"
-                                        Text="10000"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                                <!-- Insert sub-tab content: devices list -->
+                                                <ScrollViewer x:Name="InsertPanelScroll"
+                                                              Grid.Row="1"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              Visibility="Visible">
+                                                        <StackPanel x:Name="SimulationPanelContainer"
+                                                                    Margin="5"/>
+                                                </ScrollViewer>
 
-                                <TextBlock Text="E_Na (mV):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbENa"
-                                        Text="50"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                                <!-- Simulate sub-tab content: parameter inputs + Begin button -->
+                                                <ScrollViewer x:Name="SimulatePanelScroll"
+                                                              Grid.Row="1"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              Visibility="Collapsed">
+                                                        <StackPanel Margin="10">
+                                                                <TextBlock Text="Simulation Parameters"
+                                                                           Foreground="White"
+                                                                           FontWeight="Bold"
+                                                                           FontSize="14"
+                                                                           Margin="0,0,0,12"/>
 
-                                <TextBlock Text="E_K (mV):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbEK"
-                                        Text="-77"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                                                <TextBlock Text="V_init (mV):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbVInit"
+                                                                         Text="-65"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
 
-                                <TextBlock Text="E_Leak (mV):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbELeak"
-                                        Text="-54.387"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,16"/>
+                                                                <TextBlock Text="dt (ms):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbDt"
+                                                                         Text="0.025"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
 
-                                <TextBlock Text="Segmentation"
-                                        Foreground="White"
-                                        FontWeight="Bold"
-                                        FontSize="14"
-                                        Margin="0,0,0,8"/>
+                                                                <TextBlock Text="Steps:"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbSteps"
+                                                                         Text="10000"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
 
-                                <StackPanel Orientation="Horizontal"
-                                        Margin="0,0,0,8">
-                                    <RadioButton x:Name="RbNSeg"
-                                            Content="NSeg"
-                                            IsChecked="True"
-                                            Foreground="#CCC"
-                                            GroupName="SegMode"
-                                            Margin="0,0,15,0"/>
-                                    <RadioButton x:Name="RbLSeg"
-                                            Content="LSeg"
-                                            Foreground="#CCC"
-                                            GroupName="SegMode"/>
-                                </StackPanel>
+                                                                <TextBlock Text="E_Na (mV):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbENa"
+                                                                         Text="50"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
 
-                                <TextBlock Text="NSeg (每个组件的区室数):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbNSeg"
-                                        Text="5"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,8"/>
+                                                                <TextBlock Text="E_K (mV):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbEK"
+                                                                         Text="-77"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
 
-                                <TextBlock Text="LSeg (µm, 区室间距):"
-                                        Foreground="#CCC"
-                                        FontSize="11"
-                                        Margin="0,0,0,2"/>
-                                <TextBox x:Name="TbLSeg"
-                                        Text="20"
-                                        Background="#2A2A2A"
-                                        Foreground="White"
-                                        BorderBrush="#555"
-                                        Padding="4"
-                                        Margin="0,0,0,16"/>
+                                                                <TextBlock Text="E_Leak (mV):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbELeak"
+                                                                         Text="-54.387"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,16"/>
 
-                                <Button x:Name="BtnBeginSimulation"
-                                        Content="Begin"
-                                        Click="OnBeginSimulationClick"
-                                        Background="#C42B1C"
-                                        Foreground="White"
-                                        FontWeight="Bold"
-                                        FontSize="14"
-                                        Padding="10,8"
-                                        HorizontalAlignment="Stretch"
-                                        Cursor="Hand">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}"
-                                                    CornerRadius="4"
-                                                    Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Grid>
+                                                                <TextBlock Text="Segmentation"
+                                                                           Foreground="White"
+                                                                           FontWeight="Bold"
+                                                                           FontSize="14"
+                                                                           Margin="0,0,0,8"/>
 
-                    <!-- Reporting panel (placeholder) -->
-                    <Grid x:Name="ReportingPanelRoot"
-                            Visibility="Collapsed">
-                        <TextBlock Text="Reporting (coming soon)"
-                                Foreground="#888"
-                                FontSize="14"
-                                   HorizontalAlignment="Center"
-                                VerticalAlignment="Center"/>
-                    </Grid>
+                                                                <StackPanel Orientation="Horizontal"
+                                                                            Margin="0,0,0,8">
+                                                                        <RadioButton x:Name="RbNSeg"
+                                                                                     Content="NSeg"
+                                                                                     IsChecked="True"
+                                                                                     Foreground="#CCC"
+                                                                                     GroupName="SegMode"
+                                                                                     Margin="0,0,15,0"/>
+                                                                        <RadioButton x:Name="RbLSeg"
+                                                                                     Content="LSeg"
+                                                                                     Foreground="#CCC"
+                                                                                     GroupName="SegMode"/>
+                                                                </StackPanel>
+
+                                                                <TextBlock Text="NSeg (每个组件的区室数):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbNSeg"
+                                                                         Text="5"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,8"/>
+
+                                                                <TextBlock Text="LSeg (µm, 区室间距):"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"
+                                                                           Margin="0,0,0,2"/>
+                                                                <TextBox x:Name="TbLSeg"
+                                                                         Text="20"
+                                                                         Background="#2A2A2A"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"
+                                                                         Padding="4"
+                                                                         Margin="0,0,0,16"/>
+
+                                                                <Button x:Name="BtnBeginSimulation"
+                                                                        Content="Begin"
+                                                                        Click="OnBeginSimulationClick"
+                                                                        Background="#C42B1C"
+                                                                        Foreground="White"
+                                                                        FontWeight="Bold"
+                                                                        FontSize="14"
+                                                                        Padding="10,8"
+                                                                        HorizontalAlignment="Stretch"
+                                                                        Cursor="Hand">
+                                                                        <Button.Template>
+                                                                                <ControlTemplate TargetType="Button">
+                                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                                CornerRadius="4"
+                                                                                                Padding="{TemplateBinding Padding}">
+                                                                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                                                                  VerticalAlignment="Center"/>
+                                                                                        </Border>
+                                                                                </ControlTemplate>
+                                                                        </Button.Template>
+                                                                </Button>
+
+                                                                <!-- Simulation Progress Panel -->
+                                                                <StackPanel x:Name="SimProgressPanel"
+                                                                            Visibility="Collapsed"
+                                                                            Margin="0,12,0,0">
+                                                                        <Border Background="#1E1E1E"
+                                                                                CornerRadius="4"
+                                                                                Padding="8">
+                                                                                <StackPanel>
+                                                                                        <TextBlock x:Name="SimStatusText"
+                                                                                                   Text="Initializing..."
+                                                                                                   Foreground="#FFD700"
+                                                                                                   FontWeight="Bold"
+                                                                                                   Margin="0,0,0,4"/>
+                                                                                        <TextBlock x:Name="SimStepText"
+                                                                                                   Text="Step: 0 / 0"
+                                                                                                   Foreground="#AAAAAA"
+                                                                                                   FontSize="11"
+                                                                                                   Margin="0,0,0,6"/>
+                                                                                        <ProgressBar x:Name="SimProgressBar"
+                                                                                                     Minimum="0"
+                                                                                                     Maximum="100"
+                                                                                                     Value="0"
+                                                                                                     Height="8"
+                                                                                                     Foreground="#007ACC"
+                                                                                                     Background="#333333"/>
+                                                                                        <Button x:Name="BtnAbortSimulation"
+                                                                                                Content="Abort"
+                                                                                                Click="OnAbortSimulationClick"
+                                                                                                Background="#C42B1C"
+                                                                                                Foreground="White"
+                                                                                                FontWeight="Bold"
+                                                                                                Padding="8,4"
+                                                                                                Margin="0,8,0,0"
+                                                                                                HorizontalAlignment="Stretch"
+                                                                                                Cursor="Hand"/>
+                                                                                </StackPanel>
+                                                                        </Border>
+                                                                </StackPanel>
+                                                        </StackPanel>
+                                                </ScrollViewer>
+                                        </Grid>
+
+                                        <!-- Reporting panel (with Components / Probes sub-tabs) -->
+                                        <Grid x:Name="ReportingPanelRoot"
+                                              Visibility="Collapsed">
+                                                <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Sub-tab buttons -->
+                                                <StackPanel Grid.Row="0"
+                                                            Orientation="Horizontal"
+                                                            Background="#1E1E1E"
+                                                            Margin="0,0,0,1">
+                                                        <ToggleButton x:Name="ReportSubTabComponents"
+                                                                      Content="Components"
+                                                                      IsChecked="True"
+                                                                      Click="OnReportSubTabComponentsClick"
+                                                                      Padding="14,5"
+                                                                      MinWidth="70"
+                                                                      Background="#333337"
+                                                                      Foreground="White"
+                                                                      BorderThickness="0"
+                                                                      Margin="4,4,2,4"/>
+                                                        <ToggleButton x:Name="ReportSubTabProbes"
+                                                                      Content="Probes"
+                                                                      Click="OnReportSubTabProbesClick"
+                                                                      Padding="14,5"
+                                                                      MinWidth="70"
+                                                                      Background="#333337"
+                                                                      Foreground="White"
+                                                                      BorderThickness="0"
+                                                                      Margin="0,4,4,4"/>
+                                                </StackPanel>
+
+                                                <!-- Components sub-tab -->
+                                                <ScrollViewer x:Name="ReportComponentsScroll"
+                                                              Grid.Row="1"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              Visibility="Visible">
+                                                        <StackPanel x:Name="ReportComponentsContainer"
+                                                                    Margin="5"/>
+                                                </ScrollViewer>
+
+                                                <!-- Probes sub-tab -->
+                                                <ScrollViewer x:Name="ReportProbesScroll"
+                                                              Grid.Row="1"
+                                                              VerticalScrollBarVisibility="Auto"
+                                                              Visibility="Collapsed">
+                                                        <StackPanel x:Name="ReportProbesContainer"
+                                                                    Margin="5"/>
+                                                </ScrollViewer>
+                                        </Grid>
+                                </Grid>
+                        </Border>
+
+                        <!-- Right side: Shared 3D viewport area -->
+                        <Grid Grid.Column="1"
+                              x:Name="ViewportGrid"
+                              ClipToBounds="True">
+
+                                <helix:HelixViewport3D x:Name="MainViewport"
+                                                       ShowCoordinateSystem="True"
+                                                       CoordinateSystemLabelForeground="White"
+                                                       ZoomExtentsWhenLoaded="True"
+                                                       ShowViewCube="True"
+                                                       MouseDown="OnViewportMouseDown"
+                                                       MouseMove="OnViewportMouseMove"
+                                                       MouseUp="OnViewportMouseUp"
+                                                       MouseWheel="OnViewportMouseWheel">
+                                </helix:HelixViewport3D>
+
+                                <!-- Crosshair + Coordinate HUD -->
+                                <Canvas x:Name="OverlayCanvas"
+                                        IsHitTestVisible="False">
+                                        <Path x:Name="CrosshairPath"
+                                              Stroke="#88FFFFFF"
+                                              StrokeThickness="1"
+                                              SnapsToDevicePixels="True">
+                                                <Path.Data>
+                                                        <GeometryGroup>
+                                                                <LineGeometry StartPoint="-10,0"
+                                                                              EndPoint="10,0"/>
+                                                                <LineGeometry StartPoint="0,-10"
+                                                                              EndPoint="0,10"/>
+                                                        </GeometryGroup>
+                                                </Path.Data>
+                                        </Path>
+                                        <Border x:Name="CoordHud"
+                                                Background="#CC000000"
+                                                CornerRadius="4"
+                                                Padding="5,2"
+                                                Canvas.Left="0"
+                                                Canvas.Top="0">
+                                                <TextBlock x:Name="CoordText"
+                                                           Text="X:0 Y:0 Z:0"
+                                                           Foreground="#00FF00"
+                                                           FontFamily="Consolas"
+                                                           FontSize="12"/>
+                                        </Border>
+                                </Canvas>
+
+                                <!-- Edit Dimensions Popup (Modeling mode) -->
+                                <Grid x:Name="EditPopup"
+                                      Visibility="Collapsed"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Top"
+                                      Width="220">
+                                        <Border Background="#DD333333"
+                                                BorderBrush="#555"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="10">
+                                                <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="10"
+                                                                          ShadowDepth="2"
+                                                                          Opacity="0.5"/>
+                                                </Border.Effect>
+                                                <StackPanel>
+                                                        <TextBlock Text="Edit Dimensions"
+                                                                   Foreground="White"
+                                                                   FontWeight="Bold"
+                                                                   Margin="0,0,0,10"/>
+
+                                                        <StackPanel x:Name="PanelAxonLength"
+                                                                    Visibility="Collapsed"
+                                                                    Margin="0,0,0,5">
+                                                                <TextBlock Text="Length:"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"/>
+                                                                <TextBox x:Name="TbLength"
+                                                                         Background="#222"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"/>
+                                                        </StackPanel>
+
+                                                        <StackPanel x:Name="PanelRadius"
+                                                                    Visibility="Collapsed"
+                                                                    Margin="0,0,0,5">
+                                                                <TextBlock Text="Base / Soma Radius:"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"/>
+                                                                <TextBox x:Name="TbRadius"
+                                                                         Background="#222"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"/>
+                                                        </StackPanel>
+
+                                                        <StackPanel x:Name="PanelTopRadius"
+                                                                    Visibility="Collapsed"
+                                                                    Margin="0,0,0,10">
+                                                                <TextBlock Text="Top Radius:"
+                                                                           Foreground="#CCC"
+                                                                           FontSize="11"/>
+                                                                <TextBox x:Name="TbTopRadius"
+                                                                         Background="#222"
+                                                                         Foreground="White"
+                                                                         BorderBrush="#555"/>
+                                                        </StackPanel>
+
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    HorizontalAlignment="Right">
+                                                                <Button Content="Cancel"
+                                                                        Click="OnCancelEdit"
+                                                                        Width="60"
+                                                                        Margin="0,0,5,0"
+                                                                        Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
+                                                                <Button Content="Apply"
+                                                                        Click="OnApplyEdit"
+                                                                        Width="60"
+                                                                        Background="#007ACC"
+                                                                        Foreground="White"/>
+                                                        </StackPanel>
+                                                </StackPanel>
+                                        </Border>
+                                </Grid>
+
+                                <!-- Modeling mode bottom toolbar -->
+                                <Border x:Name="ModelingToolbar"
+                                        Visibility="Visible"
+                                        VerticalAlignment="Bottom"
+                                        HorizontalAlignment="Center"
+                                        Background="#CC333333"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,20">
+                                        <StackPanel Orientation="Horizontal">
+                                                <Button Content="Add Soma"
+                                                        Click="OnAddSomaClick"
+                                                        Padding="10,5"
+                                                        Margin="5"/>
+                                                <Button Content="Add Axon"
+                                                        Click="OnAddAxonClick"
+                                                        Padding="10,5"
+                                                        Margin="5"/>
+                                                <Button Content="Add Dend"
+                                                        Click="OnAddDendClick"
+                                                        Padding="10,5"
+                                                        Margin="5"/>
+                                        </StackPanel>
+                                </Border>
+
+                                <!-- Simulation mode bottom toolbar -->
+                                <Border x:Name="SimulationToolbar"
+                                        Visibility="Collapsed"
+                                        VerticalAlignment="Bottom"
+                                        HorizontalAlignment="Center"
+                                        Background="#CC333333"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,20">
+                                        <StackPanel Orientation="Horizontal">
+                                                <Button Content="Add Stimulation"
+                                                        Click="OnAddStimulationClick"
+                                                        Background="DarkGoldenrod"
+                                                        Foreground="White"
+                                                        Padding="10,5"
+                                                        Margin="5"/>
+                                                <Button Content="Add Probe"
+                                                        Click="OnAddProbeClick"
+                                                        Background="DarkCyan"
+                                                        Foreground="White"
+                                                        Padding="10,5"
+                                                        Margin="5"/>
+                                        </StackPanel>
+                                </Border>
+
+                        </Grid>
+
+                        <!-- Channel selector popup -->
+                        <Popup x:Name="ChannelSelectorPopup"
+                               StaysOpen="False"
+                               Placement="MousePoint">
+                                <Border Background="#333333"
+                                        BorderBrush="#555555"
+                                        BorderThickness="1"
+                                        Padding="10">
+                                        <StackPanel>
+                                                <TextBlock Text="Select Channel to Add:"
+                                                           Foreground="#CCCCCC"
+                                                           Margin="0,0,0,5"/>
+                                                <StackPanel x:Name="ChannelSelectorList"/>
+                                        </StackPanel>
+                                </Border>
+                        </Popup>
+
                 </Grid>
-            </Border>
-
-            <!-- Right side: Shared 3D viewport area -->
-            <Grid Grid.Column="1"
-                    x:Name="ViewportGrid"
-                    ClipToBounds="True">
-
-                <helix:HelixViewport3D x:Name="MainViewport"
-                                       ShowCoordinateSystem="True"
-                                       CoordinateSystemLabelForeground="White"
-                                       ZoomExtentsWhenLoaded="True"
-                                       ShowViewCube="True"
-                                       MouseDown="OnViewportMouseDown"
-                                       MouseMove="OnViewportMouseMove"
-                                       MouseUp="OnViewportMouseUp"
-                                       MouseWheel="OnViewportMouseWheel">
-                </helix:HelixViewport3D>
-
-                <!-- Crosshair + Coordinate HUD -->
-                <Canvas x:Name="OverlayCanvas"
-                        IsHitTestVisible="False">
-                    <Path x:Name="CrosshairPath"
-                            Stroke="#88FFFFFF"
-                            StrokeThickness="1"
-                            SnapsToDevicePixels="True">
-                        <Path.Data>
-                            <GeometryGroup>
-                                <LineGeometry StartPoint="-10,0"
-                                        EndPoint="10,0"/>
-                                <LineGeometry StartPoint="0,-10"
-                                        EndPoint="0,10"/>
-                            </GeometryGroup>
-                        </Path.Data>
-                    </Path>
-                    <Border x:Name="CoordHud"
-                            Background="#CC000000"
-                            CornerRadius="4"
-                            Padding="5,2"
-                            Canvas.Left="0"
-                            Canvas.Top="0">
-                        <TextBlock x:Name="CoordText"
-                                Text="X:0 Y:0 Z:0"
-                                Foreground="#00FF00"
-                                FontFamily="Consolas"
-                                FontSize="12"/>
-                    </Border>
-                </Canvas>
-
-                <!-- Edit Dimensions Popup (Modeling mode) -->
-                <Grid x:Name="EditPopup"
-                        Visibility="Collapsed"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Width="220">
-                    <Border Background="#DD333333"
-                            BorderBrush="#555"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="10">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="10"
-                                    ShadowDepth="2"
-                                    Opacity="0.5"/>
-                        </Border.Effect>
-                        <StackPanel>
-                            <TextBlock Text="Edit Dimensions"
-                                    Foreground="White"
-                                    FontWeight="Bold"
-                                    Margin="0,0,0,10"/>
-
-                            <StackPanel x:Name="PanelAxonLength"
-                                    Visibility="Collapsed"
-                                    Margin="0,0,0,5">
-                                <TextBlock Text="Length:"
-                                        Foreground="#CCC"
-                                        FontSize="11"/>
-                                <TextBox x:Name="TbLength"
-                                        Background="#222"
-                                        Foreground="White"
-                                        BorderBrush="#555"/>
-                            </StackPanel>
-
-                            <StackPanel x:Name="PanelRadius"
-                                    Visibility="Collapsed"
-                                    Margin="0,0,0,5">
-                                <TextBlock Text="Base / Soma Radius:"
-                                        Foreground="#CCC"
-                                        FontSize="11"/>
-                                <TextBox x:Name="TbRadius"
-                                        Background="#222"
-                                        Foreground="White"
-                                        BorderBrush="#555"/>
-                            </StackPanel>
-
-                            <StackPanel x:Name="PanelTopRadius"
-                                    Visibility="Collapsed"
-                                    Margin="0,0,0,10">
-                                <TextBlock Text="Top Radius:"
-                                        Foreground="#CCC"
-                                        FontSize="11"/>
-                                <TextBox x:Name="TbTopRadius"
-                                        Background="#222"
-                                        Foreground="White"
-                                        BorderBrush="#555"/>
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right">
-                                <Button Content="Cancel"
-                                        Click="OnCancelEdit"
-                                        Width="60"
-                                        Margin="0,0,5,0"
-                                        Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
-                                <Button Content="Apply"
-                                        Click="OnApplyEdit"
-                                        Width="60"
-                                        Background="#007ACC"
-                                        Foreground="White"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- Modeling mode bottom toolbar -->
-                <Border x:Name="ModelingToolbar"
-                        Visibility="Visible"
-                        VerticalAlignment="Bottom"
-                        HorizontalAlignment="Center"
-                        Background="#CC333333"
-                        CornerRadius="8"
-                        Padding="10"
-                        Margin="0,0,0,20">
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Add Soma"
-                                Click="OnAddSomaClick"
-                                Padding="10,5"
-                                Margin="5"/>
-                        <Button Content="Add Axon"
-                                Click="OnAddAxonClick"
-                                Padding="10,5"
-                                Margin="5"/>
-                        <Button Content="Add Dend"
-                                Click="OnAddDendClick"
-                                Padding="10,5"
-                                Margin="5"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Simulation mode bottom toolbar -->
-                <Border x:Name="SimulationToolbar"
-                        Visibility="Collapsed"
-                        VerticalAlignment="Bottom"
-                        HorizontalAlignment="Center"
-                        Background="#CC333333"
-                        CornerRadius="8"
-                        Padding="10"
-                        Margin="0,0,0,20">
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Add Stimulation"
-                                Click="OnAddStimulationClick"
-                                Background="DarkGoldenrod"
-                                Foreground="White"
-                                Padding="10,5"
-                                Margin="5"/>
-                        <Button Content="Add Probe"
-                                Click="OnAddProbeClick"
-                                Background="DarkCyan"
-                                Foreground="White"
-                                Padding="10,5"
-                                Margin="5"/>
-                    </StackPanel>
-                </Border>
-
-            </Grid>
-
-            <!-- Channel selector popup -->
-            <Popup x:Name="ChannelSelectorPopup"
-                    StaysOpen="False"
-                    Placement="MousePoint">
-                <Border Background="#333333"
-                        BorderBrush="#555555"
-                        BorderThickness="1"
-                        Padding="10">
-                    <StackPanel>
-                        <TextBlock Text="Select Channel to Add:"
-                                Foreground="#CCCCCC"
-                                Margin="0,0,0,5"/>
-                        <StackPanel x:Name="ChannelSelectorList"/>
-                    </StackPanel>
-                </Border>
-            </Popup>
-
         </Grid>
-    </Grid>
 </Window>

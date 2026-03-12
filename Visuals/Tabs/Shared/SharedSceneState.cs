@@ -42,6 +42,12 @@ namespace NeuronCAD.Visuals.Tabs.Shared
         public List<IAttachedDevice> Devices { get; } = new();
 
         /// <summary>
+        /// 上一次仿真完成后的仿真数据（包含区室化结果和探针/刺激绑定信息）。
+        /// 由 MainWindow.OnBeginSimulationClick 在仿真成功后写入，供 Reporting 面板读取探针映射。
+        /// </summary>
+        public SimulationData? LastSimulationData { get; set; }
+
+        /// <summary>
         /// 构造函数，基于给定的 HelixViewport3D 创建视口控制器和连接控制器。
         /// 由 MainWindow.InitializeControllers 调用。
         /// </summary>

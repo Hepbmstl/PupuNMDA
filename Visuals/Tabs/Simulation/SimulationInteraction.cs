@@ -59,6 +59,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         /// <summary>设备删除事件，被 SimulationPanelController.HandleDeviceRemoved 订阅。</summary>
         public event Action<IAttachedDevice>? OnDeviceRemoved;
 
+        /// <summary>设备选中变更事件，被 SimulationPanelController.HandleDeviceSelectionChanged 订阅。</summary>
+        public event Action<IAttachedDevice?>? OnDeviceSelectionChanged;
+
+        /// <summary>当前选中的设备。</summary>
+        private IAttachedDevice? _selectedDevice;
+
         /// <summary>
         /// 构造函数。由 MainWindow.InitializeControllers 调用。
         /// </summary>
@@ -101,6 +107,18 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             }
             _dragDevice = null;
             _currentState = SimulationState.Idle;
+            SelectDevice(null);
+        }
+
+        /// <summary>
+        /// 强制选中指定设备（或取消选中），触发 OnDeviceSelectionChanged 事件。
+        /// 被面板展开和视口点击调用。
+        /// </summary>
+        public void SelectDevice(IAttachedDevice? device)
+        {
+            if (_selectedDevice == device) return;
+            _selectedDevice = device;
+            OnDeviceSelectionChanged?.Invoke(_selectedDevice);
         }
 
         #endregion
@@ -196,6 +214,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
         /// <summary>
         /// 鼠标释放事件处理。DraggingDevice 状态下释放拖拽，回到 Idle。
+        /// Idle 状态左键点击（非拖拽）选中设备。
         /// 由 MainWindow.OnViewportMouseUp 路由调用。
         /// </summary>
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
@@ -206,6 +225,13 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 _currentState = SimulationState.Idle;
                 e.Handled = true;
                 return;
+            }
+
+            if (_currentState == SimulationState.Idle && e.ChangedButton == MouseButton.Left && !_isDraggingViewport)
+            {
+                var mousePos = e.GetPosition(_scene.HelixViewport);
+                var hitDevice = HitTestDevice(mousePos);
+                SelectDevice(hitDevice);
             }
         }
 

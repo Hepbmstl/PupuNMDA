@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 
 namespace NeuronCAD.Visuals.Tabs.Modeling
@@ -34,6 +35,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         /// <summary>当前正在操作“添加通道”的目标实体，由 btnAddChannel.Click 设置。</summary>
         private IVisualEntity _currentOperatingEntity;
 
+        /// <summary>相机跳转回调，由 MainWindow 注入。</summary>
+        private readonly Action<Point3D>? _navigateToPoint;
+
+        /// <summary>标记是否正在通过代码设置展开状态（防止递归触发选中）。</summary>
+        private bool _suppressExpandEvent;
+
         /// <summary>
         /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器和交互控制器，并订阅事件。
         /// </summary>
@@ -41,12 +48,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         /// <param name="popup">离子通道选择弹窗</param>
         /// <param name="popupList">弹窗内按钮列表容器</param>
         /// <param name="interaction">建模交互控制器（用于订阅事件）</param>
-        public PropertiesPanelController(StackPanel container, Popup popup, StackPanel popupList, InteractionController interaction)
+        public PropertiesPanelController(StackPanel container, Popup popup, StackPanel popupList, InteractionController interaction, Action<Point3D>? navigateToPoint = null)
         {
             _container = container;
             _channelPopup = popup;
             _channelSelectorList = popupList;
             _interaction = interaction;
+            _navigateToPoint = navigateToPoint;
 
             _interaction.OnEntityAdded += HandleEntityAdded;
             _interaction.OnEntityRemoved += HandleEntityRemoved;
@@ -122,22 +130,30 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         /// </summary>
         private void HandleSelectionChanged(IVisualEntity? selectedEntity)
         {
-            foreach (var kvp in _uiNodes)
+            _suppressExpandEvent = true;
+            try
             {
-                var entId = kvp.Key;
-                var expander = kvp.Value;
+                foreach (var kvp in _uiNodes)
+                {
+                    var entId = kvp.Key;
+                    var expander = kvp.Value;
 
-                if (selectedEntity != null && entId == selectedEntity.Id)
-                {
-                    expander.IsExpanded = true;
-                    expander.BorderBrush = Brushes.Orange;
-                    expander.BorderThickness = new Thickness(1);
+                    if (selectedEntity != null && entId == selectedEntity.Id)
+                    {
+                        expander.IsExpanded = true;
+                        expander.BorderBrush = Brushes.Orange;
+                        expander.BorderThickness = new Thickness(1);
+                    }
+                    else
+                    {
+                        expander.IsExpanded = false;
+                        expander.BorderThickness = new Thickness(0);
+                    }
                 }
-                else
-                {
-                    expander.IsExpanded = false;
-                    expander.BorderThickness = new Thickness(0);
-                }
+            }
+            finally
+            {
+                _suppressExpandEvent = false;
             }
         }
 
@@ -166,7 +182,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 Margin = new Thickness(0, 0, 0, 5)
             };
 
-            expander.Expanded += (s, e) => _interaction.ForceSelect(entity);
+            expander.Expanded += (s, e) =>
+            {
+                if (_suppressExpandEvent) return;
+                _interaction.ForceSelect(entity);
+                _navigateToPoint?.Invoke(entity.CenterPosition);
+            };
 
             var panel = new StackPanel { Margin = new Thickness(10, 5, 0, 5) };
 

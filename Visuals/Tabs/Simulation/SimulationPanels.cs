@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 
 namespace NeuronCAD.Visuals.Tabs.Simulation
@@ -23,18 +24,30 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         /// <summary>设备 ID 到属性卡片 Expander 的映射字典。</summary>
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
 
+        /// <summary>设备 ID 到 IAttachedDevice 的映射字典，用于面板点击时导航。</summary>
+        private readonly Dictionary<string, IAttachedDevice> _deviceMap = new Dictionary<string, IAttachedDevice>();
+
+        /// <summary>相机跳转回调，由 MainWindow 注入。</summary>
+        private readonly Action<Point3D>? _navigateToPoint;
+
+        /// <summary>标记是否正在通过代码设置展开状态（防止递归触发选中）。</summary>
+        private bool _suppressExpandEvent;
+
         /// <summary>
         /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器并订阅事件。
         /// </summary>
         /// <param name="container">仿真属性面板 StackPanel</param>
         /// <param name="interaction">仿真交互控制器</param>
-        public SimulationPanelController(StackPanel container, SimulationInteractionController interaction)
+        /// <param name="navigateToPoint">相机导航回调（可选）</param>
+        public SimulationPanelController(StackPanel container, SimulationInteractionController interaction, Action<Point3D>? navigateToPoint = null)
         {
             _container = container;
             _interaction = interaction;
+            _navigateToPoint = navigateToPoint;
 
             _interaction.OnDeviceAdded += HandleDeviceAdded;
             _interaction.OnDeviceRemoved += HandleDeviceRemoved;
+            _interaction.OnDeviceSelectionChanged += HandleDeviceSelectionChanged;
         }
 
         /// <summary>
@@ -45,6 +58,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         {
             var expander = BuildDeviceNode(device);
             _uiNodes[device.Id] = expander;
+            _deviceMap[device.Id] = device;
             _container.Children.Add(expander);
         }
 
@@ -58,6 +72,40 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             {
                 _container.Children.Remove(expander);
                 _uiNodes.Remove(device.Id);
+                _deviceMap.Remove(device.Id);
+            }
+        }
+
+        /// <summary>
+        /// 处理设备选中变更事件：展开对应卡片并高亮边框。
+        /// 被 SimulationInteractionController.OnDeviceSelectionChanged 事件触发调用。
+        /// </summary>
+        private void HandleDeviceSelectionChanged(IAttachedDevice? selectedDevice)
+        {
+            _suppressExpandEvent = true;
+            try
+            {
+                foreach (var kvp in _uiNodes)
+                {
+                    var devId = kvp.Key;
+                    var expander = kvp.Value;
+
+                    if (selectedDevice != null && devId == selectedDevice.Id)
+                    {
+                        expander.IsExpanded = true;
+                        expander.BorderBrush = Brushes.Orange;
+                        expander.BorderThickness = new Thickness(1);
+                    }
+                    else
+                    {
+                        expander.IsExpanded = false;
+                        expander.BorderThickness = new Thickness(0);
+                    }
+                }
+            }
+            finally
+            {
+                _suppressExpandEvent = false;
             }
         }
 
@@ -78,6 +126,13 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 Foreground = Brushes.LightGray,
                 Margin = new Thickness(0, 0, 0, 5),
                 IsExpanded = true
+            };
+
+            expander.Expanded += (s, e) =>
+            {
+                if (_suppressExpandEvent) return;
+                _interaction.SelectDevice(device);
+                _navigateToPoint?.Invoke(device.TargetEntity.CenterPosition);
             };
 
             var panel = new StackPanel { Margin = new Thickness(10, 5, 0, 5) };
