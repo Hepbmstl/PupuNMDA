@@ -363,5 +363,192 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             : base(start, end, radius, color, "Dend")
         {
         }
+
+        /// <summary>
+        /// 将世界坐标点转换为圆台表面锚点引用。
+        /// 通过逆变换矩阵将世界坐标转为局部坐标，然后根据 Z 值判断端盖或侧面，
+        /// 侧面锚点用 (AxialT, Angle) 参数化表示。
+        /// 被 InteractionController.ConfirmAction（创建连接）和 SimulationInteractionController 调用。
+        /// </summary>
+        public bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor)
+        {
+            anchor = new AnchorRef { Mode = AnchorMode.AxonCylinder, AxialT = 0.5, Angle = 0.0 };
+
+            if (Visual3D.Transform == null) return false;
+            var inv = Visual3D.Transform.Value;
+            if (!inv.HasInverse) return false;
+            inv.Invert();
+
+            var local = inv.Transform(worldPoint);
+
+            // 底端盖判定
+            if (local.Z <= 1e-3)
+            {
+                anchor.Mode = AnchorMode.AxonCapStart;
+                anchor.AxialT = 0.0;
+                anchor.Angle = 0.0;
+                return true;
+            }
+            // 顶端盖判定
+            if (local.Z >= _length - 1e-3)
+            {
+                anchor.Mode = AnchorMode.AxonCapEnd;
+                anchor.AxialT = 1.0;
+                anchor.Angle = 0.0;
+                return true;
+            }
+
+            // 侧面：计算轴向比例和周向角度
+            var t = _length <= 1e-9 ? 0.5 : local.Z / _length;
+            t = Math.Clamp(t, 0.0, 1.0);
+
+            double angle;
+            double r2 = local.X * local.X + local.Y * local.Y;
+
+            if (r2 < 1e-6)
+            {
+                // 命中点过于靠近轴心，使用缓存角度避免突变
+                angle = _lastAnchorAngle;
+            }
+            else
+            {
+                angle = Math.Atan2(local.Y, local.X);
+                _lastAnchorAngle = angle;
+            }
+
+            anchor.Mode = AnchorMode.AxonCylinder;
+            anchor.AxialT = t;
+            anchor.Angle = angle;
+            return true;
+        }
+
+        /// <summary>
+        /// 将锚点引用转换回世界坐标。根据锚点模式在局部坐标系中计算点位，
+        /// 然后通过变换矩阵映射到世界坐标系。
+        /// 被 ConnectionController.Update（刷新连接线）和 AttachedDeviceBase.UpdatePosition 调用。
+        /// </summary>
+        public bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint)
+        {
+            worldPoint = new Point3D();
+            if (Visual3D.Transform == null) return false;
+
+            Point3D local;
+
+            if (anchor.Mode == AnchorMode.AxonCapStart)
+            {
+                // 底面中心
+                local = new Point3D(0, 0, 0);
+            }
+            else if (anchor.Mode == AnchorMode.AxonCapEnd)
+            {
+                // 顶面中心
+                local = new Point3D(0, 0, _length);
+            }
+            else
+            {
+                // 侧面：使用 AxialT 和 Angle 参数化定位
+                double t = Math.Clamp(anchor.AxialT, 0.0, 1.0);
+                double z = t * _length;
+                double r = _baseRadius + (_topRadius - _baseRadius) * t; // 沿轴向线性插值半径
+
+                double x = r * Math.Cos(anchor.Angle);
+                double y = r * Math.Sin(anchor.Angle);
+                local = new Point3D(x, y, z);
+            }
+
+            worldPoint = Visual3D.Transform.Transform(local);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 树突 (Dend) 可视化实体，直接继承自 AxonVisual 并在构造时注入 "Dend" 类型标识。
+    /// 几何形状和行为与 AxonVisual 完全一致，仅在面板中以不同名称显示。
+    /// 由 MainWindow.OnAddDendClick 创建。
+    /// </summary>
+    public class DendVisual : AxonVisual
+    {
+        /// <summary>
+        /// 构造函数，创建树突可视化实体。
+        /// 自动将 VisualType 设为 "Dend"。
+        /// </summary>
+        public DendVisual(Point3D start, Point3D end, double radius, Color color)
+            : base(start, end, radius, color, "Dend")
+        {
+        }
+
+        public bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor)
+        {
+            anchor = new AnchorRef { Mode = AnchorMode.AxonCylinder, AxialT = 0.5, Angle = 0.0 };
+
+            // Transform 可能为空或不可逆，做保护
+            if (Visual3D.Transform == null) return false;
+            var inv = Visual3D.Transform.Value;
+            if (!inv.HasInverse) return false;
+            inv.Invert();
+
+            var local = inv.Transform(worldPoint);
+
+            // 轴向参数：local.Z / Length
+            var t = _length <= 1e-9 ? 0.5 : local.Z / _length;
+            t = Math.Clamp(t, 0.0, 1.0);
+
+            // 圆周角：atan2(y,x)
+            double angle;
+            double r2 = local.X * local.X + local.Y * local.Y;
+
+            // 在圆柱轴线附近 angle 不稳定：用上一次角度，避免跳到“里面/另一侧”
+            if (r2 < 1e-6)
+            {
+                angle = _lastAnchorAngle;
+            }
+            else
+            {
+                angle = Math.Atan2(local.Y, local.X);
+                _lastAnchorAngle = angle;
+            }
+
+
+            anchor.Mode = AnchorMode.AxonCylinder;
+            anchor.AxialT = t;
+            anchor.Angle = angle;
+            return true;
+        }
+
+        public bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint)
+        {
+            worldPoint = new Point3D();
+
+            if (Visual3D.Transform == null) return false;
+
+            double r = GetMeshRadiusFallbackToField();
+            // 落在表面：x = r cos, y = r sin, z = t*Length
+            double z = Math.Clamp(anchor.AxialT, 0.0, 1.0) * _length;
+            double x = r * Math.Cos(anchor.Angle);
+            double y = r * Math.Sin(anchor.Angle);
+
+            var local = new Point3D(x, y, z);
+            worldPoint = Visual3D.Transform.Transform(local);
+            return true;
+        }
+
+        private double GetMeshRadiusFallbackToField()
+        {
+            if (MainModel.Geometry is MeshGeometry3D mesh && mesh.Positions != null && mesh.Positions.Count > 0)
+            {
+                double maxR2 = 0.0;
+                foreach (var p in mesh.Positions)
+                {
+                    double r2 = p.X * p.X + p.Y * p.Y;
+                    if (r2 > maxR2) maxR2 = r2;
+                }
+                var r = Math.Sqrt(maxR2);
+                if (r > 1e-9) return r;
+            }
+
+            return _radius;
+        }
+
+
     }
 }

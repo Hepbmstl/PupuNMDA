@@ -40,6 +40,40 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         /// <summary>选中状态材质（橙色高亮），在 SetSelected(true) 时应用。</summary>
         protected Material _selectedMaterial;
+        protected Color _current_color = Colors.Gray;
+
+        private LinesVisual3D? _wireframe;
+        private VisualDisplayMode _displayMode = VisualDisplayMode.Normal;
+
+        /// <summary>当前实体颜色，被 SetColor 更新，被面板读取 (CurrentColor 属性)。</summary>
+        protected Color _current_color = Colors.Gray;
+
+        /// <summary>线框模式下的线段可视化对象。在 Wireframe 模式时从网格三角面提取边线。</summary>
+        private LinesVisual3D? _wireframe;
+
+        /// <summary>当前显示模式（Normal/Wireframe）。由 SetDisplayMode 管理。</summary>
+        private VisualDisplayMode _displayMode = VisualDisplayMode.Normal;
+
+        /// <summary>当前颜色的公开只读属性，供 PropertiesPanelController 面板读取。</summary>
+        public Color CurrentColor => _current_color;
+
+        /// <summary>
+        /// 实体绑定的离子通道字典。
+        /// 被 PropertiesPanelController 的通道选择器弹窗操作添加/删除。
+        /// </summary>
+        public Dictionary<string, ChannelProperty> Channels { get; set; } = new Dictionary<string, ChannelProperty>();
+
+        /// <summary>离子通道散点图层字典，Key 为通道名称，Value 为 PointsVisual3D。由 UpdateChannelVisuals 管理。</summary>
+        private Dictionary<string, PointsVisual3D> _channelVisuals = new Dictionary<string, PointsVisual3D>();
+
+        /// <summary>散点随机数生成器（全局共享），用于 UpdateChannelVisuals 中的蒙特卡洛采样。</summary>
+        private static readonly Random Rnd = new Random();
+
+        /// <summary>比膜电容 (µF/cm²)，标准值 1.0。</summary>
+        public double Cm { get; set; } = 1.0;
+
+        /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4。</summary>
+        public double Ra { get; set; } = 35.4;
 
         /// <summary>当前实体颜色，被 SetColor 更新，被面板读取 (CurrentColor 属性)。</summary>
         protected Color _current_color = Colors.Gray;
