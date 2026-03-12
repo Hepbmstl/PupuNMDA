@@ -59,8 +59,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         public Dictionary<string, ChannelProperty> Channels { get; set; } = new Dictionary<string, ChannelProperty>();
 
-        /// <summary>离子通道散点图层字典，Key 为通道名称，Value 为 PointsVisual3D。由 UpdateChannelVisuals 管理。</summary>
-        private Dictionary<string, PointsVisual3D> _channelVisuals = new Dictionary<string, PointsVisual3D>();
+        /// <summary>离子通道可视化图层字典，Key 为通道名称，Value 为 ModelVisual3D（合并网格）。由 UpdateChannelVisuals 管理。</summary>
+        private Dictionary<string, ModelVisual3D> _channelVisuals = new Dictionary<string, ModelVisual3D>();
 
         /// <summary>散点随机数生成器（全局共享），用于 UpdateChannelVisuals 中的蒙特卡洛采样。</summary>
         private static readonly Random Rnd = new Random();
@@ -68,8 +68,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <summary>比膜电容 (µF/cm²)，标准值 1.0。</summary>
         public double Cm { get; set; } = 1.0;
 
-        /// <summary>轴向电阻率 (Ω·cm)，标准值 35.4。</summary>
-        public double Ra { get; set; } = 35.4;
+        /// <summary>轴向电阻率 (Ω·cm)，标准值 100.0。</summary>
+        public double Ra { get; set; } = 100.0;
 
         /// <summary>仿真后该实体被切分的区室数量。未仿真时为 0。</summary>
         public int CompartmentCount { get; set; } = 0;
@@ -224,14 +224,19 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 刷新离子通道表面散点可视化。
-        /// 根据 Channels 字典中的每个通道，使用蒙特卡洛方法在网格表面按面积加权随机采样生成散点。
-        /// 散点数量 = 三角面总面积 × GlobalBiophysics.ConductanceToRenderDensity(通道电导 G_ion_channel)（渲染专用转换）。
-        /// 被 PropertiesPanelController 中添加/删除通道后调用，以及 NotifyGeometryChanged 在几何变更时调用。
+        /// 刷新离子通道表面可视化。
+        /// 使用低密度三维小球体代替屏幕空间散点，球体合并为单个网格以减少绘制调用。
+        /// 球体具有固定三维尺寸，不会随视角距离变化而改变大小。
+        /// 每通道最多 MaxChannelParticles 个粒子，密度按电导比例缩放。
         /// </summary>
         public void UpdateChannelVisuals()
         {
-            // 1. 清理当前图层引用的显存资源
+            const int MaxChannelParticles = 80;
+            const double DensityFactor = 0.03;
+            const double ParticleRadius = 0.15;
+            const int ParticleSeg = 4;
+
+            // 1. 清理当前图层
             foreach (var vis in _channelVisuals.Values)
             {
                 Visual3D.Children.Remove(vis);
@@ -247,7 +252,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             var indices = mesh.TriangleIndices;
             int triangleCount = indices.Count / 3;
 
-            // 3. 预计算所有三角面的面积和累积概率密度（用于面积加权采样）
+            // 3. 预计算累积面积（面积加权采样）
             double[] cumulativeAreas = new double[triangleCount];
             double totalArea = 0;
 
@@ -267,18 +272,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             if (totalArea <= 0) return;
 
-            // 4. 为每个通道重建表面散点分布
+            // 4. 为每个通道生成固定三维大小的粒子网格
             foreach (var kvp in Channels)
             {
                 var channel = kvp.Value;
-                int pointCount = (int)(totalArea * GlobalBiophysics.ConductanceToRenderDensity(channel.G_ion_channel));
-                if (pointCount <= 0) continue;
+                int pointCount = Math.Clamp(
+                    (int)(totalArea * channel.G_ion_channel * DensityFactor),
+                    3, MaxChannelParticles);
 
-                var points = new Point3DCollection(pointCount);
+                var builder = new MeshBuilder();
 
                 for (int p = 0; p < pointCount; p++)
                 {
-                    // 二分查找选中一个具备面积权重的三角形面片
                     double randomArea = Rnd.NextDouble() * totalArea;
                     int triIndex = Array.BinarySearch(cumulativeAreas, randomArea);
                     if (triIndex < 0) triIndex = ~triIndex;
@@ -288,7 +293,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                     Point3D p1 = positions[indices[triIndex * 3 + 1]];
                     Point3D p2 = positions[indices[triIndex * 3 + 2]];
 
-                    // 生成重心坐标（均匀三角采样算法）
                     double r1 = Rnd.NextDouble();
                     double r2 = Rnd.NextDouble();
                     double sqrtR1 = Math.Sqrt(r1);
@@ -301,31 +305,31 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                     double py = u * p0.Y + v * p1.Y + w * p2.Y;
                     double pz = u * p0.Z + v * p1.Z + w * p2.Z;
 
-                    // 沿法线方向偏移 0.05，避免 Z-Fighting
+                    // 沿法线偏移，避免 Z-Fighting
                     Vector3D normal = Vector3D.CrossProduct(p1 - p0, p2 - p0);
                     if (normal.LengthSquared > 1e-10)
                     {
                         normal.Normalize();
-                        px += normal.X * 0.05;
-                        py += normal.Y * 0.05;
-                        pz += normal.Z * 0.05;
+                        px += normal.X * ParticleRadius;
+                        py += normal.Y * ParticleRadius;
+                        pz += normal.Z * ParticleRadius;
                     }
 
-                    points.Add(new Point3D(px, py, pz));
+                    builder.AddSphere(new Point3D(px, py, pz), ParticleRadius, ParticleSeg, ParticleSeg);
                 }
 
-                var pointsVis = new PointsVisual3D
-                {
-                    Points = points,
-                    Color = channel.Color,
-                    Size = 5
-                };
+                var meshGeo = builder.ToMesh();
+                if (meshGeo == null) continue;
 
-                _channelVisuals[kvp.Key] = pointsVis;
+                var material = MaterialHelper.CreateMaterial(channel.Color);
+                var model = new GeometryModel3D(meshGeo, material) { BackMaterial = material };
+                var visual = new ModelVisual3D { Content = model };
+
+                _channelVisuals[kvp.Key] = visual;
 
                 if (_displayMode == VisualDisplayMode.Normal)
                 {
-                    Visual3D.Children.Add(pointsVis);
+                    Visual3D.Children.Add(visual);
                 }
             }
         }

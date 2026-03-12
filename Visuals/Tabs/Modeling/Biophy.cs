@@ -21,9 +21,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public Color Color { get; set; }
 
         /// <summary>
-        /// 离子通道电导密度（单位：µS/cm²）。
-        /// 在仿真中用于电导相关计算；在渲染时通过 GlobalBiophysics.ConductanceToRenderDensity 转换为视觉散点密度。
-        /// 注意：渲染密度仅具有视觉意义，不代表物理点数。
+        /// 离子通道电导密度（单位：mS/cm²）。
+        /// 在仿真中直接传入 Hines_method.py 的 add_channel_to_segment 接口。
         /// </summary>
         public float G_ion_channel { get; set; }
 
@@ -32,7 +31,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         /// <param name="name">通道名称</param>
         /// <param name="color">渲染颜色</param>
-        /// <param name="G">电导密度 (µS/cm²)</param>
+        /// <param name="G">电导密度 (mS/cm²)</param>
         public ChannelProperty(string name, Color color, float G)
         {
             Name = name;
@@ -61,27 +60,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         static GlobalBiophysics()
         {
             // 名称使用短键以与 Hines_method 的键名一致
-            var naChannel = new ChannelProperty("Na", Colors.Red, 50.0f);
-            var kChannel = new ChannelProperty("K", Colors.Blue, 30.0f);
-            var leakChannel = new ChannelProperty("L", Colors.LightGreen, 10.0f);
+            var naChannel = new ChannelProperty("Na", Colors.Red, 120.0f);
+            var kChannel = new ChannelProperty("K", Colors.Blue, 36.0f);
+            var leakChannel = new ChannelProperty("L", Colors.LightGreen, 0.3f);
 
             GlobalChannels.Add(naChannel.Name, naChannel);
             GlobalChannels.Add(kChannel.Name, kChannel);
             GlobalChannels.Add(leakChannel.Name, leakChannel);
         }
 
-        /// <summary>
-        /// 将电导密度（µS/cm²）转换为用于渲染的点云密度（无物理意义，仅用于视觉效果）。
-        /// 该转换函数统一渲染尺度到微级量纲，返回值为每单位面积的渲染点密度。
-        /// </summary>
-        public static float ConductanceToRenderDensity(double g_uS_per_cm2)
-        {
-            // 简单线性缩放并截断，比例因子可根据视觉效果调整。
-            const double scale = 0.1; // 每 µS/cm² 对应的视觉密度比例
-            double v = g_uS_per_cm2 * scale;
-            if (v < 0) v = 0;
-            if (v > 10000) v = 10000;
-            return (float)v;
-        }
     }
 }

@@ -71,8 +71,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             var builder = new MeshBuilder();
             builder.AddSphere(new Point3D(0, 0, 0), _radius, 24, 24);
             MainModel.Geometry = builder.ToMesh();
-            MainModel.Geometry = builder.ToMesh();
-            MainModel.Geometry = builder.ToMesh();
             NotifyGeometryChanged();
         }
 

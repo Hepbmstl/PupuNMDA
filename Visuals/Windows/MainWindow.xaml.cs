@@ -278,11 +278,11 @@ namespace NeuronCAD.Visuals.Windows
 
             // 读取仿真参数
             if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -65.0;
-            if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.025;
+            if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.02;
             if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
-            if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 50.0;
-            if (!double.TryParse(TbEK.Text, out double eK)) eK = -77.0;
-            if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.387;
+            if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 55.0;
+            if (!double.TryParse(TbEK.Text, out double eK)) eK = -72.0;
+            if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.3;
 
             // ── 进入仿真状态：禁用交互，显示进度面板 ──
             _isSimulating = true;
@@ -542,7 +542,7 @@ namespace NeuronCAD.Visuals.Windows
         /// </summary>
         private void OnAddSomaClick(object sender, RoutedEventArgs e)
         {
-            var newSoma = new SomaVisual(new Point3D(0, 0, 0), 2.0, Colors.DodgerBlue);
+            var newSoma = new SomaVisual(new Point3D(0, 0, 0), 10.0, Colors.DodgerBlue);
             _modelingInteraction.StartPlacing(newSoma);
         }
 
@@ -553,8 +553,8 @@ namespace NeuronCAD.Visuals.Windows
         private void OnAddAxonClick(object sender, RoutedEventArgs e)
         {
             var start = new Point3D(0, 0, 0);
-            var end = new Point3D(0, 0, 5);
-            var newAxon = new AxonVisual(start, end, 0.5, Colors.LimeGreen);
+            var end = new Point3D(0, 0, 50);
+            var newAxon = new AxonVisual(start, end, 2.5, Colors.LimeGreen);
             _modelingInteraction.StartPlacing(newAxon);
         }
 
@@ -565,8 +565,8 @@ namespace NeuronCAD.Visuals.Windows
         private void OnAddDendClick(object sender, RoutedEventArgs e)
         {
             var start = new Point3D(0, 0, 0);
-            var end = new Point3D(0, 0, 5);
-            var newDend = new DendVisual(start, end, 0.5, Colors.MediumPurple);
+            var end = new Point3D(0, 0, 50);
+            var newDend = new DendVisual(start, end, 1.0, Colors.MediumPurple);
             _modelingInteraction.StartPlacing(newDend);
         }
 
