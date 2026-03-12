@@ -40,6 +40,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         /// <summary>选中状态材质（橙色高亮），在 SetSelected(true) 时应用。</summary>
         protected Material _selectedMaterial;
+        protected Color _current_color = Colors.Gray;
+
+        private LinesVisual3D? _wireframe;
+        private VisualDisplayMode _displayMode = VisualDisplayMode.Normal;
 
         /// <summary>当前实体颜色，被 SetColor 更新，被面板读取 (CurrentColor 属性)。</summary>
         protected Color _current_color = Colors.Gray;

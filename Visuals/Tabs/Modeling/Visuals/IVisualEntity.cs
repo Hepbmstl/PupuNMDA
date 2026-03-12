@@ -118,4 +118,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <returns>转换是否成功</returns>
         bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint);
     }
+    public interface IAnchoredEntity
+    {
+        bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor);
+        bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint);
+    }
 }

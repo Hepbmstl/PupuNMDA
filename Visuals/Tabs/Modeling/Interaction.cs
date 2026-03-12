@@ -411,6 +411,35 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         /// </summary>
         private void UpdateObjectPosition(Point mousePos)
         {
+            if (_dragConnId == null) return;
+            if (!_connectionController.ConnectionsById.TryGetValue(_dragConnId, out var conn)) return;
+
+            // 端点 A 只能落在 A 实体上；端点 B 只能落在 B 实体上
+            var targetEntity = _dragEndIsA ? conn.A : conn.B;
+            if (targetEntity is not Visuals.IAnchoredEntity anchoredTarget)
+                return;
+
+            var hits = _helixViewport.Viewport.FindHits(mousePos);
+            if (hits == null || hits.Count == 0) return;
+
+            // 找到命中 targetEntity.Visual3D 的最近 hit
+            var hit = hits
+                .OrderBy(h => h.Distance)
+                .FirstOrDefault(h => IsSelfOrChild(h.Visual, targetEntity.Visual3D));
+
+            if (hit == null) return;
+
+            if (!anchoredTarget.TryWorldPointToAnchor(hit.Position, out var newAnchor))
+                return;
+
+            if (_dragEndIsA) conn.AnchorA = newAnchor;
+            else conn.AnchorB = newAnchor;
+
+            _connectionController.Update(conn.Id);
+        }
+
+        private void UpdateObjectPosition(Point mousePos)
+        {//吸附 移动到命中点
             if (_activeEntity == null) return;
 
             var allHits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -618,6 +647,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             var deleteItem = new MenuItem { Header = "Delete" };
             deleteItem.Click += (s, e) => DeleteSelected();
+
+            var connectItem = new MenuItem { Header = "Connect" };
+            connectItem.Click += (s, e) =>
+            {
+                if (_activeEntity == null) return;
+                _connectSourceEntity = _activeEntity;
+                _currentState = InteractionState.SelectingConnectionTarget;
+            };
 
             contextMenu.Items.Add(moveItem);
             contextMenu.Items.Add(resizeItem);
