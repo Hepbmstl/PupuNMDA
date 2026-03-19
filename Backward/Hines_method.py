@@ -4,10 +4,22 @@ import math
 from dataclasses import dataclass, field
 import json
 import matplotlib
-matplotlib.use('TkAgg')
+try:
+    matplotlib.use('TkAgg')
+except Exception:
+    pass
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
+FARADAY = 96485.3       # 库仑/摩尔 (C/mol)
+R_GAS = 8.314           # 焦耳/(摩尔·开尔文) (J/(mol*K))
+CELSIUS = 36.0          # 模拟温度 (degC)
+TEMP_K = CELSIUS + 273.15
+Z_CA = 2.0              # 钙离子化合价
+
+CA_OUT = 2.0            # 胞外钙浓度 (mM)
+CA_INF = 2.4e-4         # 胞内稳态游离钙浓度 (mM)
+TAU_CA = 5.0            # 钙离子衰减时间常数 (ms)
 
 E_TABLE = {
     "Na": {"E": 55.0},
@@ -27,6 +39,10 @@ HISTORY_V = None
 HISTORY_M = None
 HISTORY_H = None
 HISTORY_N = None
+
+HISTORY_CA = None
+HISTORY_MT = None
+HISTORY_HT = None
 
 PROBE_LIST = []
 # PROBE_LIST stores tuples for interval probes:
@@ -60,6 +76,7 @@ def set_env(V_init: float= -65.0,
         steps: int = 1000,
         n_node:int = 0 ): 
     global V, DT, DEL, STEPS, N_NODE, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
 
     V = V_init # 初始化所有区室的电压
     DT = dt # 模拟步长
@@ -70,6 +87,9 @@ def set_env(V_init: float= -65.0,
     HISTORY_M = np.zeros((steps + 1, n_node))
     HISTORY_H = np.zeros((steps + 1, n_node))
     HISTORY_N = np.zeros((steps + 1, n_node))
+    HISTORY_CA = np.zeros((steps + 1, n_node))
+    HISTORY_MT = np.zeros((steps + 1, n_node))
+    HISTORY_HT = np.zeros((steps + 1, n_node))
 
 def set_E(table : dict): # 设置所有离子的电位
     global E_TABLE
@@ -134,6 +154,25 @@ class Segment:
     
     def return_connection(self):
         return None
+    
+    def get_absolute_P_max(self, ion_name):
+        """提取渗透率并转换为与面积相关的绝对系数"""
+        # 结果保留 cm/s * cm^2 = cm^3/s 的比例，后续 GHK 函数会统一转换量纲
+        return self.channels.get(ion_name, 0.0) * self.surface_area_cm2
+    
+    @property
+    def gamma_Ca(self):
+        """
+        计算法拉第几何转换系数 (浓度通量因子)
+        单位换算推导：将绝对电流 (uA) 转化为浓度变化 (mM/ms)
+        假设钙离子聚集在膜下 d = 0.1 um 的壳层中
+        """
+        d_um = 0.1
+        shell_volume_L = self.surface_area_cm2 * (d_um * 1e-4) * 1e-3 # 升
+        # d[Ca]/dt = - I / (Z * F * Volume)
+        # I(uA)=1e-6 A, d[Ca]/dt 单位 mM/ms = mol/(L·s):
+        # gamma = 1e-6 / (Z * F * Volume_L)
+        return 1e-6 / (Z_CA * FARADAY * shell_volume_L)
 
 
 def init_segment(uid: str, # 初始化区室
@@ -159,6 +198,7 @@ def clear_environment():
     """重置所有全局状态，用于下一次仿真运行前清理。"""
     global SEGMENT, V, DT, DEL, STEPS, N_NODE
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
     global PROBE_LIST, STIMULATION, PROBE_SAVE_DATA
     global CURRENT_STEP, SIMULATION_RUNNING, E_TABLE
 
@@ -172,6 +212,9 @@ def clear_environment():
     HISTORY_M = None
     HISTORY_H = None
     HISTORY_N = None
+    HISTORY_CA = None
+    HISTORY_MT = None
+    HISTORY_HT = None
     PROBE_LIST = []
     STIMULATION = []
     PROBE_SAVE_DATA = {}
@@ -197,7 +240,6 @@ def is_simulation_running():
 # -----------------------------------------------------------------------------------
 # simulation
 
-
 def calculate_Kij(seg_i: Segment, seg_j: Segment):
     # 计算绝对电阻，单位转换为 kOhm
     # R (kOhm) = Ra (ohm*cm) * 10 * L (um) / Area (um^2)
@@ -219,9 +261,37 @@ def alpha_n(V):
     return (0.01 * (V + 50))/(1 - np.exp(-((V+50)/10)))
 
 def beta_m(V): return 4 * np.exp(-(V+60)/18)
+
 def alpha_h(V): return 0.07 * np.exp(-(V+60)/20)
+
 def beta_h(V): return 1/(1 + np.exp(-((V+30)/10)))
+
 def beta_n(V): return 0.125 * np.exp(-(V+60)/80)
+
+def inf_mT(V):
+    return 1.0 / (1.0 + np.exp(-(V + 56.0) / 6.2))
+
+def inf_hT(V):
+    return 1.0 / (1.0 + np.exp((V + 80.0) / 4.0))
+
+def tau_mT(V):
+    # Q10 温度校正因子 (假设实验数据 24度，目标 36度)
+    phi_m = 5.0 ** ((CELSIUS - 24.0) / 10.0)
+    return (0.612 + 1.0 / (np.exp(-(V + 132.0) / 16.7) + np.exp((V + 16.8) / 18.2))) / phi_m
+
+def tau_hT(V):
+    phi_h = 3.0 ** ((CELSIUS - 24.0) / 10.0)
+    if V < -80.0:
+        return np.exp((V + 467.0) / 66.6) / phi_h
+    else:
+        return (28.0 + np.exp(-(V + 22.0) / 10.5)) / phi_h
+
+def gating_update_tau_inf(DEL, xi_old, inf, tau):
+    """
+    基于 tau 和 inf 的隐式门控更新 (相比 alpha/beta 更稳定)
+    xi_new = xi_old + DEL * (inf - xi_old) / tau
+    """
+    return (xi_old + (DEL / tau) * inf) / (1.0 + DEL / tau)
 
 def init_gates(V):
     m0 = alpha_m(V) / (alpha_m(V) + beta_m(V))
@@ -235,12 +305,57 @@ def gating_update(DEL, xi_old, alpha, beta):
     return xi_old * decay + drive
 
 
+def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
+    """
+    计算给定电压下的绝对 T 型钙电流 (uA) 及其对电压的等效偏导电导 (mS)
+    包含临界点 V->0 的洛必达极限处理，防止浮点数溢出或 ZeroDivision。
+    """
+    # 如果该区室没有 T 通道，直接截断数据流
+    if P_max_abs == 0.0:
+        return 0.0, 0.0
+
+    # 无量纲电压因子 k
+    k = (Z_CA * FARADAY) / (1000.0 * R_GAS * TEMP_K)
+    z = k * V
+    
+    # 概率因子与常数前缀
+    # 量纲对齐：P_max_abs(cm^3/s) * 2F(C/mol) * 10^-3 -> mA (随后转为 uA 乘 1000)
+    GHK_prefix = P_max_abs * (m_T**2) * h_T * (Z_CA * FARADAY * 1e-3) * 1000.0
+    
+    # 奇点状态截获 (V 极小)
+    if abs(z) < 1e-4:
+        # 泰勒展开极限状态 (L'Hôpital's limit)
+        I_T_abs = GHK_prefix * (Cai - Cao) * (1.0 - z/2.0)
+        g_Ca_eq = GHK_prefix * k * ((Cai + Cao) / 2.0)
+        return I_T_abs, g_Ca_eq
+
+    # 正常状态空间推演
+    exp_z = np.exp(z)
+    exp_minus_z = np.exp(-z)
+    
+    # 1. 绝对电流求值
+    f_z = z * (Cai - Cao * exp_minus_z) / (1.0 - exp_minus_z)
+    I_T_abs = GHK_prefix * f_z
+    
+    # 2. 偏导数 (Jacobian) 求值 (链式求导解析解)
+    denominator = (exp_z - 1.0)
+    f_prime_z = ((Cai * exp_z * (1.0 + z) - Cao) * denominator - (Cai * z * exp_z - Cao * z) * exp_z) / (denominator**2)
+    g_Ca_eq = GHK_prefix * k * f_prime_z
+    
+    return I_T_abs, g_Ca_eq
+
+
+# -----------------------------------------------------------------------------------
+
+
 # 状态容器：维度为 (steps + 1, N_NODE)
 def start_simulation(progress_callback=None):
     global CURRENT_STEP, SIMULATION_RUNNING
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
         raise RuntimeError("请先调用 set_env")
     
+    if HISTORY_MT is None or HISTORY_HT is None or HISTORY_CA is None:
+        raise RuntimeError("请先调用 set_env")
     SIMULATION_RUNNING = True
     CURRENT_STEP = 0
 
@@ -257,6 +372,10 @@ def start_simulation(progress_callback=None):
             HISTORY_N[0, i] = n0
             HISTORY_H[0, i] = h0
 
+            HISTORY_MT[0, i] = inf_mT(V)
+            HISTORY_HT[0, i] = inf_hT(V)
+            HISTORY_CA[0, i] = CA_INF
+
         for step in range(STEPS):
             CURRENT_STEP = step
             if progress_callback is not None:
@@ -267,6 +386,10 @@ def start_simulation(progress_callback=None):
             m_t = HISTORY_M[step]
             h_t = HISTORY_H[step]
             n_t = HISTORY_N[step]
+
+            mT_t = HISTORY_MT[step]
+            hT_t = HISTORY_HT[step]
+            Ca_t = HISTORY_CA[step]
             
             m_half = np.zeros(N_NODE)
             h_half = np.zeros(N_NODE)
@@ -274,6 +397,11 @@ def start_simulation(progress_callback=None):
             g_Na_half = np.zeros(N_NODE)
             g_K_half = np.zeros(N_NODE)
             g_L_abs = np.zeros(N_NODE) 
+
+            mT_half = np.zeros(N_NODE)
+            hT_half = np.zeros(N_NODE)
+            I_T_abs = np.zeros(N_NODE)
+            g_Ca_eq = np.zeros(N_NODE)
             
             # 步骤 1: 门控变量与电导状态更新
             for i, seg in enumerate(seg_list):
@@ -281,10 +409,18 @@ def start_simulation(progress_callback=None):
                 m_half[i] = gating_update(DEL, m_t[i], alpha_m(v_current), beta_m(v_current))
                 h_half[i] = gating_update(DEL, h_t[i], alpha_h(v_current), beta_h(v_current))
                 n_half[i] = gating_update(DEL, n_t[i], alpha_n(v_current), beta_n(v_current))
+
+                mT_half[i] = gating_update_tau_inf(DEL, mT_t[i], inf_mT(v_current), tau_mT(v_current))
+                hT_half[i] = gating_update_tau_inf(DEL, hT_t[i], inf_hT(v_current), tau_hT(v_current))
                 
                 g_Na_half[i] = (m_half[i]**3) * h_half[i] * seg.get_absolute_g_max("Na")
                 g_K_half[i] = (n_half[i]**4) * seg.get_absolute_g_max("K")
                 g_L_abs[i] = seg.get_absolute_g_max("L")
+
+                P_Ca_abs = seg.get_absolute_P_max("CaT")
+                I_T_abs[i], g_Ca_eq[i] = evaluate_GHK_and_Jacobian(
+                    V_t[i], Ca_t[i], CA_OUT, P_Ca_abs, mT_half[i], hT_half[i]
+                )
                 
             A = np.zeros((N_NODE, N_NODE))
             b = np.zeros(N_NODE)
@@ -302,12 +438,13 @@ def start_simulation(progress_callback=None):
                     A[i, target_idx] = -K_ij
                     sum_Kij += K_ij
                 
-                A[i, i] = C_factor + g_Na_half[i] + g_K_half[i] + g_L_abs[i] + sum_Kij
+                A[i, i] = C_factor + g_Na_half[i] + g_K_half[i] + g_L_abs[i] + sum_Kij + g_Ca_eq[i]
 
                 b[i] = (C_factor * V_t[i] + 
                         g_Na_half[i] * E_TABLE["Na"]["E"] + 
                         g_K_half[i] * E_TABLE["K"]["E"] + 
-                        g_L_abs[i] * E_TABLE["L"]["E"])
+                        g_L_abs[i] * E_TABLE["L"]["E"] -
+                        I_T_abs[i] + g_Ca_eq[i] * V_t[i])
                 
                 # --- 外部刺激数据流 ---
                 # 遍历所有刺激配置，若命中当前空间位置与时间窗口，叠加电流至已知项向量 b
@@ -323,6 +460,14 @@ def start_simulation(progress_callback=None):
             HISTORY_M[step + 1] = m_half
             HISTORY_H[step + 1] = h_half
             HISTORY_N[step + 1] = n_half
+
+            HISTORY_MT[step + 1] = mT_half
+            HISTORY_HT[step + 1] = hT_half
+
+            for i, seg in enumerate(seg_list):
+                Ca_current = Ca_t[i]
+                dCa_dt = -seg.gamma_Ca * I_T_abs[i] + (CA_INF - Ca_current) / TAU_CA
+                HISTORY_CA[step + 1, i] = Ca_current + DT * dCa_dt
 
             # --- 探针数据登记 ---
             # 检查当前步长是否触发探针，若触发则打包整个状态空间的标量与向量参数
@@ -358,6 +503,11 @@ def start_simulation(progress_callback=None):
                         "g_Na_half": float(g_Na_half[idx]),
                         "g_K_half": float(g_K_half[idx]),
                         "g_L_abs": float(g_L_abs[idx]),
+                        "mT": float(mT_t[idx]),
+                        "hT": float(hT_t[idx]),
+                        "Ca": float(Ca_t[idx]),
+                        "I_T_abs": float(I_T_abs[idx]),
+                        "g_Ca_eq": float(g_Ca_eq[idx]),
                         "A_matrix_row": A[idx, :].tolist(),
                         "b_vector_val": float(b[idx]),
                         "V_half_val": float(V_half[idx]),
@@ -381,6 +531,19 @@ def export_history_matrices():
         np.ascontiguousarray(HISTORY_M, dtype=np.float64),
         np.ascontiguousarray(HISTORY_H, dtype=np.float64),
         np.ascontiguousarray(HISTORY_N, dtype=np.float64)
+    )
+
+
+def export_calcium_history_matrices():
+    """
+    提供钙离子相关的时序状态流出口。
+    保证 C-contiguous 连续内存状态。
+    """
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
+    return (
+        np.ascontiguousarray(HISTORY_CA, dtype=np.float64),
+        np.ascontiguousarray(HISTORY_MT, dtype=np.float64),
+        np.ascontiguousarray(HISTORY_HT, dtype=np.float64)
     )
 
 def export_probe_data_json() -> str:
@@ -443,6 +606,19 @@ def compute_continuous_derivatives(segment_id: int, step: int,
     I_ion = (g_Na * (V_i - E_TABLE["Na"]["E"]) + 
              g_K * (V_i - E_TABLE["K"]["E"]) + 
              g_L * (V_i - E_TABLE["L"]["E"]))
+
+    # T-type calcium current contribution
+    if HISTORY_MT is not None and HISTORY_HT is not None and HISTORY_CA is not None:
+        mT_i = HISTORY_MT[step, idx]
+        hT_i = HISTORY_HT[step, idx]
+        Ca_i = HISTORY_CA[step, idx]
+    else:
+        mT_i = inf_mT(V_i)
+        hT_i = inf_hT(V_i)
+        Ca_i = CA_INF
+    P_Ca_abs = seg.get_absolute_P_max("CaT")
+    I_T_ca, _ = evaluate_GHK_and_Jacobian(V_i, Ca_i, CA_OUT, P_Ca_abs, mT_i, hT_i)
+    I_ion += I_T_ca
 
     I_axial = 0.0
     for connected_id in seg.connected_segments:
@@ -624,11 +800,12 @@ def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: floa
         end_time_ms:   终止时间 (ms)
     """
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, DT, STEPS, SEGMENT
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_H is None or HISTORY_N is None:
         raise RuntimeError("请先调用 set_env 并执行仿真。")
 
-    valid_labels = ['V', 'm', 'h', 'n']
+    valid_labels = ['V', 'm', 'h', 'n', 'Ca', 'mT', 'hT']
     if var_label not in valid_labels:
         raise ValueError(f"变量标签必须在 {valid_labels} 中选择，当前: '{var_label}'")
 
@@ -645,7 +822,10 @@ def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: floa
     if start_step >= end_step:
         raise ValueError(f"时间范围无效: start={start_time_ms}ms, end={end_time_ms}ms")
 
-    history_map = {'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N}
+    history_map = {
+        'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N,
+        'Ca': HISTORY_CA, 'mT': HISTORY_MT, 'hT': HISTORY_HT
+    }
     data = history_map[var_label][start_step:end_step + 1, idx]
     time_axis = np.arange(start_step, end_step + 1) * DT
 
@@ -653,7 +833,10 @@ def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: floa
         'V': 'Membrane Potential (mV)',
         'm': 'Na activation (m)',
         'h': 'Na inactivation (h)',
-        'n': 'K activation (n)'
+        'n': 'K activation (n)',
+        'Ca': 'Intracellular Ca²⁺ (mM)',
+        'mT': 'T-type Ca activation (mT)',
+        'hT': 'T-type Ca inactivation (hT)'
     }
 
     fig, ax = plt.subplots(figsize=(10, 5))

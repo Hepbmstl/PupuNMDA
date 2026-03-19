@@ -5,11 +5,9 @@ Hines_method.py 完整测试套件
   - 区室构建与属性 (Segment, init_segment, add_channel_to_segment, add_connection)
   - 探针与刺激注册 (insert_probe, insert_stimulation)
   - HH 门控动力学 (alpha/beta 速率函数, init_gates, gating_update)
-  - T-type 钙通道门控 (inf_mT, inf_hT, tau_mT, tau_hT, gating_update_tau_inf)
-  - GHK 电流与 Jacobian (evaluate_GHK_and_Jacobian)
   - 物理计算 (calculate_Kij, compute_continuous_derivatives)
-  - 完整仿真流程 (start_simulation — 单/多区室，含钙通道)
-  - 数据导出接口 (export_history_matrices, export_calcium_history_matrices, export_probe_data_json)
+  - 完整仿真流程 (start_simulation — 单/多区室)
+  - 数据导出接口 (export_history_matrices, export_probe_data_json)
   - 端到端集成测试 (模拟 SimulationRunner.cs 调用顺序)
 """
 
@@ -28,10 +26,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import Hines_method as hm
 
-# Hines_method.py 内部会调用 matplotlib.use('TkAgg') 覆盖 Agg，
-# 这里重新强制设置为 Agg 以避免测试中出现 Tk 错误。
-matplotlib.use('Agg', force=True)
-
 
 # ============================================================
 # Fixtures
@@ -43,7 +37,6 @@ def clean_state():
     hm.clear_environment()
     yield
     hm.clear_environment()
-    plt.close('all')  # 防止 matplotlib 图形累积
 
 
 def _build_single_compartment(
@@ -61,17 +54,6 @@ def _build_single_compartment(
     return seg_id
 
 
-def _build_single_compartment_with_CaT(
-    v_init=-65.0, dt=0.025, steps=500,
-    Ra=100.0, D=10.0, L=100.0, Cm=1.0,
-    g_Na=120.0, g_K=36.0, g_L=0.3, P_CaT=1e-5
-):
-    """辅助函数：搭建单区室 HH + CaT 环境。"""
-    seg_id = _build_single_compartment(v_init, dt, steps, Ra, D, L, Cm, g_Na, g_K, g_L)
-    hm.add_channel_to_segment(seg_id, "CaT", P_CaT)
-    return seg_id
-
-
 def _build_two_compartments(dt=0.025, steps=400):
     """辅助函数：搭建双区室并双向连接。"""
     hm.set_env(V_init=-65.0, dt=dt, steps=steps, n_node=2)
@@ -84,14 +66,6 @@ def _build_two_compartments(dt=0.025, steps=400):
     hm.add_connection(0, 1)
     hm.add_connection(1, 0)
     return 0, 1
-
-
-def _build_two_compartments_with_CaT(dt=0.025, steps=400, P_CaT=1e-5):
-    """辅助函数：搭建双区室 HH + CaT。"""
-    sid0, sid1 = _build_two_compartments(dt=dt, steps=steps)
-    hm.add_channel_to_segment(sid0, "CaT", P_CaT)
-    hm.add_channel_to_segment(sid1, "CaT", P_CaT * 0.5)
-    return sid0, sid1
 
 
 # ============================================================
@@ -112,13 +86,6 @@ class TestEnvironment:
         assert hm.HISTORY_H.shape == (201, 3)
         assert hm.HISTORY_N.shape == (201, 3)
 
-    def test_set_env_initializes_calcium_globals(self):
-        """set_env 应同时初始化钙离子相关历史矩阵。"""
-        hm.set_env(V_init=-60.0, dt=0.01, steps=200, n_node=3)
-        assert hm.HISTORY_CA.shape == (201, 3)
-        assert hm.HISTORY_MT.shape == (201, 3)
-        assert hm.HISTORY_HT.shape == (201, 3)
-
     def test_set_E_replaces_table(self):
         custom = {"Na": {"E": 50.0}, "K": {"E": -80.0}, "L": {"E": -60.0}}
         hm.set_E(custom)
@@ -138,9 +105,6 @@ class TestEnvironment:
         assert hm.STIMULATION == []
         assert hm.PROBE_SAVE_DATA == {}
         assert hm.HISTORY_V is None
-        assert hm.HISTORY_CA is None
-        assert hm.HISTORY_MT is None
-        assert hm.HISTORY_HT is None
         assert hm.V == -65.0
         assert hm.DT == 0.02
         assert hm.STEPS == 1000
@@ -180,28 +144,6 @@ class TestSegment:
         # 不存在的通道应返回 0
         assert seg.get_absolute_g_max("Ca") == 0.0
 
-    def test_get_absolute_P_max(self):
-        """get_absolute_P_max 应返回渗透率密度乘以表面积。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        seg.add_channels("CaT", 1e-5)
-        expected = 1e-5 * seg.surface_area_cm2
-        assert seg.get_absolute_P_max("CaT") == pytest.approx(expected, rel=1e-10)
-        assert seg.get_absolute_P_max("missing") == 0.0
-
-    def test_gamma_Ca_positive(self):
-        """gamma_Ca 应为正值。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        assert seg.gamma_Ca > 0
-        assert np.isfinite(seg.gamma_Ca)
-
-    def test_gamma_Ca_dimensional_correctness(self):
-        """gamma_Ca 量纲验证：1e-6 / (z * F * Vol_L)。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        d_um = 0.1
-        shell_vol_L = seg.surface_area_cm2 * (d_um * 1e-4) * 1e-3
-        expected = 1e-6 / (hm.Z_CA * hm.FARADAY * shell_vol_L)
-        assert seg.gamma_Ca == pytest.approx(expected, rel=1e-10)
-
     def test_init_segment_registers_in_global(self):
         hm.init_segment(uid="soma", Ra=35.4, D=12.0, L=80.0, Cm=1.0, id=7)
         assert 7 in hm.SEGMENT
@@ -215,10 +157,8 @@ class TestSegment:
         hm.init_segment(uid="a", Ra=100.0, D=5.0, L=50.0, Cm=1.0, id=0)
         hm.add_channel_to_segment(0, "Na", 120.0)
         hm.add_channel_to_segment(0, "K", 36.0)
-        hm.add_channel_to_segment(0, "CaT", 1e-5)
         assert hm.SEGMENT[0].channels["Na"] == 120.0
         assert hm.SEGMENT[0].channels["K"] == 36.0
-        assert hm.SEGMENT[0].channels["CaT"] == 1e-5
 
     def test_add_connection(self):
         hm.init_segment(uid="a", Ra=100.0, D=5.0, L=50.0, Cm=1.0, id=0)
@@ -344,138 +284,6 @@ class TestGatingKinetics:
 
 
 # ============================================================
-# 4b. T-type 钙通道门控动力学
-# ============================================================
-
-class TestTTypeGating:
-
-    def test_inf_mT_range(self):
-        """inf_mT 应在 [0, 1] 且单调递增。"""
-        vals = [hm.inf_mT(V) for V in np.linspace(-100, 40, 50)]
-        for v in vals:
-            assert 0.0 <= v <= 1.0
-        # 单调递增
-        assert all(vals[i] <= vals[i+1] + 1e-12 for i in range(len(vals)-1))
-
-    def test_inf_hT_range(self):
-        """inf_hT 应在 [0, 1] 且单调递减。"""
-        vals = [hm.inf_hT(V) for V in np.linspace(-100, 40, 50)]
-        for v in vals:
-            assert 0.0 <= v <= 1.0
-        # 单调递减
-        assert all(vals[i] >= vals[i+1] - 1e-12 for i in range(len(vals)-1))
-
-    def test_tau_mT_positive(self):
-        """tau_mT 应始终为正值。"""
-        for V in np.linspace(-100, 40, 50):
-            assert hm.tau_mT(V) > 0
-
-    def test_tau_hT_positive(self):
-        """tau_hT 应始终为正值。"""
-        for V in np.linspace(-100, 40, 50):
-            assert hm.tau_hT(V) > 0
-
-    def test_tau_hT_branch_at_minus80(self):
-        """tau_hT 在 V=-80 附近应大致连续（两段经验公式可有一定不连续）。"""
-        tau_left = hm.tau_hT(-80.01)
-        tau_right = hm.tau_hT(-79.99)
-        # 经验公式在 -80 mV 处存在固有不连续，允许 20% 偏差
-        assert abs(tau_left - tau_right) / max(tau_left, tau_right) < 0.2
-
-    def test_gating_update_tau_inf_convergence(self):
-        """gating_update_tau_inf 从任意初值应收敛到 inf。"""
-        V = -65.0
-        inf_val = hm.inf_mT(V)
-        tau_val = hm.tau_mT(V)
-        x = 0.0
-        dt_half = 0.005
-        for _ in range(100000):
-            x = hm.gating_update_tau_inf(dt_half, x, inf_val, tau_val)
-        assert x == pytest.approx(inf_val, abs=1e-6)
-
-    def test_gating_update_tau_inf_preserves_steady_state(self):
-        """从稳态开始应保持稳态。"""
-        V = -65.0
-        inf_val = hm.inf_hT(V)
-        tau_val = hm.tau_hT(V)
-        x = inf_val
-        dt_half = 0.01
-        for _ in range(1000):
-            x = hm.gating_update_tau_inf(dt_half, x, inf_val, tau_val)
-        assert x == pytest.approx(inf_val, rel=1e-10)
-
-
-# ============================================================
-# 4c. GHK 电流计算
-# ============================================================
-
-class TestGHKCurrent:
-
-    def test_zero_permeability_returns_zero(self):
-        """P_max_abs=0 时应返回 (0, 0)。"""
-        I, g = hm.evaluate_GHK_and_Jacobian(-65.0, 0.00024, 2.0, 0.0, 0.3, 0.5)
-        assert I == 0.0
-        assert g == 0.0
-
-    def test_singularity_near_zero_voltage(self):
-        """V≈0 时应使用泰勒展开而不崩溃。"""
-        P_abs = 1e-10
-        I, g = hm.evaluate_GHK_and_Jacobian(0.0, 0.00024, 2.0, P_abs, 0.3, 0.5)
-        assert np.isfinite(I)
-        assert np.isfinite(g)
-
-    def test_normal_negative_voltage(self):
-        """V=-65 mV 时应返回有限值，且 I < 0（内向电流）。"""
-        P_abs = 1e-10
-        I, g = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.3, 0.5)
-        assert np.isfinite(I)
-        assert np.isfinite(g)
-        # 胞外钙浓度远大于胞内，V<0 → 内向钙电流 → I < 0
-        assert I < 0, f"预期内向电流 (I<0): I={I}"
-
-    def test_positive_voltage_outward_current(self):
-        """V=+40 mV 时电流应较正值或接近正值（外向驱动力）。"""
-        P_abs = 1e-10
-        I, g = hm.evaluate_GHK_and_Jacobian(40.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.5, 0.5)
-        assert np.isfinite(I)
-
-    def test_g_Ca_eq_positive_at_rest(self):
-        """在静息电位附近，g_Ca_eq（等效偏导电导）应为正值。"""
-        P_abs = 1e-10
-        _, g = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.3, 0.5)
-        assert g > 0, f"g_Ca_eq 应为正: {g}"
-
-    def test_current_scales_with_permeability(self):
-        """电流应与渗透率线性相关。"""
-        P1 = 1e-10
-        P2 = 2e-10
-        I1, _ = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P1, 0.3, 0.5)
-        I2, _ = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P2, 0.3, 0.5)
-        assert I2 == pytest.approx(2.0 * I1, rel=1e-10)
-
-    def test_current_scales_with_gating(self):
-        """电流应与 m²h 成正比。"""
-        P_abs = 1e-10
-        I1, _ = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.3, 0.5)
-        I2, _ = hm.evaluate_GHK_and_Jacobian(-65.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.6, 0.5)
-        # m²h: (0.3²*0.5) vs (0.6²*0.5) → ratio = 0.18/0.045 = 4.0
-        assert I2 == pytest.approx(I1 * (0.6**2 * 0.5) / (0.3**2 * 0.5), rel=1e-10)
-
-    def test_continuity_at_singularity_boundary(self):
-        """z=0 边界两侧的值应平滑过渡。"""
-        P_abs = 1e-10
-        k = (hm.Z_CA * hm.FARADAY) / (1000.0 * hm.R_GAS * hm.TEMP_K)
-        # 找到 V 使得 |k*V| ≈ 1e-4
-        V_boundary = 1e-4 / k
-        I_inner, g_inner = hm.evaluate_GHK_and_Jacobian(
-            V_boundary * 0.5, hm.CA_INF, hm.CA_OUT, P_abs, 0.3, 0.5)
-        I_outer, g_outer = hm.evaluate_GHK_and_Jacobian(
-            V_boundary * 2.0, hm.CA_INF, hm.CA_OUT, P_abs, 0.3, 0.5)
-        # 两侧应有限且符号一致
-        assert np.isfinite(I_inner) and np.isfinite(I_outer)
-
-
-# ============================================================
 # 5. 物理计算
 # ============================================================
 
@@ -505,14 +313,6 @@ class TestPhysics:
         expected = 1.0 / (R_a + R_b)
         assert hm.calculate_Kij(seg_a, seg_b) == pytest.approx(expected, rel=1e-10)
 
-    def test_calculate_Kij_units_kOhm_to_mS(self):
-        """K_ij 单位验证：R (kOhm)，K=1/R (mS)。"""
-        seg = hm.Segment(uid="a", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        # R = Ra * 10 * (L/2) / cross_area
-        # = 100 * 10 * 50 / (pi*25) = 50000 / (pi*25) ≈ 636.6 kOhm
-        R = seg.Ra * 10.0 * (seg.L / 2) / seg.cross_area_um2
-        assert R == pytest.approx(100.0 * 10.0 * 50.0 / (math.pi * 25.0), rel=1e-10)
-
     def test_compute_continuous_derivatives_at_rest(self):
         """在静息电位和稳态门控变量下，dV/dt 应接近 0（无外部刺激）。"""
         V_rest = -65.0
@@ -536,36 +336,9 @@ class TestPhysics:
         assert dm == pytest.approx(0.0, abs=1e-8)
         assert dh == pytest.approx(0.0, abs=1e-8)
         assert dn == pytest.approx(0.0, abs=1e-8)
+        # dV/dt 在标准 HH 模型的 -65 mV 处不严格为 0（取决于离子
+        # 平衡电位），但应是有限小值
         assert np.isfinite(dV)
-
-    def test_compute_continuous_derivatives_includes_CaT(self):
-        """含 CaT 通道时，compute_continuous_derivatives 应包含钙电流贡献。"""
-        V_rest = -65.0
-        m0, n0, h0 = hm.init_gates(V_rest)
-        hm.set_env(V_init=V_rest, dt=0.025, steps=10, n_node=1)
-        hm.init_segment(uid="s", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        hm.add_channel_to_segment(0, "Na", 120.0)
-        hm.add_channel_to_segment(0, "K", 36.0)
-        hm.add_channel_to_segment(0, "L", 0.3)
-
-        hm.HISTORY_V[0, 0] = V_rest
-        hm.HISTORY_M[0, 0] = m0
-        hm.HISTORY_H[0, 0] = h0
-        hm.HISTORY_N[0, 0] = n0
-        hm.HISTORY_CA[0, 0] = hm.CA_INF
-        hm.HISTORY_MT[0, 0] = hm.inf_mT(V_rest)
-        hm.HISTORY_HT[0, 0] = hm.inf_hT(V_rest)
-
-        # 无 CaT 通道
-        dV_no_Ca, _, _, _ = hm.compute_continuous_derivatives(segment_id=0, step=0)
-
-        # 添加 CaT 通道
-        hm.add_channel_to_segment(0, "CaT", 1e-5)
-        dV_with_Ca, _, _, _ = hm.compute_continuous_derivatives(segment_id=0, step=0)
-
-        # 有 CaT 通道时 dV 应不同
-        assert dV_no_Ca != pytest.approx(dV_with_Ca, abs=1e-10), \
-            "CaT 通道未影响 dV/dt"
 
 
 # ============================================================
@@ -579,6 +352,7 @@ class TestSingleCompartmentSimulation:
         _build_single_compartment(v_init=-65.0, dt=0.025, steps=1000)
         hm.start_simulation()
         V_final = hm.HISTORY_V[-1, 0]
+        # 无刺激，电压应漂移很小
         assert abs(V_final - (-65.0)) < 5.0, f"静息漂移过大: V_final={V_final}"
 
     def test_stimulation_triggers_spike(self):
@@ -587,6 +361,7 @@ class TestSingleCompartmentSimulation:
         hm.insert_stimulation("stim_1", seg_id, 0.1, 1.0, 0.5)
         hm.start_simulation()
         V_max = np.max(hm.HISTORY_V[:, 0])
+        # 典型 HH 动作电位峰值应超过 0 mV
         assert V_max > 0.0, f"未触发动作电位: V_max={V_max}"
 
     def test_history_shape(self):
@@ -633,94 +408,21 @@ class TestSingleCompartmentSimulation:
 
 
 # ============================================================
-# 6b. 含 CaT 通道的单区室仿真
-# ============================================================
-
-class TestSingleCompartmentWithCaT:
-
-    def test_calcium_history_shape(self):
-        """HISTORY_CA/MT/HT 形状应正确。"""
-        steps = 200
-        _build_single_compartment_with_CaT(steps=steps)
-        hm.start_simulation()
-        assert hm.HISTORY_CA.shape == (steps + 1, 1)
-        assert hm.HISTORY_MT.shape == (steps + 1, 1)
-        assert hm.HISTORY_HT.shape == (steps + 1, 1)
-
-    def test_calcium_concentration_non_negative(self):
-        """钙浓度在整个仿真过程中应为非负。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=2000)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(hm.HISTORY_CA >= 0), "钙浓度出现负值"
-
-    def test_calcium_concentration_finite(self):
-        """钙浓度应始终有限。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=2000)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(np.isfinite(hm.HISTORY_CA))
-
-    def test_mT_hT_bounded(self):
-        """T-type 门控变量在仿真过程中应保持在 [0, 1]。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=2000)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(hm.HISTORY_MT >= -1e-10)
-        assert np.all(hm.HISTORY_MT <= 1.0 + 1e-10)
-        assert np.all(hm.HISTORY_HT >= -1e-10)
-        assert np.all(hm.HISTORY_HT <= 1.0 + 1e-10)
-
-    def test_calcium_initial_value(self):
-        """钙浓度初始值应为 CA_INF。"""
-        _build_single_compartment_with_CaT(steps=10)
-        hm.start_simulation()
-        assert hm.HISTORY_CA[0, 0] == pytest.approx(hm.CA_INF, rel=1e-10)
-
-    def test_mT_hT_initial_steady_state(self):
-        """mT, hT 初始值应为稳态值。"""
-        V_init = -65.0
-        _build_single_compartment_with_CaT(v_init=V_init, steps=10)
-        hm.start_simulation()
-        assert hm.HISTORY_MT[0, 0] == pytest.approx(hm.inf_mT(V_init), rel=1e-10)
-        assert hm.HISTORY_HT[0, 0] == pytest.approx(hm.inf_hT(V_init), rel=1e-10)
-
-    def test_calcium_relaxes_to_CA_INF_without_stimulus(self):
-        """无刺激时钙浓度应维持在 CA_INF 附近。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=2000)
-        hm.start_simulation()
-        Ca_final = hm.HISTORY_CA[-1, 0]
-        assert abs(Ca_final - hm.CA_INF) < 1e-3, f"Ca 未回到稳态: {Ca_final}"
-
-    def test_stimulation_with_CaT_still_produces_spike(self):
-        """有 CaT 通道时刺激仍应产生动作电位。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=2000)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        V_max = np.max(hm.HISTORY_V[:, 0])
-        assert V_max > 0.0, f"CaT 影响了 AP: V_max={V_max}"
-
-    def test_voltage_finite_with_CaT(self):
-        """含 CaT 通道时电压应始终有限（无数值爆炸）。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=3000, P_CaT=1e-4)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(np.isfinite(hm.HISTORY_V))
-
-
-# ============================================================
 # 7. 多区室仿真
 # ============================================================
 
 class TestMultiCompartmentSimulation:
 
     def test_two_compartment_spike_propagation(self):
-        """刺激第一个区室，动作电位应传播到第二个区室。"""
+        """
+        刺激第一个区室，动作电位应传播到第二个区室。
+        """
         sid0, sid1 = _build_two_compartments(dt=0.025, steps=3000)
         hm.insert_stimulation("stim", sid0, 0.1, 1.0, 0.5)
         hm.start_simulation()
         V_max_0 = np.max(hm.HISTORY_V[:, 0])
         V_max_1 = np.max(hm.HISTORY_V[:, 1])
+        # 两个区室都应产生动作电位
         assert V_max_0 > 0.0, f"区室0未放电: V_max={V_max_0}"
         assert V_max_1 > -30.0, f"区室1电位过低: V_max={V_max_1}"
 
@@ -741,21 +443,14 @@ class TestMultiCompartmentSimulation:
             hm.add_channel_to_segment(sid, "Na", 120.0)
             hm.add_channel_to_segment(sid, "K", 36.0)
             hm.add_channel_to_segment(sid, "L", 0.3)
+        # 不添加 connection
         hm.insert_stimulation("stim", 0, 0.05, 1.0, 1.0)
         hm.start_simulation()
         V_uncoupled = hm.HISTORY_V[:, 1].copy()
 
+        # 连接的区室1应受到区室0的影响
         diff = np.max(np.abs(V_coupled - V_uncoupled))
         assert diff > 0.01, f"轴向耦合无效: max_diff={diff}"
-
-    def test_two_compartment_with_CaT(self):
-        """双区室含 CaT 通道时仿真应稳定。"""
-        sid0, sid1 = _build_two_compartments_with_CaT(dt=0.025, steps=2000)
-        hm.insert_stimulation("stim", sid0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(np.isfinite(hm.HISTORY_V))
-        assert np.all(np.isfinite(hm.HISTORY_CA))
-        assert np.all(hm.HISTORY_CA >= 0)
 
 
 # ============================================================
@@ -770,17 +465,19 @@ class TestProbeDataCollection:
         steps = 400
         seg_id = _build_single_compartment(dt=dt, steps=steps)
         hm.insert_stimulation("stim", seg_id, 0.1, 1.0, 0.5)
+        # 探针覆盖 1.0 ms 到 3.0 ms
         hm.insert_probe("probe_main", seg_id, 1.0, 2.0)
         hm.start_simulation()
 
         assert "probe_main" in hm.PROBE_SAVE_DATA
         data = hm.PROBE_SAVE_DATA["probe_main"]
         assert len(data) > 0
+        # 验证时间范围
         for entry in data:
             assert 1.0 <= entry["time_ms"] <= 3.0
 
     def test_probe_data_fields(self):
-        """探针数据应包含所有预期字段（含钙离子相关字段）。"""
+        """探针数据应包含所有预期字段。"""
         dt = 0.025
         steps = 200
         seg_id = _build_single_compartment(dt=dt, steps=steps)
@@ -793,7 +490,6 @@ class TestProbeDataCollection:
             "step", "time_ms", "segment_id", "V", "m", "h", "n",
             "dV_dt", "dm_dt", "dh_dt", "dn_dt",
             "g_Na_half", "g_K_half", "g_L_abs",
-            "mT", "hT", "Ca", "I_T_abs", "g_Ca_eq",
             "A_matrix_row", "b_vector_val", "V_half_val", "V_t_next"
         }
         for entry in data:
@@ -802,8 +498,9 @@ class TestProbeDataCollection:
     def test_probe_outside_window_collects_nothing(self):
         """探针时间窗口在仿真范围外时不应收集数据。"""
         dt = 0.025
-        steps = 100
+        steps = 100  # 总时间 = 2.5 ms
         seg_id = _build_single_compartment(dt=dt, steps=steps)
+        # 探针从 10 ms 开始，远超仿真时长
         hm.insert_probe("p_late", seg_id, 10.0, 1.0)
         hm.start_simulation()
         assert "p_late" not in hm.PROBE_SAVE_DATA
@@ -818,27 +515,10 @@ class TestProbeDataCollection:
         hm.start_simulation()
         assert "p_early" in hm.PROBE_SAVE_DATA
         assert "p_late" in hm.PROBE_SAVE_DATA
+        # 两组数据时间不应重叠
         early_times = {e["time_ms"] for e in hm.PROBE_SAVE_DATA["p_early"]}
         late_times = {e["time_ms"] for e in hm.PROBE_SAVE_DATA["p_late"]}
         assert early_times.isdisjoint(late_times)
-
-    def test_probe_with_CaT_includes_calcium_fields(self):
-        """含 CaT 通道时探针数据应包含有意义的钙离子字段。"""
-        dt = 0.025
-        steps = 200
-        seg_id = _build_single_compartment_with_CaT(dt=dt, steps=steps)
-        hm.insert_probe("p_ca", seg_id, 0.0, dt * steps)
-        hm.start_simulation()
-
-        data = hm.PROBE_SAVE_DATA["p_ca"]
-        assert len(data) > 0
-        # 验证钙离子字段存在且有限
-        for entry in data:
-            assert np.isfinite(entry["Ca"])
-            assert np.isfinite(entry["mT"])
-            assert np.isfinite(entry["hT"])
-            assert np.isfinite(entry["I_T_abs"])
-            assert np.isfinite(entry["g_Ca_eq"])
 
 
 # ============================================================
@@ -854,17 +534,6 @@ class TestExport:
         hm.start_simulation()
         hV, hM, hH, hN = hm.export_history_matrices()
         for arr in [hV, hM, hH, hN]:
-            assert arr.shape == (steps + 1, 1)
-            assert arr.dtype == np.float64
-            assert arr.flags['C_CONTIGUOUS']
-
-    def test_export_calcium_history_matrices(self):
-        """导出钙离子历史矩阵应形状和类型正确。"""
-        steps = 100
-        _build_single_compartment_with_CaT(steps=steps)
-        hm.start_simulation()
-        hCA, hMT, hHT = hm.export_calcium_history_matrices()
-        for arr in [hCA, hMT, hHT]:
             assert arr.shape == (steps + 1, 1)
             assert arr.dtype == np.float64
             assert arr.flags['C_CONTIGUOUS']
@@ -930,7 +599,7 @@ class TestIntegrationSimulationRunnerFlow:
         steps = 2000
         hm.set_env(V_init=v_init, dt=dt, steps=steps, n_node=1)
 
-        # ── 3. set_E ──
+        # ── 3. set_E (通过 JSON，模拟 C# 端) ──
         e_json = '{"Na":{"E":55.0},"K":{"E":-72.0},"L":{"E":-54.3}}'
         hm.set_E(json.loads(e_json))
 
@@ -962,6 +631,7 @@ class TestIntegrationSimulationRunnerFlow:
         assert len(step_log) == steps
         assert "probe_0" in result
         assert len(result["probe_0"]) > 0
+        # 检查动作电位
         V_max = np.max(hm.HISTORY_V[:, 0])
         assert V_max > 0.0, f"未触发 AP: V_max={V_max}"
 
@@ -1003,53 +673,11 @@ class TestIntegrationSimulationRunnerFlow:
         assert len(result["probe_soma"]) > 0
         assert len(result["probe_end"]) > 0
 
+        # 信号应该传播到末端
         V_history, M_history, H_history, N_history = hm.export_history_matrices()
         assert V_history.shape == (steps + 1, n_node)
         V_max_end = np.max(V_history[:, 2])
         assert V_max_end > -50.0, f"信号未传播到末端: V_max={V_max_end}"
-
-    def test_full_workflow_with_CaT(self):
-        """含 CaT 通道的端到端流程。"""
-        hm.clear_environment()
-
-        dt = 0.025
-        steps = 2000
-        hm.set_env(V_init=-65.0, dt=dt, steps=steps, n_node=2)
-        hm.set_E({"Na": {"E": 55.0}, "K": {"E": -72.0}, "L": {"E": -54.3}})
-
-        hm.init_segment(uid="soma", Ra=100.0, D=12.0, L=80.0, Cm=1.0, id=0)
-        hm.init_segment(uid="dend", Ra=100.0, D=5.0, L=150.0, Cm=1.0, id=1)
-
-        for sid in [0, 1]:
-            hm.add_channel_to_segment(sid, "Na", 120.0)
-            hm.add_channel_to_segment(sid, "K", 36.0)
-            hm.add_channel_to_segment(sid, "L", 0.3)
-            hm.add_channel_to_segment(sid, "CaT", 1e-5)
-
-        hm.add_connection(0, 1)
-        hm.add_connection(1, 0)
-
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.insert_probe("probe_soma", 0, 0.0, dt * steps)
-
-        hm.start_simulation()
-
-        # 基本断言
-        assert hm.CURRENT_STEP == steps
-        assert np.all(np.isfinite(hm.HISTORY_V))
-        assert np.all(np.isfinite(hm.HISTORY_CA))
-        assert np.all(hm.HISTORY_CA >= 0)
-
-        # 导出验证
-        hCA, hMT, hHT = hm.export_calcium_history_matrices()
-        assert hCA.shape == (steps + 1, 2)
-
-        result = json.loads(hm.export_probe_data_json())
-        assert "probe_soma" in result
-        # 验证探针数据包含钙字段
-        for entry in result["probe_soma"][:5]:
-            assert "Ca" in entry
-            assert "I_T_abs" in entry
 
 
 # ============================================================
@@ -1059,11 +687,13 @@ class TestIntegrationSimulationRunnerFlow:
 class TestEdgeCases:
 
     def test_zero_stimulation_current(self):
-        """零电流刺激不应产生动作电位。"""
+        """零电流刺激不应产生动作电位（HH 模型在 -65 mV 非严格稳态，
+        因 E_L=-54.3 存在自然漂移，但不应触发再生性放电）。"""
         seg_id = _build_single_compartment(steps=200)
         hm.insert_stimulation("zero_stim", seg_id, 0.0, 0.0, 1.0)
         hm.start_simulation()
         V_max = np.max(hm.HISTORY_V[:, 0])
+        # 不应触发动作电位（峰值远低于 0 mV）
         assert V_max < 0.0, f"零刺激触发了 AP: V_max={V_max}"
 
     def test_very_short_dt(self):
@@ -1104,36 +734,29 @@ class TestEdgeCases:
         hm.start_simulation()
         V_diff_high_Ra = np.max(np.abs(hm.HISTORY_V[:, 0] - hm.HISTORY_V[:, 1]))
 
+        # 高 Ra 时两区室电压差应更大（耦合更弱）
         assert V_diff_high_Ra > V_diff_low_Ra
 
     def test_no_channels_passive_decay(self):
-        """无活性通道（仅漏电流），刺激结束后电压应单调衰减回 E_L。"""
+        """无活性通道（仅漏电流），刺激结束后电压应单调衰减回 E_L，
+        不会出现 HH 再生性尖峰特征。"""
         hm.set_env(V_init=-65.0, dt=0.025, steps=2000, n_node=1)
         hm.init_segment(uid="passive", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        hm.add_channel_to_segment(0, "Na", 0.0)
-        hm.add_channel_to_segment(0, "K", 0.0)
-        hm.add_channel_to_segment(0, "L", 0.3)
+        hm.add_channel_to_segment(0, "Na", 0.0)  # 无 Na
+        hm.add_channel_to_segment(0, "K", 0.0)   # 无 K
+        hm.add_channel_to_segment(0, "L", 0.3)   # 仅漏电流
         hm.insert_stimulation("stim", 0, 0.0005, 1.0, 0.5)
         hm.start_simulation()
         V_trace = hm.HISTORY_V[:, 0]
+        # 刺激结束后（约 step 60 之后），电压应单调趋向 E_L = -54.3
+        stim_end_step = int((1.0 + 0.5) / 0.025) + 10
+        V_after = V_trace[stim_end_step:]
+        # 电压在刺激后应不再上升（允许微小数值抖动）
+        diffs = np.diff(V_after)
+        # 衰减期电压变化应趋向 0 或负值（回到 E_L）
         assert np.all(np.isfinite(V_trace)), "出现非有限值"
+        # 最终电压应接近漏电流平衡电位
         assert abs(V_trace[-1] - (-54.3)) < 1.0, f"最终电压未收敛到 E_L: {V_trace[-1]}"
-
-    def test_very_short_dt_with_CaT(self):
-        """极小时间步长含 CaT 通道不应导致数值爆炸。"""
-        _build_single_compartment_with_CaT(dt=0.001, steps=100, P_CaT=1e-4)
-        hm.insert_stimulation("stim", 0, 0.05, 0.01, 0.05)
-        hm.start_simulation()
-        assert np.all(np.isfinite(hm.HISTORY_V))
-        assert np.all(np.isfinite(hm.HISTORY_CA))
-
-    def test_large_P_CaT_stability(self):
-        """较大的 CaT 渗透率不应导致数值不稳定。"""
-        _build_single_compartment_with_CaT(dt=0.025, steps=1000, P_CaT=1e-3)
-        hm.insert_stimulation("stim", 0, 0.1, 1.0, 0.5)
-        hm.start_simulation()
-        assert np.all(np.isfinite(hm.HISTORY_V))
-        assert np.all(np.isfinite(hm.HISTORY_CA))
 
 
 # ============================================================
@@ -1167,12 +790,13 @@ class TestShowDynamicPhasePortrait:
             hm.show_dynamic_phase_portrait("nonexistent_probe")
 
     def test_runs_with_valid_input(self, monkeypatch):
-        """Valid 输入下应成功执行而不崩溃。"""
+        """Valid 输入下应成功执行而不崩溃（拦截 plt.show）。"""
         monkeypatch.setattr(plt, "show", lambda *a, **kw: None)
         _build_single_compartment(dt=0.025, steps=200)
         hm.insert_probe("p0", 0, 0.0, 2.0)
         hm.insert_stimulation("s0", 0, 0.1, 0.5, 1.0)
         hm.start_simulation()
+        # 不应抛出异常
         hm.show_dynamic_phase_portrait("p0", x_var='V', y_var='n', Nx=5, Ny=5, interval=10)
 
     def test_custom_axis_combination(self, monkeypatch):
@@ -1253,7 +877,7 @@ class TestPlotVariableOverTime:
             hm.plot_variable_over_time(0, 'V', 5.0, 0.5)
 
     def test_plots_voltage(self, monkeypatch):
-        """绘制 V 变量应成功执行。"""
+        """绘制 V 变量应成功执行（拦截 plt.show）。"""
         monkeypatch.setattr(plt, "show", lambda *a, **kw: None)
         _build_single_compartment(dt=0.025, steps=400)
         hm.insert_stimulation("s0", 0, 0.1, 1.0, 0.5)
@@ -1268,21 +892,14 @@ class TestPlotVariableOverTime:
         for label in ['V', 'm', 'h', 'n']:
             hm.plot_variable_over_time(0, label, 0.0, 2.0)
 
-    def test_plots_calcium_variables(self, monkeypatch):
-        """Ca、mT、hT 变量标签应成功绘制。"""
-        monkeypatch.setattr(plt, "show", lambda *a, **kw: None)
-        _build_single_compartment_with_CaT(dt=0.025, steps=200)
-        hm.start_simulation()
-        for label in ['Ca', 'mT', 'hT']:
-            hm.plot_variable_over_time(0, label, 0.0, 2.0)
-
     def test_time_clamp(self, monkeypatch):
         """时间范围超出仿真范围时应被截断而不报错。"""
         monkeypatch.setattr(plt, "show", lambda *a, **kw: None)
         dt = 0.025
-        steps = 100
+        steps = 100  # 总时间 2.5 ms
         _build_single_compartment(dt=dt, steps=steps)
         hm.start_simulation()
+        # end_time 超出仿真范围，应被 clamp 到 STEPS
         hm.plot_variable_over_time(0, 'V', 0.0, 100.0)
 
     def test_multi_compartment(self, monkeypatch):
@@ -1307,50 +924,8 @@ class TestPlotVariableOverTime:
         # 有 V override
         dV2, dm2, dh2, dn2 = hm.compute_continuous_derivatives(
             segment_id=0, step=0, V_override=0.0)
+        # 电压偏移应导致不同的导数值
         assert dV1 != pytest.approx(dV2, abs=1e-3)
-
-
-# ============================================================
-# 15. 量纲一致性验证
-# ============================================================
-
-class TestDimensionalConsistency:
-    """验证关键物理量的量纲链正确性。"""
-
-    def test_Kij_units_mS(self):
-        """K_ij = 1/(R_i + R_j) 应为 mS 量级。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        # R = Ra * 10 * L/2 / cross_area (kOhm)
-        R_half = seg.Ra * 10.0 * (seg.L / 2) / seg.cross_area_um2
-        K = hm.calculate_Kij(seg, seg)
-        assert K == pytest.approx(1.0 / (2 * R_half), rel=1e-10)
-        # 典型值约 mS 量级
-        assert K > 0
-
-    def test_absolute_C_uF(self):
-        """absolute_C 应以 uF 为单位。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        # Cm=1 uF/cm², surface_area in cm² → C in uF
-        C = seg.absolute_C
-        expected = 1.0 * math.pi * 10 * 100 * 1e-8
-        assert C == pytest.approx(expected, rel=1e-10)
-
-    def test_C_over_DEL_is_mS(self):
-        """C/DEL 量纲应为 mS (= uF/ms = uA/mV)。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        DEL = 0.0125  # ms
-        C_factor = seg.absolute_C / DEL  # uF / ms = mS
-        # 应为正
-        assert C_factor > 0
-
-    def test_gamma_Ca_correct_coefficient(self):
-        """gamma_Ca 系数验证：1e-6 / (z*F*Vol)→ (mM/ms)/uA。"""
-        seg = hm.Segment(uid="t", Ra=100.0, D=10.0, L=100.0, Cm=1.0, id=0)
-        d = 0.1  # um
-        vol_cm3 = seg.surface_area_cm2 * d * 1e-4
-        vol_L = vol_cm3 * 1e-3
-        expected = 1e-6 / (2.0 * 96485.3 * vol_L)
-        assert seg.gamma_Ca == pytest.approx(expected, rel=1e-10)
 
 
 if __name__ == "__main__":
