@@ -107,9 +107,8 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             string typeName = entity switch
             {
-                SomaVisual => "Soma",
                 DendVisual => "Dend",
-                AxonVisual axon => axon.VisualType,
+                AxonVisual a => a.VisualType,
                 _ => "Entity"
             };
 
@@ -131,9 +130,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             AddLabel(stack, $"Cm: {entity.Cm} µF/cm²");
             AddLabel(stack, $"Ra: {entity.Ra} Ω·cm");
 
-            if (entity is SomaVisual soma)
-                AddLabel(stack, $"Radius: {soma.Radius:F2} µm");
-            else if (entity is AxonVisual axon)
+            if (entity is AxonVisual axon)
             {
                 AddLabel(stack, $"Length: {axon.Length:F2} µm");
                 AddLabel(stack, $"Base R: {axon.BaseRadius:F2} µm");
@@ -275,7 +272,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         private Expander BuildProbeExpander(SimProbe simProbe, IAttachedDevice? device)
         {
             string targetInfo = device != null
-                ? $"Target: {(device.TargetEntity is SomaVisual ? "Soma" : device.TargetEntity is DendVisual ? "Dend" : "Axon")}"
+                ? $"Target: {(device.TargetEntity is DendVisual ? "Dend" : device.TargetEntity is SomaVisual ? "Soma" : "Axon")}"
                 : "Target: unknown";
 
             var expander = new Expander

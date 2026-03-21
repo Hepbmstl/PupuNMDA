@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -89,7 +90,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                     {
                         if (!_currentOperatingEntity.Channels.ContainsKey(ch.Name))
                         {
-                            _currentOperatingEntity.Channels.Add(ch.Name, ch);
+                            var clone = ch.Clone();
+                            _currentOperatingEntity.Channels.Add(clone.Name, clone);
                             _currentOperatingEntity.UpdateChannelVisuals();
                             RefreshChannelList(_currentOperatingEntity);
                         }
@@ -170,10 +172,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             {
                 entityType = axon.VisualType;
             }
-            else if (entity is SomaVisual)
-            {
-                entityType = "Soma";
-            }
 
             var expander = new Expander
             {
@@ -221,13 +219,6 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 tbLength.LostFocus += (s, e) => { if (double.TryParse(tbLength.Text, out double v)) axonEntity.Length = v; };
                 panel.Children.Add(tbLength);
             }
-            else if (entity is SomaVisual soma)
-            {
-                panel.Children.Add(new TextBlock { Text = "Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
-                var tbRadius = new TextBox { Text = soma.Radius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
-                tbRadius.LostFocus += (s, e) => { if (double.TryParse(tbRadius.Text, out double v)) soma.Radius = v; };
-                panel.Children.Add(tbRadius);
-            }
 
             // Cm (µF/cm²)
             panel.Children.Add(new TextBlock { Text = "Cm (µF/cm²):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
@@ -251,6 +242,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             btnAddChannel.Click += (s, e) =>
             {
                 _currentOperatingEntity = entity;
+                InitializeChannelSelector();
                 _channelPopup.IsOpen = true;
             };
             panel.Children.Add(btnAddChannel);
@@ -282,12 +274,36 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             foreach (var kvp in entity.Channels)
             {
                 var chName = kvp.Key;
+                var chProp = kvp.Value;
                 var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-                var txt = new TextBlock { Text = chName, Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center };
+                string unitSuffix = chProp.IsPermeability ? " cm/s" : " mS/cm\u00b2";
+                var txt = new TextBlock
+                {
+                    Text = $"{chName} ({chProp.G_ion_channel.ToString(CultureInfo.InvariantCulture)}{unitSuffix})",
+                    Foreground = Brushes.LightGray,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
                 Grid.SetColumn(txt, 0);
+
+                var capturedName = chName;
+                var btnGear = new Button
+                {
+                    Content = "\u2699",
+                    Width = 20,
+                    Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)),
+                    Foreground = Brushes.White,
+                    Margin = new Thickness(2, 0, 2, 0),
+                    ToolTip = "Edit channel value for this entity"
+                };
+                btnGear.Click += (s, e) =>
+                {
+                    ShowChannelEditPopup(entity, capturedName, listPanel);
+                };
+                Grid.SetColumn(btnGear, 1);
 
                 var btnDel = new Button { Content = "-", Width = 20, Background = Brushes.Maroon, Foreground = Brushes.White };
                 btnDel.Click += (s, e) =>
@@ -296,12 +312,104 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                     entity.UpdateChannelVisuals();
                     RefreshChannelList(entity, listPanel);
                 };
-                Grid.SetColumn(btnDel, 1);
+                Grid.SetColumn(btnDel, 2);
 
                 row.Children.Add(txt);
+                row.Children.Add(btnGear);
                 row.Children.Add(btnDel);
                 listPanel.Children.Add(row);
             }
+        }
+
+        private void ShowChannelEditPopup(IVisualEntity entity, string channelName, StackPanel listPanel)
+        {
+            if (!entity.Channels.TryGetValue(channelName, out var ch)) return;
+
+            var win = new Window
+            {
+                Title = $"Edit Channel: {channelName}",
+                Width = 340,
+                Height = 180,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)),
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var panel = new StackPanel { Margin = new Thickness(15) };
+
+            string unitText = ch.IsPermeability
+                ? "Permeability P (cm/s) \u2014 GHK, not conductance"
+                : "Conductance g (mS/cm\u00b2)";
+            panel.Children.Add(new TextBlock
+            {
+                Text = unitText,
+                Foreground = Brushes.LightGray,
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+
+            var tbVal = new TextBox
+            {
+                Text = ch.G_ion_channel.ToString(CultureInfo.InvariantCulture),
+                Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                Padding = new Thickness(6, 4, 6, 4),
+                FontSize = 14
+            };
+            panel.Children.Add(tbVal);
+
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+
+            var btnOK = new Button
+            {
+                Content = "OK",
+                Width = 60,
+                Padding = new Thickness(0, 4, 0, 4),
+                Margin = new Thickness(0, 0, 8, 0),
+                Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            btnOK.Click += (s2, e2) =>
+            {
+                if (float.TryParse(tbVal.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float val))
+                {
+                    ch.G_ion_channel = val;
+                    RefreshChannelList(entity, listPanel);
+                    win.DialogResult = true;
+                    win.Close();
+                }
+                else
+                {
+                    MessageBox.Show("Invalid numeric value.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+
+            var btnCancel = new Button
+            {
+                Content = "Cancel",
+                Width = 60,
+                Padding = new Thickness(0, 4, 0, 4),
+                Background = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            btnCancel.Click += (s2, e2) => { win.DialogResult = false; win.Close(); };
+
+            btnPanel.Children.Add(btnOK);
+            btnPanel.Children.Add(btnCancel);
+            panel.Children.Add(btnPanel);
+
+            win.Content = panel;
+            win.ShowDialog();
         }
     }
 }

@@ -95,6 +95,15 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
+        /// 通知外部（面板等）有设备被加载（从文件恢复），触发 OnDeviceAdded 事件。
+        /// 被 SaveLoadManager.ApplyToScene 调用。
+        /// </summary>
+        public void NotifyDeviceLoaded(IAttachedDevice device)
+        {
+            OnDeviceAdded?.Invoke(device);
+        }
+
+        /// <summary>
         /// 停用仿真交互：取消当前操作，移除未提交的设备可视化对象。
         /// 被 MainWindow.SwitchTab 在切换标签页时调用。
         /// </summary>

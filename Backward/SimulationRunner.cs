@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Python.Runtime;
 using NeuronCAD.Visuals.Tabs.Simulation;
+using NeuronCAD.Visuals.Windows;
 
 namespace NeuronCAD.Backward
 {
@@ -100,6 +101,11 @@ namespace NeuronCAD.Backward
                         "{{\"Na\":{{\"E\":{0}}},\"K\":{{\"E\":{1}}},\"L\":{{\"E\":{2}}}}}",
                         eNa, eK, eLeak);
                     sim.set_E(json.loads(eJson));
+
+                    // ── 3b. set ion channel params ──
+                    dynamic json2 = Py.Import("json");
+                    sim.set_hh_params(json2.loads(IonChannelParams.GetHHParamsJson()));
+                    sim.set_ca_params(json2.loads(IonChannelParams.GetCaParamsJson()));
 
                     // ── 4. init_segment + add_channel_to_segment（按 GlobalId 顺序） ──
                     foreach (var comp in simData.Compartments)

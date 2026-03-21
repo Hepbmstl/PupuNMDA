@@ -115,7 +115,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
         /// <summary>
         /// 逆向计算目标实体在特定 Anchor 处的表面法线（世界坐标系）。
-        /// 对 AxonVisual 使用圆台几何计算，对 SomaVisual 等球体使用球心指向表面向量。
+        /// 对 AxonVisual（含 SomaVisual、DendVisual）使用圆台几何计算，其他形状使用中心指向表面向量。
         /// 由 UpdatePosition 内部调用。
         /// </summary>
         /// <returns>世界坐标系下的单位法线向量</returns>

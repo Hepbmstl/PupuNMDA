@@ -57,6 +57,31 @@ PROBE_SAVE_DATA = {}
 CURRENT_STEP = -1
 SIMULATION_RUNNING = False
 
+# HH gating parameters (modifiable via C# Ion Channel Setting)
+HH_PARAMS = {
+    "alpha_m_A": 0.1, "alpha_m_Vs": 35.0, "alpha_m_k": 10.0,
+    "beta_m_A": 4.0, "beta_m_Vs": 60.0, "beta_m_k": 18.0,
+    "alpha_h_A": 0.07, "alpha_h_Vs": 60.0, "alpha_h_k": 20.0,
+    "beta_h_A": 1.0, "beta_h_Vs": 30.0, "beta_h_k": 10.0,
+    "alpha_n_A": 0.01, "alpha_n_Vs": 50.0, "alpha_n_k": 10.0,
+    "beta_n_A": 0.125, "beta_n_Vs": 60.0, "beta_n_k": 80.0,
+}
+
+# Ca T-type channel parameters (modifiable via C# Ion Channel Setting)
+CA_PARAMS = {
+    "inf_mT_Vh": 56.0, "inf_mT_k": 6.2,
+    "inf_hT_Vh": 80.0, "inf_hT_k": 4.0,
+    "tau_mT_base": 0.612, "tau_mT_V1": 132.0, "tau_mT_k1": 16.7,
+    "tau_mT_V2": 16.8, "tau_mT_k2": 18.2, "tau_mT_Q10": 5.0, "tau_mT_Tref": 24.0,
+    "tau_hT_Vthresh": -80.0,
+    "tau_hT_V1": 467.0, "tau_hT_k1": 66.6,
+    "tau_hT_base": 28.0, "tau_hT_V2": 22.0, "tau_hT_k2": 10.5,
+    "tau_hT_Q10": 3.0, "tau_hT_Tref": 24.0,
+}
+
+_HH_PARAMS_DEFAULT = dict(HH_PARAMS)
+_CA_PARAMS_DEFAULT = dict(CA_PARAMS)
+
 # -----------------------------------------------------------------------------------
 # tools：
 
@@ -74,9 +99,14 @@ def save_data_HH(prob_id, data: dict):
 def set_env(V_init: float= -65.0,
         dt: float = 0.02,
         steps: int = 1000,
-        n_node:int = 0 ): 
+        n_node:int = 0,
+        celsius: float = 36.0,
+        ca_out: float = 2.0,
+        ca_inf: float = 2.4e-4,
+        tau_ca: float = 5.0):
     global V, DT, DEL, STEPS, N_NODE, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
+    global CELSIUS, TEMP_K, CA_OUT, CA_INF, TAU_CA
 
     V = V_init # 初始化所有区室的电压
     DT = dt # 模拟步长
@@ -91,9 +121,29 @@ def set_env(V_init: float= -65.0,
     HISTORY_MT = np.zeros((steps + 1, n_node))
     HISTORY_HT = np.zeros((steps + 1, n_node))
 
+    CELSIUS = celsius
+    TEMP_K = celsius + 273.15
+    CA_OUT = ca_out
+    CA_INF = ca_inf
+    TAU_CA = tau_ca
+
 def set_E(table : dict): # 设置所有离子的电位
     global E_TABLE
     E_TABLE = table
+
+def set_hh_params(params):
+    """从 C# 传入 HH 门控参数字典，更新 HH_PARAMS。"""
+    global HH_PARAMS
+    for key in params:
+        if key in HH_PARAMS:
+            HH_PARAMS[key] = float(params[key])
+
+def set_ca_params(params):
+    """从 C# 传入 Ca T-type 通道参数字典，更新 CA_PARAMS。"""
+    global CA_PARAMS
+    for key in params:
+        if key in CA_PARAMS:
+            CA_PARAMS[key] = float(params[key])
 
 def insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms):
     """
@@ -118,6 +168,7 @@ class Segment:
     L: float           # 长度 (um)
     Cm: float          # 比膜电容 (uF/cm^2)，标准值通常为 1.0
     id: int
+    ca_shell_depth_um: float = 0.1
 
     channels: dict = field(default_factory=dict)
     connected_segments: list = field(default_factory=list)
@@ -167,7 +218,7 @@ class Segment:
         单位换算推导：将绝对电流 (uA) 转化为浓度变化 (mM/ms)
         假设钙离子聚集在膜下 d = 0.1 um 的壳层中
         """
-        d_um = 0.1
+        d_um = self.ca_shell_depth_um
         shell_volume_L = self.surface_area_cm2 * (d_um * 1e-4) * 1e-3 # 升
         # d[Ca]/dt = - I / (Z * F * Volume)
         # I(uA)=1e-6 A, d[Ca]/dt 单位 mM/ms = mol/(L·s):
@@ -175,13 +226,8 @@ class Segment:
         return 1e-6 / (Z_CA * FARADAY * shell_volume_L)
 
 
-def init_segment(uid: str, # 初始化区室
-        Ra: float,          # 局部轴向电阻率 (ohm * cm)
-        D: float,           # 直径 (um)
-        L: float,           # 长度 (um)
-        Cm: float,
-        id: int ):
-    new_seg = Segment(uid=uid, Ra=Ra, D=D, L=L, Cm=Cm, id=id)
+def init_segment(uid: str, Ra: float, D: float, L: float, Cm: float, id: int, ca_shell_depth_um: float = 0.1):
+    new_seg = Segment(uid=uid, Ra=Ra, D=D, L=L, Cm=Cm, id=id, ca_shell_depth_um = ca_shell_depth_um)
     SEGMENT[id] = new_seg
 
 
@@ -225,6 +271,8 @@ def clear_environment():
         "K":  {"E": -72.0},
         "L":  {"E": -54.3}
     }
+    HH_PARAMS.update(_HH_PARAMS_DEFAULT)
+    CA_PARAMS.update(_CA_PARAMS_DEFAULT)
 
 
 def get_current_step():
@@ -248,43 +296,81 @@ def calculate_Kij(seg_i: Segment, seg_j: Segment):
     
     return 1.0 / (R_i + R_j)
 
-def alpha_m(V): 
-    # V -> -35 时的极限值为 0.1 / (1/10) = 1.0
-    if abs(V + 35.0) < 1e-6:
-        return 1.0
-    return (0.1 * (V + 35))/(1 - np.exp(-((V+35)/10)))
+def alpha_m(V):
+    A  = HH_PARAMS["alpha_m_A"]
+    Vs = HH_PARAMS["alpha_m_Vs"]
+    k  = HH_PARAMS["alpha_m_k"]
+    if abs(V + Vs) < 1e-6:
+        return A * k
+    return (A * (V + Vs)) / (1 - np.exp(-((V + Vs) / k)))
 
-def alpha_n(V): 
-    # V -> -50 时的极限值为 0.01 / (1/10) = 0.1
-    if abs(V + 50.0) < 1e-6:
-        return 0.1
-    return (0.01 * (V + 50))/(1 - np.exp(-((V+50)/10)))
+def alpha_n(V):
+    A  = HH_PARAMS["alpha_n_A"]
+    Vs = HH_PARAMS["alpha_n_Vs"]
+    k  = HH_PARAMS["alpha_n_k"]
+    if abs(V + Vs) < 1e-6:
+        return A * k
+    return (A * (V + Vs)) / (1 - np.exp(-((V + Vs) / k)))
 
-def beta_m(V): return 4 * np.exp(-(V+60)/18)
+def beta_m(V):
+    A  = HH_PARAMS["beta_m_A"]
+    Vs = HH_PARAMS["beta_m_Vs"]
+    k  = HH_PARAMS["beta_m_k"]
+    return A * np.exp(-(V + Vs) / k)
 
-def alpha_h(V): return 0.07 * np.exp(-(V+60)/20)
+def alpha_h(V):
+    A  = HH_PARAMS["alpha_h_A"]
+    Vs = HH_PARAMS["alpha_h_Vs"]
+    k  = HH_PARAMS["alpha_h_k"]
+    return A * np.exp(-(V + Vs) / k)
 
-def beta_h(V): return 1/(1 + np.exp(-((V+30)/10)))
+def beta_h(V):
+    A  = HH_PARAMS["beta_h_A"]
+    Vs = HH_PARAMS["beta_h_Vs"]
+    k  = HH_PARAMS["beta_h_k"]
+    return A / (1 + np.exp(-((V + Vs) / k)))
 
-def beta_n(V): return 0.125 * np.exp(-(V+60)/80)
+def beta_n(V):
+    A  = HH_PARAMS["beta_n_A"]
+    Vs = HH_PARAMS["beta_n_Vs"]
+    k  = HH_PARAMS["beta_n_k"]
+    return A * np.exp(-(V + Vs) / k)
 
 def inf_mT(V):
-    return 1.0 / (1.0 + np.exp(-(V + 56.0) / 6.2))
+    Vh = CA_PARAMS["inf_mT_Vh"]
+    k  = CA_PARAMS["inf_mT_k"]
+    return 1.0 / (1.0 + np.exp(-(V + Vh) / k))
 
 def inf_hT(V):
-    return 1.0 / (1.0 + np.exp((V + 80.0) / 4.0))
+    Vh = CA_PARAMS["inf_hT_Vh"]
+    k  = CA_PARAMS["inf_hT_k"]
+    return 1.0 / (1.0 + np.exp((V + Vh) / k))
 
 def tau_mT(V):
-    # Q10 温度校正因子 (假设实验数据 24度，目标 36度)
-    phi_m = 5.0 ** ((CELSIUS - 24.0) / 10.0)
-    return (0.612 + 1.0 / (np.exp(-(V + 132.0) / 16.7) + np.exp((V + 16.8) / 18.2))) / phi_m
+    base = CA_PARAMS["tau_mT_base"]
+    V1   = CA_PARAMS["tau_mT_V1"]
+    k1   = CA_PARAMS["tau_mT_k1"]
+    V2   = CA_PARAMS["tau_mT_V2"]
+    k2   = CA_PARAMS["tau_mT_k2"]
+    Q10  = CA_PARAMS["tau_mT_Q10"]
+    Tref = CA_PARAMS["tau_mT_Tref"]
+    phi_m = Q10 ** ((CELSIUS - Tref) / 10.0)
+    return (base + 1.0 / (np.exp(-(V + V1) / k1) + np.exp((V + V2) / k2))) / phi_m
 
 def tau_hT(V):
-    phi_h = 3.0 ** ((CELSIUS - 24.0) / 10.0)
-    if V < -80.0:
-        return np.exp((V + 467.0) / 66.6) / phi_h
+    Vth  = CA_PARAMS["tau_hT_Vthresh"]
+    V1   = CA_PARAMS["tau_hT_V1"]
+    k1   = CA_PARAMS["tau_hT_k1"]
+    base = CA_PARAMS["tau_hT_base"]
+    V2   = CA_PARAMS["tau_hT_V2"]
+    k2   = CA_PARAMS["tau_hT_k2"]
+    Q10  = CA_PARAMS["tau_hT_Q10"]
+    Tref = CA_PARAMS["tau_hT_Tref"]
+    phi_h = Q10 ** ((CELSIUS - Tref) / 10.0)
+    if V < Vth:
+        return np.exp((V + V1) / k1) / phi_h
     else:
-        return (28.0 + np.exp(-(V + 22.0) / 10.5)) / phi_h
+        return (base + np.exp(-(V + V2) / k2)) / phi_h
 
 def gating_update_tau_inf(DEL, xi_old, inf, tau):
     """
@@ -325,7 +411,8 @@ def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
     # 奇点状态截获 (V 极小)
     if abs(z) < 1e-4:
         # 泰勒展开极限状态 (L'Hôpital's limit)
-        I_T_abs = GHK_prefix * (Cai - Cao) * (1.0 - z/2.0)
+        # f(z) = z*(Ci - Co*e^{-z})/(1-e^{-z}) ≈ (Ci-Co) + z*(Ci+Co)/2 + O(z²)
+        I_T_abs = GHK_prefix * ((Cai - Cao) + z * (Cai + Cao) / 2.0)
         g_Ca_eq = GHK_prefix * k * ((Cai + Cao) / 2.0)
         return I_T_abs, g_Ca_eq
 

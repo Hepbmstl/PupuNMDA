@@ -191,6 +191,24 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             CancelAction();
             ForceSelect(null);
         }
+
+        /// <summary>
+        /// 通知外部（属性面板等）有实体被加载（从文件恢复），触发 OnEntityAdded 事件。
+        /// 被 SaveLoadManager.ApplyToScene 调用。
+        /// </summary>
+        public void NotifyEntityLoaded(IVisualEntity entity)
+        {
+            OnEntityAdded?.Invoke(entity);
+        }
+
+        /// <summary>
+        /// 通知外部（属性面板等）有实体被移除，触发 OnEntityRemoved 事件。
+        /// 被 MainWindow.ClearScene 调用。
+        /// </summary>
+        public void NotifyEntityRemoved(IVisualEntity entity)
+        {
+            OnEntityRemoved?.Invoke(entity);
+        }
         #endregion
 
         #region Input Handlers (IViewportInteractionHandler)

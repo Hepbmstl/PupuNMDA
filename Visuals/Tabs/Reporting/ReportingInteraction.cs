@@ -231,9 +231,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             if (_overlaysVisible) HideOverlays();
 
-            if (entity is SomaVisual soma)
-                BuildSomaOverlays(soma);
-            else if (entity is AxonVisual axon)
+            if (entity is AxonVisual axon)
                 BuildAxonOverlays(axon);
 
             _overlaysVisible = true;
@@ -246,37 +244,6 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             _overlays.Clear();
             _hoveredOverlay = null;
             _overlaysVisible = false;
-        }
-
-        private void BuildSomaOverlays(SomaVisual soma)
-        {
-            if (soma.CompartmentIds.Count == 0) return;
-
-            var colorIdx = soma.CompartmentIds[0] % CompartmentColors.Length;
-            var defaultColor = CompartmentColors[colorIdx];
-
-            var mesh = CreateSphereMesh(soma.Radius + 0.08, 20, 20);
-            var geoModel = new GeometryModel3D
-            {
-                Geometry = mesh,
-                Material = new DiffuseMaterial(new SolidColorBrush(defaultColor)),
-                BackMaterial = new DiffuseMaterial(new SolidColorBrush(defaultColor))
-            };
-
-            var visual = new ModelVisual3D { Content = geoModel };
-            visual.Transform = soma.Visual3D.Transform;
-
-            _overlays.Add(new CompartmentOverlay
-            {
-                GlobalId = soma.CompartmentIds[0],
-                ParentEntityId = soma.Id,
-                Index = 0,
-                Visual3D = visual,
-                GeometryModel = geoModel,
-                DefaultMaterial = geoModel.Material,
-                HighlightMaterial = new DiffuseMaterial(new SolidColorBrush(HighlightColor))
-            });
-            _scene.HelixViewport.Children.Add(visual);
         }
 
         private void BuildAxonOverlays(AxonVisual axon)
@@ -334,9 +301,6 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             if (entity.CompartmentCount <= 0) return null;
 
-            if (entity is SomaVisual)
-                return _overlays.FirstOrDefault(o => o.ParentEntityId == entity.Id);
-
             if (entity is AxonVisual axon)
             {
                 if (axon.Visual3D.Transform == null) return null;
@@ -360,50 +324,6 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         #endregion
 
         #region Mesh Generators
-
-        private static MeshGeometry3D CreateSphereMesh(double radius, int stacks, int slices)
-        {
-            var mesh = new MeshGeometry3D();
-
-            for (int stack = 0; stack <= stacks; stack++)
-            {
-                double phi = Math.PI * stack / stacks;
-                double sinPhi = Math.Sin(phi);
-                double cosPhi = Math.Cos(phi);
-
-                for (int slice = 0; slice <= slices; slice++)
-                {
-                    double theta = 2 * Math.PI * slice / slices;
-                    double x = radius * sinPhi * Math.Cos(theta);
-                    double y = radius * sinPhi * Math.Sin(theta);
-                    double z = radius * cosPhi;
-
-                    mesh.Positions.Add(new Point3D(x, y, z));
-                    mesh.Normals.Add(new Vector3D(x, y, z));
-                }
-            }
-
-            for (int stack = 0; stack < stacks; stack++)
-            {
-                for (int slice = 0; slice < slices; slice++)
-                {
-                    int i0 = stack * (slices + 1) + slice;
-                    int i1 = i0 + 1;
-                    int i2 = i0 + slices + 1;
-                    int i3 = i2 + 1;
-
-                    mesh.TriangleIndices.Add(i0);
-                    mesh.TriangleIndices.Add(i2);
-                    mesh.TriangleIndices.Add(i1);
-
-                    mesh.TriangleIndices.Add(i1);
-                    mesh.TriangleIndices.Add(i2);
-                    mesh.TriangleIndices.Add(i3);
-                }
-            }
-
-            return mesh;
-        }
 
         private static MeshGeometry3D CreateTruncatedConeMesh(double baseRadius, double topRadius, double length, int segments)
         {

@@ -169,27 +169,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 var entity = kvp.Value;
                 var ids = new List<int>();
 
-                if (entity is SomaVisual soma)
-                {
-                    // Soma 视为单个等效圆柱区室：L = D = 2R
-                    // 表面积 π·D·L = π·(2R)·(2R) = 4πR²，与球面积一致
-                    var comp = new Compartment
-                    {
-                        GlobalId = globalId,
-                        ParentEntityId = entity.Id,
-                        ParentEntityType = "Soma",
-                        Index = 0,
-                        Length_um = soma.Radius * 2.0,
-                        Diameter_um = soma.Radius * 2.0,
-                        Cm = entity.Cm,
-                        Ra = entity.Ra,
-                        Channels = new Dictionary<string, ChannelProperty>(entity.Channels)
-                    };
-                    ids.Add(globalId);
-                    compartments.Add(comp);
-                    globalId++;
-                }
-                else if (entity is AxonVisual axon)
+                if (entity is AxonVisual axon)
                 {
                     double totalLength = axon.Length;
                     int n = ComputeSegmentCount(totalLength);
@@ -293,25 +273,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 var entity = kvp.Value;
                 var ids = new List<int>();
 
-                if (entity is SomaVisual soma)
-                {
-                    var comp = new Compartment
-                    {
-                        GlobalId = globalId,
-                        ParentEntityId = entity.Id,
-                        ParentEntityType = "Soma",
-                        Index = 0,
-                        Length_um = soma.Radius * 2.0,
-                        Diameter_um = soma.Radius * 2.0,
-                        Cm = entity.Cm,
-                        Ra = entity.Ra,
-                        Channels = new Dictionary<string, ChannelProperty>(entity.Channels)
-                    };
-                    ids.Add(globalId);
-                    compartments.Add(comp);
-                    globalId++;
-                }
-                else if (entity is AxonVisual axon)
+                if (entity is AxonVisual axon)
                 {
                     double totalLength = axon.Length;
                     int n = ComputeSegmentCount(totalLength);

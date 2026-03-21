@@ -21,23 +21,39 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         public Color Color { get; set; }
 
         /// <summary>
-        /// 离子通道电导密度（单位：mS/cm²）。
+        /// 离子通道电导密度（单位：mS/cm²）或膜渗透率（单位：cm/s，当 IsPermeability 为 true 时）。
         /// 在仿真中直接传入 Hines_method.py 的 add_channel_to_segment 接口。
         /// </summary>
         public float G_ion_channel { get; set; }
+
+        /// <summary>
+        /// 为 true 时表示 G_ion_channel 字段存储的是膜渗透率 P (cm/s) 而非电导密度 g (mS/cm²)。
+        /// 用于 CaT 等通过 GHK 方程计算电流的通道。
+        /// </summary>
+        public bool IsPermeability { get; set; }
 
         /// <summary>
         /// 构造函数。
         /// </summary>
         /// <param name="name">通道名称</param>
         /// <param name="color">渲染颜色</param>
-        /// <param name="G">电导密度 (mS/cm²)</param>
-        public ChannelProperty(string name, Color color, float G)
+        /// <param name="G">电导密度 (mS/cm²) 或渗透率 (cm/s)</param>
+        /// <param name="isPermeability">是否为渗透率通道</param>
+        public ChannelProperty(string name, Color color, float G, bool isPermeability = false)
         {
             Name = name;
             Id = Guid.NewGuid().ToString();
             Color = color;
             G_ion_channel = G;
+            IsPermeability = isPermeability;
+        }
+
+        /// <summary>
+        /// 创建当前实例的深拷贝（新 Id），用于为每个实体维护独立的通道参数。
+        /// </summary>
+        public ChannelProperty Clone()
+        {
+            return new ChannelProperty(Name, Color, G_ion_channel, IsPermeability);
         }
     }
 
@@ -59,15 +75,25 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// </summary>
         static GlobalBiophysics()
         {
+            ResetToDefaults();
+        }
+
+        /// <summary>重置全局通道为初始默认值。</summary>
+        public static void ResetToDefaults()
+        {
+            GlobalChannels.Clear();
             // 名称使用短键以与 Hines_method 的键名一致
             var naChannel = new ChannelProperty("Na", Colors.Red, 120.0f);
             var kChannel = new ChannelProperty("K", Colors.Blue, 36.0f);
             var leakChannel = new ChannelProperty("L", Colors.LightGreen, 0.3f);
+            // CaT: 键名对齐 Hines_method.py 中 get_absolute_P_max("CaT")，
+            // 值为膜渗透率 P (cm/s)，而非 HH 电导密度
+            var catChannel = new ChannelProperty("CaT", Colors.Orange, 1e-4f, isPermeability: true);
 
             GlobalChannels.Add(naChannel.Name, naChannel);
             GlobalChannels.Add(kChannel.Name, kChannel);
             GlobalChannels.Add(leakChannel.Name, leakChannel);
+            GlobalChannels.Add(catChannel.Name, catChannel);
         }
-
     }
 }

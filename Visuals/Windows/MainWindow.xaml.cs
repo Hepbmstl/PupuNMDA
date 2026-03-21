@@ -1,9 +1,11 @@
-﻿using System.Windows;
+﻿using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using NeuronCAD.Backward;
 using NeuronCAD.Visuals.Tabs.Shared;
 using NeuronCAD.Visuals.Tabs.Modeling;
@@ -58,6 +60,9 @@ namespace NeuronCAD.Visuals.Windows
 
         /// <summary>是否正在仿真中。为 true 时禁止所有建模/仿真交互操作。</summary>
         private bool _isSimulating;
+
+        /// <summary>当前项目文件路径。Save 时直接覆盖，为 null 时走 Save As 流程。</summary>
+        private string? _currentProjectPath;
 
         /// <summary>
         /// 构造函数，初始化 XAML 组件并在窗口 Loaded 后初始化控制器。
@@ -483,13 +488,7 @@ namespace NeuronCAD.Visuals.Windows
                 TbRadius.Text = axon.BaseRadius.ToString("F2");
                 TbTopRadius.Text = axon.TopRadius.ToString("F2");
             }
-            else if (entity is SomaVisual soma)
-            {
-                PanelAxonLength.Visibility = Visibility.Collapsed;
-                PanelRadius.Visibility = Visibility.Visible;
-                PanelTopRadius.Visibility = Visibility.Collapsed;
-                TbRadius.Text = soma.Radius.ToString("F2");
-            }
+
 
             EditPopup.Margin = new Thickness(mousePos.X, mousePos.Y, 0, 0);
             EditPopup.Visibility = Visibility.Visible;
@@ -511,10 +510,7 @@ namespace NeuronCAD.Visuals.Windows
                     if (double.TryParse(TbRadius.Text, out double br)) axon.BaseRadius = br;
                     if (double.TryParse(TbTopRadius.Text, out double tr)) axon.TopRadius = tr;
                 }
-                else if (_editingEntity is SomaVisual soma)
-                {
-                    if (double.TryParse(TbRadius.Text, out double r)) soma.Radius = r;
-                }
+
             }
             catch { }
 
@@ -542,7 +538,9 @@ namespace NeuronCAD.Visuals.Windows
         /// </summary>
         private void OnAddSomaClick(object sender, RoutedEventArgs e)
         {
-            var newSoma = new SomaVisual(new Point3D(0, 0, 0), 10.0, Colors.DodgerBlue);
+            var start = new Point3D(0, 0, 0);
+            var end = new Point3D(0, 0, 10);
+            var newSoma = new SomaVisual(start, end, 5.0, Colors.DodgerBlue);
             _modelingInteraction.StartPlacing(newSoma);
         }
 
@@ -610,6 +608,160 @@ namespace NeuronCAD.Visuals.Windows
             ReportSubTabProbes.IsChecked = true;
             ReportComponentsScroll.Visibility = Visibility.Collapsed;
             ReportProbesScroll.Visibility = Visibility.Visible;
+        }
+
+        #endregion
+
+        #region Edit Menu
+
+        private void OnIonChannelSettingClick(object sender, RoutedEventArgs e)
+        {
+            var win = new IonChannelSettingWindow { Owner = this };
+            win.ShowDialog();
+        }
+
+        #endregion
+
+        #region File Menu
+
+        private void OnNewProjectClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+            var result = MessageBox.Show("是否创建新项目？当前未保存的更改将丢失。",
+                "New Project", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+            if (result != MessageBoxResult.OK) return;
+
+            ClearScene();
+            _currentProjectPath = null;
+            Title = "NeuronCAD 2026";
+        }
+
+        private void OnOpenProjectClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+
+            var dlg = new OpenFileDialog
+            {
+                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
+                Title = "Open Project"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var project = SaveLoadManager.Load(dlg.FileName);
+                SaveLoadManager.ApplyToScene(
+                    project,
+                    _scene,
+                    _modelingInteraction,
+                    _simulationInteraction,
+                    v => TbVInit.Text = v,
+                    v => TbDt.Text = v,
+                    v => TbSteps.Text = v,
+                    v => TbENa.Text = v,
+                    v => TbEK.Text = v,
+                    v => TbELeak.Text = v,
+                    v => TbNSeg.Text = v,
+                    v => TbLSeg.Text = v,
+                    isNSeg => { RbNSeg.IsChecked = isNSeg; RbLSeg.IsChecked = !isNSeg; });
+
+                _currentProjectPath = dlg.FileName;
+                Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+
+                // 切换到建模模式查看加载结果
+                if (_activeTab != ActiveTab.Modeling)
+                {
+                    SwitchTab(ActiveTab.Modeling);
+                    SyncTabButtons();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载失败：\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OnSaveProjectClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+            if (_currentProjectPath == null)
+            {
+                OnSaveAsProjectClick(sender, e);
+                return;
+            }
+            SaveToFile(_currentProjectPath);
+        }
+
+        private void OnSaveAsProjectClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+
+            var dlg = new SaveFileDialog
+            {
+                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
+                Title = "Save Project As"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            SaveToFile(dlg.FileName);
+            _currentProjectPath = dlg.FileName;
+            Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+        }
+
+        private void OnExitClick(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void SaveToFile(string filePath)
+        {
+            try
+            {
+                if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -65.0;
+                if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.02;
+                if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
+                if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 55.0;
+                if (!double.TryParse(TbEK.Text, out double eK)) eK = -72.0;
+                if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.3;
+
+                string segMode = RbNSeg.IsChecked == true ? "NSeg" : "LSeg";
+                if (!int.TryParse(TbNSeg.Text, out int nSeg) || nSeg <= 0) nSeg = 5;
+                if (!double.TryParse(TbLSeg.Text, out double lSeg) || lSeg <= 0) lSeg = 20.0;
+
+                SaveLoadManager.Save(filePath, _scene,
+                    vInit, dt, steps, eNa, eK, eLeak,
+                    36.0, 2.0, 2.4e-4, 5.0,
+                    segMode, nSeg, lSeg);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"保存失败：\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ClearScene()
+        {
+            _modelingInteraction.Deactivate();
+            _simulationInteraction.Deactivate();
+
+            foreach (var device in _scene.Devices.ToList())
+                _scene.HelixViewport.Children.Remove(device.Visual3D);
+            _scene.Devices.Clear();
+
+            foreach (var connId in _scene.ConnectionController.ConnectionsById.Keys.ToList())
+                _scene.ConnectionController.Remove(connId);
+
+            foreach (var entity in _scene.Entities.ToList())
+            {
+                _scene.HelixViewport.Children.Remove(entity.Visual3D);
+                _scene.SimulationRegistry.Unregister(entity.Id);
+                _modelingInteraction.NotifyEntityRemoved(entity);
+            }
+            _scene.Entities.Clear();
+
+            IonChannelParams.ResetToDefault();
         }
 
         #endregion

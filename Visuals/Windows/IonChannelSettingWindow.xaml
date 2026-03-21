@@ -1,0 +1,81 @@
+<Window x:Class="NeuronCAD.Visuals.Windows.IonChannelSettingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ion Channel Setting"
+        Height="720"
+        Width="680"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E"
+        ResizeMode="CanResizeWithGrip">
+        <Grid>
+                <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TabControl Grid.Row="0"
+                            Background="#252526"
+                            BorderBrush="#3F3F46"
+                            Margin="8">
+                        <!-- Tab 1: HH Gating -->
+                        <TabItem Header="HH Gating"
+                                 Foreground="#F1F1F1">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Background="#1E1E1E">
+                                        <StackPanel x:Name="HHPanel"
+                                                    Margin="15"/>
+                                </ScrollViewer>
+                        </TabItem>
+
+                        <!-- Tab 2: Ca²⁺ T-type -->
+                        <TabItem Header="Ca²⁺ T-type"
+                                 Foreground="#F1F1F1">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Background="#1E1E1E">
+                                        <StackPanel x:Name="CaPanel"
+                                                    Margin="15"/>
+                                </ScrollViewer>
+                        </TabItem>
+
+                        <!-- Tab 3: Channels -->
+                        <TabItem Header="Channels"
+                                 Foreground="#F1F1F1">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Background="#1E1E1E">
+                                        <StackPanel x:Name="ChannelsPanel"
+                                                    Margin="15"/>
+                                </ScrollViewer>
+                        </TabItem>
+                </TabControl>
+
+                <!-- Bottom buttons -->
+                <StackPanel Grid.Row="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="15,5,15,15">
+                        <Button Content="Reset to Default"
+                                Click="OnResetClick"
+                                Padding="12,6"
+                                Margin="0,0,8,0"
+                                Background="#555555"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Cursor="Hand"/>
+                        <Button Content="Apply"
+                                Click="OnApplyClick"
+                                Padding="12,6"
+                                Margin="0,0,8,0"
+                                Background="#007ACC"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Cursor="Hand"/>
+                        <Button Content="Cancel"
+                                Click="OnCancelClick"
+                                Padding="12,6"
+                                Background="#444444"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Cursor="Hand"/>
+                </StackPanel>
+        </Grid>
+</Window>

@@ -11,7 +11,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     /// 可视化实体抽象基类，实现 IVisualEntity 接口的公共逻辑。
     /// 持有 HelixToolkit 三维模型 (GeometryModel3D)、材质管理、线框模式切换、
     /// 离子通道表面散点可视化等功能。
-    /// 派生类：SomaVisual（球体）、AxonVisual（圆台/圆柱）、DendVisual（AxonVisual 套壳）。
+    /// 派生类：SomaVisual（圆台，继承 AxonVisual）、AxonVisual（圆台/圆柱）、DendVisual（AxonVisual 套壳）。
     /// 调用者：InteractionController（放置/选择/移动/显示模式切换）、
     /// PropertiesPanelController（属性编辑和通道管理）、MainWindow（编辑弹窗）。
     /// </summary>
@@ -443,9 +443,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     {
         /// <summary>锚点在圆柱/圆台侧面（Axon/Dend），使用 AxialT 和 Angle 定位。</summary>
         AxonCylinder,
-        /// <summary>锚点在 Soma 圆柱表面（预留，当前 SomaVisual 使用 SomaUniform）。</summary>
+        /// <summary>锚点在 Soma 圆台表面（预留，当前 SomaVisual 使用 AxonCylinder）。</summary>
         SomaCylinder,
-        /// <summary>锚点在 Soma 表面均匀分布（简化版本，返回球心）。</summary>
+        /// <summary>锚点在 Soma 表面均匀分布（已废弃，Soma 现已改为圆台逻辑）。</summary>
         SomaUniform,
         /// <summary>锚点在 Axon/Dend 底面端盖 (Z=0)。</summary>
         AxonCapStart,
