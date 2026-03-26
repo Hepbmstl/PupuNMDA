@@ -68,9 +68,11 @@ HH_PARAMS = {
 }
 
 # Ca T-type channel parameters (modifiable via C# Ion Channel Setting)
+# Raw Vh values from ITGHK.mod; shift/actshift applied in kinetic functions
 CA_PARAMS = {
-    "inf_mT_Vh": 56.0, "inf_mT_k": 6.2,
-    "inf_hT_Vh": 80.0, "inf_hT_k": 4.0,
+    "shift": 2.0, "actshift": 0.0,
+    "inf_mT_Vh": 57.0, "inf_mT_k": 6.2,
+    "inf_hT_Vh": 81.0, "inf_hT_k": 4.0,
     "tau_mT_base": 0.612, "tau_mT_V1": 132.0, "tau_mT_k1": 16.7,
     "tau_mT_V2": 16.8, "tau_mT_k2": 18.2, "tau_mT_Q10": 5.0, "tau_mT_Tref": 24.0,
     "tau_hT_Vthresh": -80.0,
@@ -337,16 +339,21 @@ def beta_n(V):
     return A * np.exp(-(V + Vs) / k)
 
 def inf_mT(V):
+    shift = CA_PARAMS["shift"]
+    actshift = CA_PARAMS["actshift"]
     Vh = CA_PARAMS["inf_mT_Vh"]
     k  = CA_PARAMS["inf_mT_k"]
-    return 1.0 / (1.0 + np.exp(-(V + Vh) / k))
+    return 1.0 / (1.0 + np.exp(-(V + shift + actshift + Vh) / k))
 
 def inf_hT(V):
+    shift = CA_PARAMS["shift"]
     Vh = CA_PARAMS["inf_hT_Vh"]
     k  = CA_PARAMS["inf_hT_k"]
-    return 1.0 / (1.0 + np.exp((V + Vh) / k))
+    return 1.0 / (1.0 + np.exp((V + shift + Vh) / k))
 
 def tau_mT(V):
+    shift = CA_PARAMS["shift"]
+    actshift = CA_PARAMS["actshift"]
     base = CA_PARAMS["tau_mT_base"]
     V1   = CA_PARAMS["tau_mT_V1"]
     k1   = CA_PARAMS["tau_mT_k1"]
@@ -355,9 +362,11 @@ def tau_mT(V):
     Q10  = CA_PARAMS["tau_mT_Q10"]
     Tref = CA_PARAMS["tau_mT_Tref"]
     phi_m = Q10 ** ((CELSIUS - Tref) / 10.0)
-    return (base + 1.0 / (np.exp(-(V + V1) / k1) + np.exp((V + V2) / k2))) / phi_m
+    Vs = V + shift + actshift
+    return (base + 1.0 / (np.exp(-(Vs + V1) / k1) + np.exp((Vs + V2) / k2))) / phi_m
 
 def tau_hT(V):
+    shift = CA_PARAMS["shift"]
     Vth  = CA_PARAMS["tau_hT_Vthresh"]
     V1   = CA_PARAMS["tau_hT_V1"]
     k1   = CA_PARAMS["tau_hT_k1"]
@@ -367,17 +376,20 @@ def tau_hT(V):
     Q10  = CA_PARAMS["tau_hT_Q10"]
     Tref = CA_PARAMS["tau_hT_Tref"]
     phi_h = Q10 ** ((CELSIUS - Tref) / 10.0)
-    if V < Vth:
-        return np.exp((V + V1) / k1) / phi_h
+    Vs = V + shift
+    if Vs < Vth:
+        return np.exp((Vs + V1) / k1) / phi_h
     else:
-        return (base + np.exp(-(V + V2) / k2)) / phi_h
+        return (base + np.exp(-(Vs + V2) / k2)) / phi_h
 
 def gating_update_tau_inf(DEL, xi_old, inf, tau):
     """
-    基于 tau 和 inf 的隐式门控更新 (相比 alpha/beta 更稳定)
-    xi_new = xi_old + DEL * (inf - xi_old) / tau
+    基于 tau 和 inf 的 Crank-Nicolson 门控更新 (与 gating_update 一致的全步长推进)
+    使用 DEL=dt/2 实现 dt 步长的 CN 格式，匹配 NEURON cnexp 精度
     """
-    return (xi_old + (DEL / tau) * inf) / (1.0 + DEL / tau)
+    decay = (1 - DEL / tau) / (1 + DEL / tau)
+    drive = (2 * DEL / tau * inf) / (1 + DEL / tau)
+    return xi_old * decay + drive
 
 def init_gates(V):
     m0 = alpha_m(V) / (alpha_m(V) + beta_m(V))
@@ -385,17 +397,16 @@ def init_gates(V):
     n0 = alpha_n(V) / (alpha_n(V) + beta_n(V))
     return m0, n0, h0
 
-def gating_update(DEL, xi_old, alpha, beta):
-    decay = (1 - DEL * (alpha + beta)) / (1 + DEL * (alpha + beta))
-    drive = (2 * DEL * alpha) / (1 + DEL * (alpha + beta))
+def gating_update(DEL, xi_old, alpha, beta, tadj=1.0):
+    tau = (1.0 / (alpha + beta)) / tadj
+    inf = alpha / (alpha + beta)
+    decay = (1 - DEL / tau) / (1 + DEL / tau)
+    drive = (2 * DEL / tau * inf) / (1 + DEL / tau)
     return xi_old * decay + drive
 
 
 def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
-    """
-    计算给定电压下的绝对 T 型钙电流 (uA) 及其对电压的等效偏导电导 (mS)
-    包含临界点 V->0 的洛必达极限处理，防止浮点数溢出或 ZeroDivision。
-    """
+
     # 如果该区室没有 T 通道，直接截断数据流
     if P_max_abs == 0.0:
         return 0.0, 0.0
@@ -490,12 +501,16 @@ def start_simulation(progress_callback=None):
             I_T_abs = np.zeros(N_NODE)
             g_Ca_eq = np.zeros(N_NODE)
             
+            # Q10 温度校正 (hh2.mod: tadj = 3.0 ^ ((celsius-36)/10))
+            tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
+
             # 步骤 1: 门控变量与电导状态更新
             for i, seg in enumerate(seg_list):
                 v_current = V_t[i]
-                m_half[i] = gating_update(DEL, m_t[i], alpha_m(v_current), beta_m(v_current))
-                h_half[i] = gating_update(DEL, h_t[i], alpha_h(v_current), beta_h(v_current))
-                n_half[i] = gating_update(DEL, n_t[i], alpha_n(v_current), beta_n(v_current))
+
+                m_half[i] = gating_update(DEL, m_t[i], alpha_m(v_current), beta_m(v_current), tadj_hh)
+                h_half[i] = gating_update(DEL, h_t[i], alpha_h(v_current), beta_h(v_current), tadj_hh)
+                n_half[i] = gating_update(DEL, n_t[i], alpha_n(v_current), beta_n(v_current), tadj_hh)
 
                 mT_half[i] = gating_update_tau_inf(DEL, mT_t[i], inf_mT(v_current), tau_mT(v_current))
                 hT_half[i] = gating_update_tau_inf(DEL, hT_t[i], inf_hT(v_current), tau_hT(v_current))
@@ -553,8 +568,14 @@ def start_simulation(progress_callback=None):
 
             for i, seg in enumerate(seg_list):
                 Ca_current = Ca_t[i]
-                dCa_dt = -seg.gamma_Ca * I_T_abs[i] + (CA_INF - Ca_current) / TAU_CA
-                HISTORY_CA[step + 1, i] = Ca_current + DT * dCa_dt
+                drive_channel = -seg.gamma_Ca * I_T_abs[i]
+                if drive_channel <= 0.0:
+                    drive_channel = 0.0  # Cannot pump inward (cadecay.mod)
+
+                # 隐式 Euler 积分 (匹配 cadecay.mod 的 derivimplicit 方法)
+                # cai' = drive + (cainf - cai)/taur
+                # cai_new = (cai_old + DT*(drive + cainf/taur)) / (1 + DT/taur)
+                HISTORY_CA[step + 1, i] = (Ca_current + DT * (drive_channel + CA_INF / TAU_CA)) / (1.0 + DT / TAU_CA)
 
             # --- 探针数据登记 ---
             # 检查当前步长是否触发探针，若触发则打包整个状态空间的标量与向量参数
@@ -680,10 +701,11 @@ def compute_continuous_derivatives(segment_id: int, step: int,
     h_i = h_override if h_override is not None else h_t[idx]
     n_i = n_override if n_override is not None else n_t[idx]
 
-    # 计算门控变量导数
-    dm_dt = alpha_m(V_i) * (1 - m_i) - beta_m(V_i) * m_i
-    dh_dt = alpha_h(V_i) * (1 - h_i) - beta_h(V_i) * h_i
-    dn_dt = alpha_n(V_i) * (1 - n_i) - beta_n(V_i) * n_i
+    # 计算门控变量导数 (含 Q10 温度校正，匹配 hh2.mod)
+    tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
+    dm_dt = tadj_hh * (alpha_m(V_i) * (1 - m_i) - beta_m(V_i) * m_i)
+    dh_dt = tadj_hh * (alpha_h(V_i) * (1 - h_i) - beta_h(V_i) * h_i)
+    dn_dt = tadj_hh * (alpha_n(V_i) * (1 - n_i) - beta_n(V_i) * n_i)
 
     # 计算电流状态
     g_Na = (m_i**3) * h_i * seg.get_absolute_g_max("Na")
