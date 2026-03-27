@@ -14,42 +14,46 @@ namespace NeuronCAD.Visuals.Windows
     /// </summary>
     public static class IonChannelParams
     {
-        // ── HH Gating ──
-        public static double AlphaM_A = 0.1, AlphaM_Vs = 35.0, AlphaM_k = 10.0;
-        public static double BetaM_A = 4.0, BetaM_Vs = 60.0, BetaM_k = 18.0;
-        public static double AlphaH_A = 0.07, AlphaH_Vs = 60.0, AlphaH_k = 20.0;
-        public static double BetaH_A = 1.0, BetaH_Vs = 30.0, BetaH_k = 10.0;
-        public static double AlphaN_A = 0.01, AlphaN_Vs = 50.0, AlphaN_k = 10.0;
-        public static double BetaN_A = 0.125, BetaN_Vs = 60.0, BetaN_k = 80.0;
+        // ── HH Gating (Traub-modified, hh2.mod) ──
+        public static double Vtraub = -63.0;
+        public static double AlphaM_A = 0.32, AlphaM_V = 13.0, AlphaM_k = 4.0;
+        public static double BetaM_A = 0.28, BetaM_V = 40.0, BetaM_k = 5.0;
+        public static double AlphaH_A = 0.128, AlphaH_V = 17.0, AlphaH_k = 18.0;
+        public static double BetaH_A = 4.0, BetaH_V = 40.0, BetaH_k = 5.0;
+        public static double AlphaN_A = 0.032, AlphaN_V = 15.0, AlphaN_k = 5.0;
+        public static double BetaN_A = 0.5, BetaN_V = 10.0, BetaN_k = 40.0;
 
-        // ── Ca²⁺ T-type ──
-        public static double InfMT_Vh = 56.0, InfMT_k = 6.2;
-        public static double InfHT_Vh = 80.0, InfHT_k = 4.0;
+        // ── Ca²⁺ T-type (ITGHK.mod + tcD_vc.oc overrides) ──
+        public static double Shift = -1.0, ActShift = 0.0;
+        public static double InfMT_Vh = 57.0, InfMT_k = 6.2;
+        public static double InfHT_Vh = 81.0, InfHT_k = 4.0;
         public static double TauMT_base = 0.612, TauMT_V1 = 132.0, TauMT_k1 = 16.7;
-        public static double TauMT_V2 = 16.8, TauMT_k2 = 18.2, TauMT_Q10 = 5.0, TauMT_Tref = 24.0;
+        public static double TauMT_V2 = 16.8, TauMT_k2 = 18.2, TauMT_Q10 = 2.5, TauMT_Tref = 24.0;
         public static double TauHT_Vthresh = -80.0;
         public static double TauHT_V1 = 467.0, TauHT_k1 = 66.6;
         public static double TauHT_base = 28.0, TauHT_V2 = 22.0, TauHT_k2 = 10.5;
-        public static double TauHT_Q10 = 3.0, TauHT_Tref = 24.0;
+        public static double TauHT_Q10 = 2.5, TauHT_Tref = 24.0;
 
         /// <summary>生成 HH 参数 JSON 字符串，用于传递给 Python set_hh_params。</summary>
         public static string GetHHParamsJson()
         {
             return string.Format(CultureInfo.InvariantCulture,
                 "{{" +
-                "\"alpha_m_A\":{0},\"alpha_m_Vs\":{1},\"alpha_m_k\":{2}," +
-                "\"beta_m_A\":{3},\"beta_m_Vs\":{4},\"beta_m_k\":{5}," +
-                "\"alpha_h_A\":{6},\"alpha_h_Vs\":{7},\"alpha_h_k\":{8}," +
-                "\"beta_h_A\":{9},\"beta_h_Vs\":{10},\"beta_h_k\":{11}," +
-                "\"alpha_n_A\":{12},\"alpha_n_Vs\":{13},\"alpha_n_k\":{14}," +
-                "\"beta_n_A\":{15},\"beta_n_Vs\":{16},\"beta_n_k\":{17}" +
+                "\"vtraub\":{0}," +
+                "\"alpha_m_A\":{1},\"alpha_m_V\":{2},\"alpha_m_k\":{3}," +
+                "\"beta_m_A\":{4},\"beta_m_V\":{5},\"beta_m_k\":{6}," +
+                "\"alpha_h_A\":{7},\"alpha_h_V\":{8},\"alpha_h_k\":{9}," +
+                "\"beta_h_A\":{10},\"beta_h_V\":{11},\"beta_h_k\":{12}," +
+                "\"alpha_n_A\":{13},\"alpha_n_V\":{14},\"alpha_n_k\":{15}," +
+                "\"beta_n_A\":{16},\"beta_n_V\":{17},\"beta_n_k\":{18}" +
                 "}}",
-                AlphaM_A, AlphaM_Vs, AlphaM_k,
-                BetaM_A, BetaM_Vs, BetaM_k,
-                AlphaH_A, AlphaH_Vs, AlphaH_k,
-                BetaH_A, BetaH_Vs, BetaH_k,
-                AlphaN_A, AlphaN_Vs, AlphaN_k,
-                BetaN_A, BetaN_Vs, BetaN_k);
+                Vtraub,
+                AlphaM_A, AlphaM_V, AlphaM_k,
+                BetaM_A, BetaM_V, BetaM_k,
+                AlphaH_A, AlphaH_V, AlphaH_k,
+                BetaH_A, BetaH_V, BetaH_k,
+                AlphaN_A, AlphaN_V, AlphaN_k,
+                BetaN_A, BetaN_V, BetaN_k);
         }
 
         /// <summary>生成 Ca T-type 参数 JSON 字符串，用于传递给 Python set_ca_params。</summary>
@@ -57,15 +61,17 @@ namespace NeuronCAD.Visuals.Windows
         {
             return string.Format(CultureInfo.InvariantCulture,
                 "{{" +
-                "\"inf_mT_Vh\":{0},\"inf_mT_k\":{1}," +
-                "\"inf_hT_Vh\":{2},\"inf_hT_k\":{3}," +
-                "\"tau_mT_base\":{4},\"tau_mT_V1\":{5},\"tau_mT_k1\":{6}," +
-                "\"tau_mT_V2\":{7},\"tau_mT_k2\":{8},\"tau_mT_Q10\":{9},\"tau_mT_Tref\":{10}," +
-                "\"tau_hT_Vthresh\":{11}," +
-                "\"tau_hT_V1\":{12},\"tau_hT_k1\":{13}," +
-                "\"tau_hT_base\":{14},\"tau_hT_V2\":{15},\"tau_hT_k2\":{16}," +
-                "\"tau_hT_Q10\":{17},\"tau_hT_Tref\":{18}" +
+                "\"shift\":{0},\"actshift\":{1}," +
+                "\"inf_mT_Vh\":{2},\"inf_mT_k\":{3}," +
+                "\"inf_hT_Vh\":{4},\"inf_hT_k\":{5}," +
+                "\"tau_mT_base\":{6},\"tau_mT_V1\":{7},\"tau_mT_k1\":{8}," +
+                "\"tau_mT_V2\":{9},\"tau_mT_k2\":{10},\"tau_mT_Q10\":{11},\"tau_mT_Tref\":{12}," +
+                "\"tau_hT_Vthresh\":{13}," +
+                "\"tau_hT_V1\":{14},\"tau_hT_k1\":{15}," +
+                "\"tau_hT_base\":{16},\"tau_hT_V2\":{17},\"tau_hT_k2\":{18}," +
+                "\"tau_hT_Q10\":{19},\"tau_hT_Tref\":{20}" +
                 "}}",
+                Shift, ActShift,
                 InfMT_Vh, InfMT_k,
                 InfHT_Vh, InfHT_k,
                 TauMT_base, TauMT_V1, TauMT_k1,
@@ -79,21 +85,23 @@ namespace NeuronCAD.Visuals.Windows
         /// <summary>重置所有参数为默认值。</summary>
         public static void ResetToDefault()
         {
-            AlphaM_A = 0.1; AlphaM_Vs = 35.0; AlphaM_k = 10.0;
-            BetaM_A = 4.0; BetaM_Vs = 60.0; BetaM_k = 18.0;
-            AlphaH_A = 0.07; AlphaH_Vs = 60.0; AlphaH_k = 20.0;
-            BetaH_A = 1.0; BetaH_Vs = 30.0; BetaH_k = 10.0;
-            AlphaN_A = 0.01; AlphaN_Vs = 50.0; AlphaN_k = 10.0;
-            BetaN_A = 0.125; BetaN_Vs = 60.0; BetaN_k = 80.0;
+            Vtraub = -63.0;
+            AlphaM_A = 0.32; AlphaM_V = 13.0; AlphaM_k = 4.0;
+            BetaM_A = 0.28; BetaM_V = 40.0; BetaM_k = 5.0;
+            AlphaH_A = 0.128; AlphaH_V = 17.0; AlphaH_k = 18.0;
+            BetaH_A = 4.0; BetaH_V = 40.0; BetaH_k = 5.0;
+            AlphaN_A = 0.032; AlphaN_V = 15.0; AlphaN_k = 5.0;
+            BetaN_A = 0.5; BetaN_V = 10.0; BetaN_k = 40.0;
 
-            InfMT_Vh = 56.0; InfMT_k = 6.2;
-            InfHT_Vh = 80.0; InfHT_k = 4.0;
+            Shift = -1.0; ActShift = 0.0;
+            InfMT_Vh = 57.0; InfMT_k = 6.2;
+            InfHT_Vh = 81.0; InfHT_k = 4.0;
             TauMT_base = 0.612; TauMT_V1 = 132.0; TauMT_k1 = 16.7;
-            TauMT_V2 = 16.8; TauMT_k2 = 18.2; TauMT_Q10 = 5.0; TauMT_Tref = 24.0;
+            TauMT_V2 = 16.8; TauMT_k2 = 18.2; TauMT_Q10 = 2.5; TauMT_Tref = 24.0;
             TauHT_Vthresh = -80.0;
             TauHT_V1 = 467.0; TauHT_k1 = 66.6;
             TauHT_base = 28.0; TauHT_V2 = 22.0; TauHT_k2 = 10.5;
-            TauHT_Q10 = 3.0; TauHT_Tref = 24.0;
+            TauHT_Q10 = 2.5; TauHT_Tref = 24.0;
         }
     }
 
@@ -125,49 +133,56 @@ namespace NeuronCAD.Visuals.Windows
 
         private void BuildHHPanel()
         {
+            // ── Traub shift ──
+            AddSection(HHPanel, "Traub Voltage Shift (hh2.mod: v2 = V − vtraub)");
+
+            AddEquation(HHPanel,
+                "v₂ = V − vtraub",
+                ("vtraub", "vtraub", IonChannelParams.Vtraub));
+
             // ── Na⁺ m gate ──
             AddSection(HHPanel, "Na⁺ Activation — m gate");
 
             AddEquation(HHPanel,
-                "\u03B1m(V) = A \u00B7 (V + V\u2080) / (1 \u2212 exp(\u2212(V + V\u2080) / k))",
+                "αm(V) = A · (V₀ − v₂) / (exp((V₀ − v₂) / k) − 1)",
                 ("A", "alpha_m_A", IonChannelParams.AlphaM_A),
-                ("V\u2080", "alpha_m_Vs", IonChannelParams.AlphaM_Vs),
+                ("V₀", "alpha_m_V", IonChannelParams.AlphaM_V),
                 ("k", "alpha_m_k", IonChannelParams.AlphaM_k));
 
             AddEquation(HHPanel,
-                "\u03B2m(V) = A \u00B7 exp(\u2212(V + V\u2080) / k)",
+                "βm(V) = A · (v₂ − V₀) / (exp((v₂ − V₀) / k) − 1)",
                 ("A", "beta_m_A", IonChannelParams.BetaM_A),
-                ("V\u2080", "beta_m_Vs", IonChannelParams.BetaM_Vs),
+                ("V₀", "beta_m_V", IonChannelParams.BetaM_V),
                 ("k", "beta_m_k", IonChannelParams.BetaM_k));
 
             // ── Na⁺ h gate ──
             AddSection(HHPanel, "Na⁺ Inactivation — h gate");
 
             AddEquation(HHPanel,
-                "\u03B1h(V) = A \u00B7 exp(\u2212(V + V\u2080) / k)",
+                "αh(V) = A · exp((V₀ − v₂) / k)",
                 ("A", "alpha_h_A", IonChannelParams.AlphaH_A),
-                ("V\u2080", "alpha_h_Vs", IonChannelParams.AlphaH_Vs),
+                ("V₀", "alpha_h_V", IonChannelParams.AlphaH_V),
                 ("k", "alpha_h_k", IonChannelParams.AlphaH_k));
 
             AddEquation(HHPanel,
-                "\u03B2h(V) = A / (1 + exp(\u2212(V + V\u2080) / k))",
+                "βh(V) = A / (1 + exp((V₀ − v₂) / k))",
                 ("A", "beta_h_A", IonChannelParams.BetaH_A),
-                ("V\u2080", "beta_h_Vs", IonChannelParams.BetaH_Vs),
+                ("V₀", "beta_h_V", IonChannelParams.BetaH_V),
                 ("k", "beta_h_k", IonChannelParams.BetaH_k));
 
             // ── K⁺ n gate ──
             AddSection(HHPanel, "K⁺ Activation — n gate");
 
             AddEquation(HHPanel,
-                "\u03B1n(V) = A \u00B7 (V + V\u2080) / (1 \u2212 exp(\u2212(V + V\u2080) / k))",
+                "αn(V) = A · (V₀ − v₂) / (exp((V₀ − v₂) / k) − 1)",
                 ("A", "alpha_n_A", IonChannelParams.AlphaN_A),
-                ("V\u2080", "alpha_n_Vs", IonChannelParams.AlphaN_Vs),
+                ("V₀", "alpha_n_V", IonChannelParams.AlphaN_V),
                 ("k", "alpha_n_k", IonChannelParams.AlphaN_k));
 
             AddEquation(HHPanel,
-                "\u03B2n(V) = A \u00B7 exp(\u2212(V + V\u2080) / k)",
+                "βn(V) = A · exp((V₀ − v₂) / k)",
                 ("A", "beta_n_A", IonChannelParams.BetaN_A),
-                ("V\u2080", "beta_n_Vs", IonChannelParams.BetaN_Vs),
+                ("V₀", "beta_n_V", IonChannelParams.BetaN_V),
                 ("k", "beta_n_k", IonChannelParams.BetaN_k));
         }
 
@@ -177,6 +192,15 @@ namespace NeuronCAD.Visuals.Windows
 
         private void BuildCaPanel()
         {
+            // ── Shift parameters ──
+            AddSection(CaPanel, "T-type Ca²⁺ Voltage Shifts (ITGHK.mod)");
+
+            AddEquation(CaPanel,
+                "shift: global voltage shift applied to all Ca kinetics\n" +
+                "actshift: additional shift for activation (m∞, τm) only",
+                ("shift", "shift", IonChannelParams.Shift),
+                ("actshift", "actshift", IonChannelParams.ActShift));
+
             // ── Steady-state ──
             AddSection(CaPanel, "T-type Ca²⁺ Steady-state Activation / Inactivation");
 
@@ -469,24 +493,27 @@ namespace NeuronCAD.Visuals.Windows
         {
             switch (key)
             {
+                case "vtraub": IonChannelParams.Vtraub = val; break;
                 case "alpha_m_A": IonChannelParams.AlphaM_A = val; break;
-                case "alpha_m_Vs": IonChannelParams.AlphaM_Vs = val; break;
+                case "alpha_m_V": IonChannelParams.AlphaM_V = val; break;
                 case "alpha_m_k": IonChannelParams.AlphaM_k = val; break;
                 case "beta_m_A": IonChannelParams.BetaM_A = val; break;
-                case "beta_m_Vs": IonChannelParams.BetaM_Vs = val; break;
+                case "beta_m_V": IonChannelParams.BetaM_V = val; break;
                 case "beta_m_k": IonChannelParams.BetaM_k = val; break;
                 case "alpha_h_A": IonChannelParams.AlphaH_A = val; break;
-                case "alpha_h_Vs": IonChannelParams.AlphaH_Vs = val; break;
+                case "alpha_h_V": IonChannelParams.AlphaH_V = val; break;
                 case "alpha_h_k": IonChannelParams.AlphaH_k = val; break;
                 case "beta_h_A": IonChannelParams.BetaH_A = val; break;
-                case "beta_h_Vs": IonChannelParams.BetaH_Vs = val; break;
+                case "beta_h_V": IonChannelParams.BetaH_V = val; break;
                 case "beta_h_k": IonChannelParams.BetaH_k = val; break;
                 case "alpha_n_A": IonChannelParams.AlphaN_A = val; break;
-                case "alpha_n_Vs": IonChannelParams.AlphaN_Vs = val; break;
+                case "alpha_n_V": IonChannelParams.AlphaN_V = val; break;
                 case "alpha_n_k": IonChannelParams.AlphaN_k = val; break;
                 case "beta_n_A": IonChannelParams.BetaN_A = val; break;
-                case "beta_n_Vs": IonChannelParams.BetaN_Vs = val; break;
+                case "beta_n_V": IonChannelParams.BetaN_V = val; break;
                 case "beta_n_k": IonChannelParams.BetaN_k = val; break;
+                case "shift": IonChannelParams.Shift = val; break;
+                case "actshift": IonChannelParams.ActShift = val; break;
                 case "inf_mT_Vh": IonChannelParams.InfMT_Vh = val; break;
                 case "inf_mT_k": IonChannelParams.InfMT_k = val; break;
                 case "inf_hT_Vh": IonChannelParams.InfHT_Vh = val; break;
@@ -511,24 +538,27 @@ namespace NeuronCAD.Visuals.Windows
 
         private double ReadParam(string key) => key switch
         {
+            "vtraub" => IonChannelParams.Vtraub,
             "alpha_m_A" => IonChannelParams.AlphaM_A,
-            "alpha_m_Vs" => IonChannelParams.AlphaM_Vs,
+            "alpha_m_V" => IonChannelParams.AlphaM_V,
             "alpha_m_k" => IonChannelParams.AlphaM_k,
             "beta_m_A" => IonChannelParams.BetaM_A,
-            "beta_m_Vs" => IonChannelParams.BetaM_Vs,
+            "beta_m_V" => IonChannelParams.BetaM_V,
             "beta_m_k" => IonChannelParams.BetaM_k,
             "alpha_h_A" => IonChannelParams.AlphaH_A,
-            "alpha_h_Vs" => IonChannelParams.AlphaH_Vs,
+            "alpha_h_V" => IonChannelParams.AlphaH_V,
             "alpha_h_k" => IonChannelParams.AlphaH_k,
             "beta_h_A" => IonChannelParams.BetaH_A,
-            "beta_h_Vs" => IonChannelParams.BetaH_Vs,
+            "beta_h_V" => IonChannelParams.BetaH_V,
             "beta_h_k" => IonChannelParams.BetaH_k,
             "alpha_n_A" => IonChannelParams.AlphaN_A,
-            "alpha_n_Vs" => IonChannelParams.AlphaN_Vs,
+            "alpha_n_V" => IonChannelParams.AlphaN_V,
             "alpha_n_k" => IonChannelParams.AlphaN_k,
             "beta_n_A" => IonChannelParams.BetaN_A,
-            "beta_n_Vs" => IonChannelParams.BetaN_Vs,
+            "beta_n_V" => IonChannelParams.BetaN_V,
             "beta_n_k" => IonChannelParams.BetaN_k,
+            "shift" => IonChannelParams.Shift,
+            "actshift" => IonChannelParams.ActShift,
             "inf_mT_Vh" => IonChannelParams.InfMT_Vh,
             "inf_mT_k" => IonChannelParams.InfMT_k,
             "inf_hT_Vh" => IonChannelParams.InfHT_Vh,

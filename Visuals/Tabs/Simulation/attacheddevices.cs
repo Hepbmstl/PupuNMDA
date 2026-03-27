@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
@@ -11,10 +12,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     /// </summary>
     public enum DeviceType
     {
-        /// <summary>刺激设备（黄色箭头）</summary>
+        /// <summary>电流钳设备（黄色箭头）</summary>
         Stimulation,
         /// <summary>探针设备（青色箭头）</summary>
-        Probe
+        Probe,
+        /// <summary>电压钳设备（红色箭头）</summary>
+        VoltageClamp
     }
 
     /// <summary>
@@ -225,6 +228,52 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         /// <param name="anchor">初始锚点</param>
         public ProbeDevice(IVisualEntity target, AnchorRef anchor)
             : base(target, anchor, Colors.Cyan)
+        {
+        }
+    }
+
+    /// <summary>
+    /// 电压钳协议步骤，对应 NEURON SEClamp 的 dur[i] / amp[i]。
+    /// </summary>
+    public class VCStep
+    {
+        /// <summary>该步骤的持续时间 (ms)。</summary>
+        public double Duration { get; set; }
+
+        /// <summary>该步骤的钳制电压 (mV)。</summary>
+        public double Amplitude { get; set; }
+    }
+
+    /// <summary>
+    /// 电压钳设备实体，持有串联电阻和协议步骤列表，红色箭头外观。
+    /// 对应 Hines_method.py: insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol)
+    /// </summary>
+    public class VoltageClampDevice : AttachedDeviceBase
+    {
+        /// <summary>设备类型：电压钳。</summary>
+        public override DeviceType Type => DeviceType.VoltageClamp;
+
+        /// <summary>串联电阻 (MΩ)，对应 SEClamp.rs，默认 5.0。</summary>
+        public double Rs { get; set; } = 5.0;
+
+        /// <summary>
+        /// 电压钳协议步骤列表，按顺序执行。
+        /// 默认 3 步：[-115, 1000ms], [-65, 1000ms], [-65, 1000ms]（复现 tcD_vc.oc 协议）。
+        /// </summary>
+        public List<VCStep> Protocol { get; set; } = new()
+        {
+            new VCStep { Duration = 1000, Amplitude = -115 },
+            new VCStep { Duration = 1000, Amplitude = -65 },
+            new VCStep { Duration = 1000, Amplitude = -65 }
+        };
+
+        /// <summary>
+        /// 构造函数。
+        /// </summary>
+        /// <param name="target">目标实体</param>
+        /// <param name="anchor">初始锚点</param>
+        public VoltageClampDevice(IVisualEntity target, AnchorRef anchor)
+            : base(target, anchor, Colors.Red)
         {
         }
     }

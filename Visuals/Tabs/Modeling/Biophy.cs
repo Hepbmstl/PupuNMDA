@@ -83,12 +83,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         {
             GlobalChannels.Clear();
             // 名称使用短键以与 Hines_method 的键名一致
-            var naChannel = new ChannelProperty("Na", Colors.Red, 120.0f);
-            var kChannel = new ChannelProperty("K", Colors.Blue, 36.0f);
-            var leakChannel = new ChannelProperty("L", Colors.LightGreen, 0.3f);
-            // CaT: 键名对齐 Hines_method.py 中 get_absolute_P_max("CaT")，
-            // 值为膜渗透率 P (cm/s)，而非 HH 电导密度
-            var catChannel = new ChannelProperty("CaT", Colors.Orange, 1e-4f, isPermeability: true);
+            // 默认值对齐 Biophy.json (tcD model): gnabar=0.003 S/cm²=3 mS/cm², gkbar=0.005=5, g_pas=3.79e-5=0.0379
+            var naChannel = new ChannelProperty("Na", Colors.Red, 3.0f);
+            var kChannel = new ChannelProperty("K", Colors.Blue, 5.0f);
+            var leakChannel = new ChannelProperty("L", Colors.LightGreen, 0.0379f);
+            // CaT: pcabar=1.7e-5 cm/s (Biophy.json)
+            var catChannel = new ChannelProperty("CaT", Colors.Orange, 1.7e-5f, isPermeability: true);
 
             GlobalChannels.Add(naChannel.Name, naChannel);
             GlobalChannels.Add(kChannel.Name, kChannel);

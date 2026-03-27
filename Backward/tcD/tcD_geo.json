@@ -1,66 +1,67 @@
 {
   "GlobalEnvironment": {
-    "V_init": -65,
-    "dt": 0.02,
+    "V_init": -70.0,
+    "dt": 0.1,
     "STEPS": 10000,
-    "celsius": 36,
-    "CA_OUT": 2,
-    "CA_INF": 0.0002,
-    "TAU_CA": 5
+    "celsius": 24.0,
+    "CA_OUT": 2.0,
+    "CA_INF": 0.00024,
+    "TAU_CA": 5.0
   },
   "E_TABLE": {
     "Na": {
-      "E": 50
+      "E": 50.0
     },
     "K": {
-      "E": -90
+      "E": -90.0
     },
     "L": {
-      "E": -54.3
+      "E": -76.5
     }
   },
   "HH_PARAMS": {
-    "alpha_m_A": 0.1,
-    "alpha_m_Vs": 35,
-    "alpha_m_k": 10,
-    "beta_m_A": 4,
-    "beta_m_Vs": 60,
-    "beta_m_k": 18,
-    "alpha_h_A": 0.07,
-    "alpha_h_Vs": 60,
-    "alpha_h_k": 20,
-    "beta_h_A": 1,
-    "beta_h_Vs": 30,
-    "beta_h_k": 10,
-    "alpha_n_A": 0.01,
-    "alpha_n_Vs": 50,
-    "alpha_n_k": 10,
-    "beta_n_A": 0.125,
-    "beta_n_Vs": 60,
-    "beta_n_k": 80
+    "vtraub": -63.0,
+    "alpha_m_A": 0.32,
+    "alpha_m_V": 13.0,
+    "alpha_m_k": 4.0,
+    "beta_m_A": 0.28,
+    "beta_m_V": 40.0,
+    "beta_m_k": 5.0,
+    "alpha_h_A": 0.128,
+    "alpha_h_V": 17.0,
+    "alpha_h_k": 18.0,
+    "beta_h_A": 4.0,
+    "beta_h_V": 40.0,
+    "beta_h_k": 5.0,
+    "alpha_n_A": 0.032,
+    "alpha_n_V": 15.0,
+    "alpha_n_k": 5.0,
+    "beta_n_A": 0.5,
+    "beta_n_V": 10.0,
+    "beta_n_k": 40.0
   },
   "CA_PARAMS": {
-    "shift": 2.0,
+    "shift": -1.0,
     "actshift": 0.0,
-    "inf_mT_Vh": 57,
+    "inf_mT_Vh": 57.0,
     "inf_mT_k": 6.2,
-    "inf_hT_Vh": 81,
-    "inf_hT_k": 4,
+    "inf_hT_Vh": 81.0,
+    "inf_hT_k": 4.0,
     "tau_mT_base": 0.612,
-    "tau_mT_V1": 132,
+    "tau_mT_V1": 132.0,
     "tau_mT_k1": 16.7,
     "tau_mT_V2": 16.8,
     "tau_mT_k2": 18.2,
-    "tau_mT_Q10": 5,
-    "tau_mT_Tref": 24,
-    "tau_hT_Vthresh": -80,
-    "tau_hT_V1": 467,
+    "tau_mT_Q10": 2.5,
+    "tau_mT_Tref": 24.0,
+    "tau_hT_Vthresh": -80.0,
+    "tau_hT_V1": 467.0,
     "tau_hT_k1": 66.6,
-    "tau_hT_base": 28,
-    "tau_hT_V2": 22,
+    "tau_hT_base": 28.0,
+    "tau_hT_V2": 22.0,
     "tau_hT_k2": 10.5,
-    "tau_hT_Q10": 3,
-    "tau_hT_Tref": 24
+    "tau_hT_Q10": 2.5,
+    "tau_hT_Tref": 24.0
   },
   "Segmentation": {
     "Mode": "NSeg",
@@ -69,13 +70,13 @@
   },
   "Entities": [
     {
-      "Id": "7e941e44-58dc-4955-9b3f-c72527ad9f95",
+      "Id": "f854f8bc-27f6-449f-af17-4c67a660e703",
       "Type": "Soma",
       "BaseRadius": 0.0,
       "TopRadius": 7.4795,
       "Length": 3.6213119169715298,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.9256760498506138,
@@ -97,31 +98,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "48884df7-d374-427c-92c7-fde2d8767c81",
+      "Id": "03ca0f7e-6b67-4055-8fc5-cf51a5cb1f5a",
       "Type": "Soma",
       "BaseRadius": 7.4795,
       "TopRadius": 10.7195,
       "Length": 1.1008916840452547,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.5576705027209095,
@@ -143,31 +144,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "9a3134c8-73b8-48f6-ac99-b3d7a08b7386",
+      "Id": "88517319-314c-4e17-bf47-3ea3bc8d9a31",
       "Type": "Soma",
       "BaseRadius": 10.7195,
       "TopRadius": 12.487,
       "Length": 2.1760182132509844,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.9061451244322805,
@@ -189,31 +190,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "275af1c5-3843-416c-837f-198ba3698c3f",
+      "Id": "45711103-73b3-429d-9155-156c4dea2532",
       "Type": "Soma",
       "BaseRadius": 12.487,
       "TopRadius": 12.6815,
       "Length": 3.396768472769377,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.356795172543195,
@@ -235,31 +236,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "259e7061-a465-4d64-97bd-ea8a5727362b",
+      "Id": "a049a9e6-f3e8-4c33-8034-190f153b5b09",
       "Type": "Soma",
       "BaseRadius": 12.6815,
       "TopRadius": 13.3595,
       "Length": 1.3418738146338502,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.7389211773195209,
@@ -281,31 +282,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "911bb625-212b-486a-b469-206f12c4ae79",
+      "Id": "dd2b3599-34bf-4ebd-8601-ac28602c0d1f",
       "Type": "Soma",
       "BaseRadius": 13.3595,
       "TopRadius": 14.4325,
       "Length": 3.623120274970182,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.7744298558203625,
@@ -327,31 +328,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "97476e9b-028b-4e19-bf52-37a5e313fe08",
+      "Id": "c28f47a5-4b5d-44a6-8702-75371167e613",
       "Type": "Soma",
       "BaseRadius": 14.4325,
       "TopRadius": 14.1555,
       "Length": 4.928503883492434,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.5423485221922649,
@@ -373,31 +374,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "03717dc0-d15f-45d4-99d3-9aa5ef72fec5",
+      "Id": "a286b496-b4b3-4ced-b674-70b100852857",
       "Type": "Soma",
       "BaseRadius": 14.1555,
       "TopRadius": 12.6485,
       "Length": 6.933733716584451,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.6797644262060853,
@@ -419,31 +420,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "43566b12-e4c8-44c4-86bb-cbe80078a532",
+      "Id": "629b55ab-389a-4019-8b1b-bd904a88e603",
       "Type": "Soma",
       "BaseRadius": 12.6485,
       "TopRadius": 11.888,
       "Length": 2.539698740008348,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.8463668691124192,
@@ -465,31 +466,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "a3e9b161-d147-4451-84c3-09d6bf8f5801",
+      "Id": "14def939-69bb-4d3c-85ea-6872ffc7c582",
       "Type": "Soma",
       "BaseRadius": 11.888,
       "TopRadius": 7.6915,
       "Length": 4.958129651390735,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.8361573405966156,
@@ -511,31 +512,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "ff3950b2-adc0-4c21-bb01-0baf96b74f5c",
+      "Id": "b59d8a9b-8ace-488c-8767-6b09fe8ce515",
       "Type": "Soma",
       "BaseRadius": 7.6915,
       "TopRadius": 5.413,
       "Length": 1.3038027611567637,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.7167082390841002,
@@ -557,31 +558,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "b28b273a-472e-4c9b-965c-97df97e09d37",
+      "Id": "640195b7-ad09-4fc3-b9f7-ad91a14bc3cd",
       "Type": "Soma",
       "BaseRadius": 5.413,
       "TopRadius": 0.0,
       "Length": 2.497398646592089,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF1E90FF",
       "Transform": [
         0.8188013134977558,
@@ -603,31 +604,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "41b08beb-508a-4a40-9185-7e9bea278925",
+      "Id": "bbdf4396-22b9-4ecf-9d57-b81d4208f01c",
       "Type": "Dend",
       "BaseRadius": 2.1605988261127553,
       "TopRadius": 1.6224358510111527,
       "Length": 7.582875444051551,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9978141420187361,
@@ -649,31 +650,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "f7a67c09-d3c7-42b6-af1c-b72960c21cb2",
+      "Id": "c487a355-f98a-4081-b455-d895140c1991",
       "Type": "Dend",
       "BaseRadius": 1.6224358510111527,
       "TopRadius": 0.8259454609572715,
       "Length": 5.5901699437494745,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9619937887599697,
@@ -695,31 +696,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "f1adbb9e-ea96-46e3-82c7-01c1ad663dbb",
+      "Id": "d1c754a2-d43b-4882-8374-20a6c28433fb",
       "Type": "Dend",
       "BaseRadius": 0.8259454609572715,
       "TopRadius": 0.8259454609572715,
       "Length": 4.123105625617661,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.8638034375544994,
@@ -741,31 +742,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "564d6259-d31a-4baa-82fe-c3d07a86d706",
+      "Id": "66528979-4cb3-4220-90fa-3432a4568f9b",
       "Type": "Dend",
       "BaseRadius": 0.8259454609572715,
       "TopRadius": 0.5825702064623147,
       "Length": 3.0413812651491097,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.1643989873053572,
@@ -787,31 +788,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "de56d32b-a1f8-4001-926a-1dead307f7d3",
+      "Id": "d10caed3-533c-44b3-9f50-7c9f630a295f",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 3.391164991562634,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.45739814228997,
@@ -833,31 +834,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "4b7350b5-51f3-450d-a8cf-72d224dffd7d",
+      "Id": "66469cbe-08c0-4ca1-8726-5aa45fc32422",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 3.9370039370059056,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.42771733337788687,
@@ -879,31 +880,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "483c7a17-3c02-4ec4-8372-de25ff782ef4",
+      "Id": "12584938-b31c-4f72-86ea-333139684cc7",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 3.640054944640259,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.21259653265090767,
@@ -925,31 +926,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "9d71309f-75eb-47c7-832d-97f0cc86bfd8",
+      "Id": "c76caeca-bb20-4af9-9e06-7e748132d3f8",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 1.0965878679450074,
       "Length": 4.06201920231798,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.15336179910788772,
@@ -971,31 +972,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "ea2bdf6d-389d-4f79-9a31-44257e35e903",
+      "Id": "ed2c3ebd-a97e-433a-be93-1ff9adc4f197",
       "Type": "Dend",
       "BaseRadius": 0.8259454609572715,
       "TopRadius": 0.5825702064623147,
       "Length": 2.23606797749979,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.8000000000000002,
@@ -1017,31 +1018,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "d5f47db4-324d-4c71-b11e-3d911fcd6ca6",
+      "Id": "90fa0478-8ebd-4c5e-a3a9-cf8bb45d6e5b",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 4.716990566028302,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.7677986644040068,
@@ -1063,31 +1064,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "1a29d3df-1863-4c6f-8f0d-cc10c2e88f81",
+      "Id": "759c027f-b013-47a2-b736-c0d2b7c25a16",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 6.123724356957945,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9121950336383609,
@@ -1109,31 +1110,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "6266d5c8-7719-4069-ac20-fc69841b8f9e",
+      "Id": "ecc82d06-d6bb-41a5-be33-393cc146213c",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 4.58257569495584,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9745743121887939,
@@ -1155,31 +1156,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "28b16f8f-aae5-4965-95ad-c4e4f1f9115f",
+      "Id": "7b469c82-5d33-45fe-9a69-c954b3d1c236",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 3.9370039370059056,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9908461831538901,
@@ -1201,31 +1202,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "28be1eab-9583-40bc-8007-08ba1b5fdb07",
+      "Id": "bb983238-191f-404e-8e5b-880cddcf4bd1",
       "Type": "Dend",
       "BaseRadius": 0.5825702064623147,
       "TopRadius": 0.5825702064623147,
       "Length": 4.8218253804964775,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.9764912214874952,
@@ -1247,31 +1248,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "5fcd3898-9e35-495b-a542-d783854e17b6",
+      "Id": "9783e437-f6fb-4a94-9a37-542d7299a51a",
       "Type": "Dend",
       "BaseRadius": 0.6760539480943045,
       "TopRadius": 0.6760539480943045,
       "Length": 10.307764064044152,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.4866556462262885,
@@ -1293,31 +1294,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "8e5309ef-98ca-43e9-a611-19352af7ef4d",
+      "Id": "361ec710-cbd0-4e34-af0e-b3a820f77a4c",
       "Type": "Dend",
       "BaseRadius": 0.6760539480943045,
       "TopRadius": 0.4,
       "Length": 7.762087348130012,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.06639004149377596,
@@ -1339,31 +1340,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "e78062bb-43bf-4b1a-8638-1d1ccf268e76",
+      "Id": "270a6ac5-273c-4c31-b7db-99b9d9883bd8",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 6.519202405202649,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.005882352941176532,
@@ -1385,31 +1386,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "b1f15409-bc0e-4688-ac5f-024bbe79b024",
+      "Id": "95d9c3ce-b001-453e-8604-78734b54d928",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 4.5,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         6.123233995736766e-17,
@@ -1431,31 +1432,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "70644839-db69-4037-ab22-7fdafad23626",
+      "Id": "80c9bade-9d36-4778-9c02-1d66d9d56a48",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 8.139410298049853,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.6757246285173463,
@@ -1477,31 +1478,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "a6abda34-875d-4932-9b41-4a5124866443",
+      "Id": "dea019bd-b240-4272-b263-8d9d0adf6ca0",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.273618495495704,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.7614556445207157,
@@ -1523,31 +1524,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "7f7f45f5-70f0-4da7-b5f3-429591df76bd",
+      "Id": "fe97c56f-a448-4530-98be-b6b2379a097f",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 10.23474474522936,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.6715824034328568,
@@ -1569,31 +1570,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "f685cc2a-0bbd-4318-8877-387a8482763d",
+      "Id": "6e3fd8fd-119c-4815-82e9-97ae727b0201",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 6.264982043070834,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.259982117628387,
@@ -1615,31 +1616,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "bbc61a26-703e-46db-9a7d-de188afe27da",
+      "Id": "fa3db9de-9893-4d27-9eb3-2203fb0deb6c",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 6.2048368229954285,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         -0.01701863190827113,
@@ -1661,31 +1662,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "8dceb48d-4cf5-471b-8772-c3b6db671db9",
+      "Id": "c1682509-2330-48ce-bfb8-f29e981f909c",
       "Type": "Dend",
       "BaseRadius": 0.6760539480943045,
       "TopRadius": 0.41332839725552917,
       "Length": 4.743416490252569,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         -0.15115796243141183,
@@ -1707,31 +1708,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "2a8a2eb6-1079-4dc3-a964-76006485e46e",
+      "Id": "2a22a707-eba4-44f5-b62c-43ba4aa5a906",
       "Type": "Dend",
       "BaseRadius": 0.41332839725552917,
       "TopRadius": 0.4,
       "Length": 5.545268253204709,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.09762461130717981,
@@ -1753,31 +1754,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "388c3736-2c20-4273-8a82-a8b4d671e3d6",
+      "Id": "b866e5dd-5b9c-4043-b3c3-994df81e4d0e",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 7.088723439378913,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.14542917838404593,
@@ -1799,31 +1800,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "33a34723-ae96-4690-baaa-6043ffe2510c",
+      "Id": "b8a977fc-069a-4a7a-b1cd-a3e6aa35f8d4",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.027735042633894,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.6263892488977608,
@@ -1845,31 +1846,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "c622d12b-5d5b-49ba-be20-f0795e57694f",
+      "Id": "6452be2c-2956-40f5-b7dc-cd8dddcf41f9",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.233092656309694,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.49526382765931726,
@@ -1891,31 +1892,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "c3d8bac6-953e-4ee7-b149-baa2c49710d5",
+      "Id": "f151b774-6bd6-4c5f-ad2c-084e37ec7ab6",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.192388155425117,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.4915217072295138,
@@ -1937,31 +1938,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "114cab61-af6b-4d77-8bf2-802b70e096c9",
+      "Id": "4aa66f42-8c5d-44c3-9312-4a145dc2d192",
       "Type": "Dend",
       "BaseRadius": 0.41332839725552917,
       "TopRadius": 0.4,
       "Length": 11.0,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.8181818181818182,
@@ -1983,31 +1984,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "1292da10-b5e7-403c-b208-6a3bf307dc02",
+      "Id": "3a243e77-9e90-4e89-bfbb-fa5bb67f2af7",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.924716620639604,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.7485352611918219,
@@ -2029,31 +2030,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "f2c78c6f-1927-4b5a-9d42-5ac2fe6867ba",
+      "Id": "4ab36b63-3b45-44df-a408-100095574585",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 10.452272480183437,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.5678214693376356,
@@ -2075,31 +2076,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "c815ac6f-4a20-43fd-ab09-4cb5a18b0979",
+      "Id": "2b9bee12-72ec-4591-b930-e00820e2b4c8",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 8.874119674649425,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.5814150218955394,
@@ -2121,31 +2122,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "bd549cc4-523f-42c9-8e89-8a7721ec08b0",
+      "Id": "c0cbbb68-0efc-4046-b8bd-11d9a9c6746d",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.340770846134703,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.63347659928377,
@@ -2167,31 +2168,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "0b1cb975-6714-4915-baf2-6385a591de64",
+      "Id": "5e484e74-893b-4046-b6e6-b8788387876f",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 8.154753215150045,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.7554628583972516,
@@ -2213,31 +2214,31 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
     },
     {
-      "Id": "18906e77-b0c2-459c-9d07-c4af637b0f25",
+      "Id": "f1065051-6b37-481b-b555-20e9155bc619",
       "Type": "Dend",
       "BaseRadius": 0.4,
       "TopRadius": 0.4,
       "Length": 9.420721840708387,
-      "Ra": 100.0,
-      "Cm": 1.0,
+      "Ra": 173.0,
+      "Cm": 0.88,
       "Color": "#FF9370DB",
       "Transform": [
         0.7059712127033647,
@@ -2259,19 +2260,19 @@
       ],
       "Channels": {
         "Na": {
-          "G": 3,
+          "G": 3.0,
           "IsPermeability": false
         },
         "K": {
-          "G": 5,
+          "G": 5.0,
           "IsPermeability": false
         },
         "L": {
-          "G": 0.3,
+          "G": 0.0379,
           "IsPermeability": false
         },
         "CaT": {
-          "G": 0.0002,
+          "G": 1.7e-05,
           "IsPermeability": true
         }
       }
@@ -2279,9 +2280,9 @@
   ],
   "Connections": [
     {
-      "Id": "77f9d25f-329d-457b-8ce7-65dec09d0e7d",
-      "EntityA_Id": "7e941e44-58dc-4955-9b3f-c72527ad9f95",
-      "EntityB_Id": "48884df7-d374-427c-92c7-fde2d8767c81",
+      "Id": "29d10c87-e0b0-44d9-a4ee-f6c3760f14e7",
+      "EntityA_Id": "f854f8bc-27f6-449f-af17-4c67a660e703",
+      "EntityB_Id": "03ca0f7e-6b67-4055-8fc5-cf51a5cb1f5a",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2295,9 +2296,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "3d90f44c-dfb9-4f38-a547-a9fd8a851daa",
-      "EntityA_Id": "48884df7-d374-427c-92c7-fde2d8767c81",
-      "EntityB_Id": "9a3134c8-73b8-48f6-ac99-b3d7a08b7386",
+      "Id": "7a169f4f-228a-484a-b11e-7cd59a8b4c6a",
+      "EntityA_Id": "03ca0f7e-6b67-4055-8fc5-cf51a5cb1f5a",
+      "EntityB_Id": "88517319-314c-4e17-bf47-3ea3bc8d9a31",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2311,9 +2312,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "0c8af335-2285-4c5a-a156-cb041690f67b",
-      "EntityA_Id": "9a3134c8-73b8-48f6-ac99-b3d7a08b7386",
-      "EntityB_Id": "275af1c5-3843-416c-837f-198ba3698c3f",
+      "Id": "fe5a0bd1-dc2b-4cb2-9756-2221d717d7ba",
+      "EntityA_Id": "88517319-314c-4e17-bf47-3ea3bc8d9a31",
+      "EntityB_Id": "45711103-73b3-429d-9155-156c4dea2532",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2327,9 +2328,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "a14f8a38-ee0b-4d67-9a9d-f7ec7039eb0b",
-      "EntityA_Id": "275af1c5-3843-416c-837f-198ba3698c3f",
-      "EntityB_Id": "259e7061-a465-4d64-97bd-ea8a5727362b",
+      "Id": "e1f985a3-5caf-4c1c-9bf2-c9ecd7f8aeb1",
+      "EntityA_Id": "45711103-73b3-429d-9155-156c4dea2532",
+      "EntityB_Id": "a049a9e6-f3e8-4c33-8034-190f153b5b09",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2343,9 +2344,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "a5cba869-3be2-4e3f-b573-a238db7fa0ca",
-      "EntityA_Id": "259e7061-a465-4d64-97bd-ea8a5727362b",
-      "EntityB_Id": "911bb625-212b-486a-b469-206f12c4ae79",
+      "Id": "53d2bdea-1cc0-4cb6-9de3-e5c2a79ae905",
+      "EntityA_Id": "a049a9e6-f3e8-4c33-8034-190f153b5b09",
+      "EntityB_Id": "dd2b3599-34bf-4ebd-8601-ac28602c0d1f",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2359,9 +2360,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "b7a89735-11a5-4e31-b9ac-0106aef4b6b5",
-      "EntityA_Id": "911bb625-212b-486a-b469-206f12c4ae79",
-      "EntityB_Id": "97476e9b-028b-4e19-bf52-37a5e313fe08",
+      "Id": "eb4f525a-2315-4015-9c95-ef1eb81a752b",
+      "EntityA_Id": "dd2b3599-34bf-4ebd-8601-ac28602c0d1f",
+      "EntityB_Id": "c28f47a5-4b5d-44a6-8702-75371167e613",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2375,9 +2376,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "9ac81428-9a59-4386-a8eb-8fb4eedcbe3b",
-      "EntityA_Id": "97476e9b-028b-4e19-bf52-37a5e313fe08",
-      "EntityB_Id": "03717dc0-d15f-45d4-99d3-9aa5ef72fec5",
+      "Id": "8632169c-2e4e-4f15-81b4-f2c6016a218c",
+      "EntityA_Id": "c28f47a5-4b5d-44a6-8702-75371167e613",
+      "EntityB_Id": "a286b496-b4b3-4ced-b674-70b100852857",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2391,9 +2392,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "a3b2648a-5948-4572-8fec-3da591071e05",
-      "EntityA_Id": "03717dc0-d15f-45d4-99d3-9aa5ef72fec5",
-      "EntityB_Id": "43566b12-e4c8-44c4-86bb-cbe80078a532",
+      "Id": "1fa0a049-803e-4a14-aea1-c5c8d1393ca9",
+      "EntityA_Id": "a286b496-b4b3-4ced-b674-70b100852857",
+      "EntityB_Id": "629b55ab-389a-4019-8b1b-bd904a88e603",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2407,9 +2408,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "ea055113-45a4-4271-a113-fa36100015a1",
-      "EntityA_Id": "43566b12-e4c8-44c4-86bb-cbe80078a532",
-      "EntityB_Id": "a3e9b161-d147-4451-84c3-09d6bf8f5801",
+      "Id": "33a16851-9b16-4f53-a5bf-62bf8d52389b",
+      "EntityA_Id": "629b55ab-389a-4019-8b1b-bd904a88e603",
+      "EntityB_Id": "14def939-69bb-4d3c-85ea-6872ffc7c582",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2423,9 +2424,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "f71af8c0-6da6-40af-9d4c-7f589d1decf4",
-      "EntityA_Id": "a3e9b161-d147-4451-84c3-09d6bf8f5801",
-      "EntityB_Id": "ff3950b2-adc0-4c21-bb01-0baf96b74f5c",
+      "Id": "fb67ea6a-4696-43bc-b7a9-28ffacf68e49",
+      "EntityA_Id": "14def939-69bb-4d3c-85ea-6872ffc7c582",
+      "EntityB_Id": "b59d8a9b-8ace-488c-8767-6b09fe8ce515",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2439,9 +2440,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "9aad50cd-da7d-4f06-9944-6cb49316a34f",
-      "EntityA_Id": "ff3950b2-adc0-4c21-bb01-0baf96b74f5c",
-      "EntityB_Id": "b28b273a-472e-4c9b-965c-97df97e09d37",
+      "Id": "fa6a4fad-9937-4c8e-8ec8-e81e6fe2e71f",
+      "EntityA_Id": "b59d8a9b-8ace-488c-8767-6b09fe8ce515",
+      "EntityB_Id": "640195b7-ad09-4fc3-b9f7-ad91a14bc3cd",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2455,9 +2456,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "d19348d6-715d-48a1-bb94-73b7fda93122",
-      "EntityA_Id": "41b08beb-508a-4a40-9185-7e9bea278925",
-      "EntityB_Id": "f7a67c09-d3c7-42b6-af1c-b72960c21cb2",
+      "Id": "5a490ed6-807e-49bb-ae0f-07c33a430599",
+      "EntityA_Id": "bbdf4396-22b9-4ecf-9d57-b81d4208f01c",
+      "EntityB_Id": "c487a355-f98a-4081-b455-d895140c1991",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2471,9 +2472,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "e28f0f95-68ab-49ba-bce6-9c9737367f11",
-      "EntityA_Id": "f7a67c09-d3c7-42b6-af1c-b72960c21cb2",
-      "EntityB_Id": "f1adbb9e-ea96-46e3-82c7-01c1ad663dbb",
+      "Id": "48a22163-8fb2-4563-bb18-680bbdd00168",
+      "EntityA_Id": "c487a355-f98a-4081-b455-d895140c1991",
+      "EntityB_Id": "d1c754a2-d43b-4882-8374-20a6c28433fb",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2487,9 +2488,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "4fc74440-b08e-4c8a-9d85-f2c890a79b3a",
-      "EntityA_Id": "564d6259-d31a-4baa-82fe-c3d07a86d706",
-      "EntityB_Id": "de56d32b-a1f8-4001-926a-1dead307f7d3",
+      "Id": "b9d6104a-9bda-4e98-b822-a327959857d2",
+      "EntityA_Id": "66528979-4cb3-4220-90fa-3432a4568f9b",
+      "EntityB_Id": "d10caed3-533c-44b3-9f50-7c9f630a295f",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2503,9 +2504,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "ffd0b240-f20d-4bab-8a98-3a77ad49a540",
-      "EntityA_Id": "de56d32b-a1f8-4001-926a-1dead307f7d3",
-      "EntityB_Id": "4b7350b5-51f3-450d-a8cf-72d224dffd7d",
+      "Id": "b650e903-0f2a-49f8-aefd-1ddfd52de65e",
+      "EntityA_Id": "d10caed3-533c-44b3-9f50-7c9f630a295f",
+      "EntityB_Id": "66469cbe-08c0-4ca1-8726-5aa45fc32422",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2519,9 +2520,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "094d69e3-1b7a-46b8-96a8-e1621427f6e6",
-      "EntityA_Id": "4b7350b5-51f3-450d-a8cf-72d224dffd7d",
-      "EntityB_Id": "483c7a17-3c02-4ec4-8372-de25ff782ef4",
+      "Id": "37c43767-e63b-4699-90e5-134f147e9b94",
+      "EntityA_Id": "66469cbe-08c0-4ca1-8726-5aa45fc32422",
+      "EntityB_Id": "12584938-b31c-4f72-86ea-333139684cc7",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2535,9 +2536,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "8267f65e-a278-4f29-8f97-9ad8cedc70fd",
-      "EntityA_Id": "483c7a17-3c02-4ec4-8372-de25ff782ef4",
-      "EntityB_Id": "9d71309f-75eb-47c7-832d-97f0cc86bfd8",
+      "Id": "7dfd58e9-7247-4933-831c-38ce9b3a4430",
+      "EntityA_Id": "12584938-b31c-4f72-86ea-333139684cc7",
+      "EntityB_Id": "c76caeca-bb20-4af9-9e06-7e748132d3f8",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2551,9 +2552,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "c1e72048-80d1-449a-b8ec-d3e1e7649c86",
-      "EntityA_Id": "ea2bdf6d-389d-4f79-9a31-44257e35e903",
-      "EntityB_Id": "d5f47db4-324d-4c71-b11e-3d911fcd6ca6",
+      "Id": "85ad84ba-c6d1-4375-bbaf-15a23afc1b13",
+      "EntityA_Id": "ed2c3ebd-a97e-433a-be93-1ff9adc4f197",
+      "EntityB_Id": "90fa0478-8ebd-4c5e-a3a9-cf8bb45d6e5b",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2567,9 +2568,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "740b8216-bbea-4a56-861d-d87baf55e5c0",
-      "EntityA_Id": "d5f47db4-324d-4c71-b11e-3d911fcd6ca6",
-      "EntityB_Id": "1a29d3df-1863-4c6f-8f0d-cc10c2e88f81",
+      "Id": "6279dca3-26f2-4efc-945d-f13c5ddf16e6",
+      "EntityA_Id": "90fa0478-8ebd-4c5e-a3a9-cf8bb45d6e5b",
+      "EntityB_Id": "759c027f-b013-47a2-b736-c0d2b7c25a16",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2583,9 +2584,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "aaf88b64-3dac-4829-ba46-a1add3376e60",
-      "EntityA_Id": "1a29d3df-1863-4c6f-8f0d-cc10c2e88f81",
-      "EntityB_Id": "6266d5c8-7719-4069-ac20-fc69841b8f9e",
+      "Id": "5e1fb015-54e6-46a2-a6de-c72073b5d057",
+      "EntityA_Id": "759c027f-b013-47a2-b736-c0d2b7c25a16",
+      "EntityB_Id": "ecc82d06-d6bb-41a5-be33-393cc146213c",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2599,9 +2600,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "32ad662f-5493-4f3b-a94f-8fe442d2ec4d",
-      "EntityA_Id": "6266d5c8-7719-4069-ac20-fc69841b8f9e",
-      "EntityB_Id": "28b16f8f-aae5-4965-95ad-c4e4f1f9115f",
+      "Id": "cb0175fb-1fa7-4137-b1eb-8e3e120d9f4a",
+      "EntityA_Id": "ecc82d06-d6bb-41a5-be33-393cc146213c",
+      "EntityB_Id": "7b469c82-5d33-45fe-9a69-c954b3d1c236",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2615,9 +2616,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "317f7b76-723c-434b-b7e1-08ee4a439130",
-      "EntityA_Id": "28b16f8f-aae5-4965-95ad-c4e4f1f9115f",
-      "EntityB_Id": "28be1eab-9583-40bc-8007-08ba1b5fdb07",
+      "Id": "8aca3f5c-17cf-495f-a01c-610ae9f57970",
+      "EntityA_Id": "7b469c82-5d33-45fe-9a69-c954b3d1c236",
+      "EntityB_Id": "bb983238-191f-404e-8e5b-880cddcf4bd1",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2631,9 +2632,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "8ee00a7b-b71a-4007-9d8e-93c500655f45",
-      "EntityA_Id": "8e5309ef-98ca-43e9-a611-19352af7ef4d",
-      "EntityB_Id": "e78062bb-43bf-4b1a-8638-1d1ccf268e76",
+      "Id": "231503c8-9ed6-4284-a4bd-a33670171ec0",
+      "EntityA_Id": "361ec710-cbd0-4e34-af0e-b3a820f77a4c",
+      "EntityB_Id": "270a6ac5-273c-4c31-b7db-99b9d9883bd8",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2647,9 +2648,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "e831ec54-a575-4aae-85ee-af70f2d96eba",
-      "EntityA_Id": "e78062bb-43bf-4b1a-8638-1d1ccf268e76",
-      "EntityB_Id": "b1f15409-bc0e-4688-ac5f-024bbe79b024",
+      "Id": "43fb5f39-40ca-4722-a2d4-60186c34a411",
+      "EntityA_Id": "270a6ac5-273c-4c31-b7db-99b9d9883bd8",
+      "EntityB_Id": "95d9c3ce-b001-453e-8604-78734b54d928",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2663,9 +2664,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "5c9fdbeb-11b9-4c86-9892-9a7565c669e8",
-      "EntityA_Id": "b1f15409-bc0e-4688-ac5f-024bbe79b024",
-      "EntityB_Id": "70644839-db69-4037-ab22-7fdafad23626",
+      "Id": "992b30e1-a855-44c3-a784-d7a3c4a11541",
+      "EntityA_Id": "95d9c3ce-b001-453e-8604-78734b54d928",
+      "EntityB_Id": "80c9bade-9d36-4778-9c02-1d66d9d56a48",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2679,9 +2680,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "2ddbd2fb-5239-4bae-ada3-14ba0e3db7ee",
-      "EntityA_Id": "70644839-db69-4037-ab22-7fdafad23626",
-      "EntityB_Id": "a6abda34-875d-4932-9b41-4a5124866443",
+      "Id": "23f8e127-85be-466e-b907-9e3213ae511c",
+      "EntityA_Id": "80c9bade-9d36-4778-9c02-1d66d9d56a48",
+      "EntityB_Id": "dea019bd-b240-4272-b263-8d9d0adf6ca0",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2695,9 +2696,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "2d2bfe22-a5f2-4539-965b-6db901e193bc",
-      "EntityA_Id": "a6abda34-875d-4932-9b41-4a5124866443",
-      "EntityB_Id": "7f7f45f5-70f0-4da7-b5f3-429591df76bd",
+      "Id": "1b938d55-cfb9-4958-bcae-0619c85bdc1a",
+      "EntityA_Id": "dea019bd-b240-4272-b263-8d9d0adf6ca0",
+      "EntityB_Id": "fe97c56f-a448-4530-98be-b6b2379a097f",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2711,9 +2712,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "477ca1fb-7182-4dbc-a7af-a2988612dd2e",
-      "EntityA_Id": "7f7f45f5-70f0-4da7-b5f3-429591df76bd",
-      "EntityB_Id": "f685cc2a-0bbd-4318-8877-387a8482763d",
+      "Id": "ca94814b-64d4-4b27-a9f1-670ba0c13ff6",
+      "EntityA_Id": "fe97c56f-a448-4530-98be-b6b2379a097f",
+      "EntityB_Id": "6e3fd8fd-119c-4815-82e9-97ae727b0201",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2727,9 +2728,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "2bd2b1d6-8ec4-438e-9ba2-3ced0cdad06f",
-      "EntityA_Id": "f685cc2a-0bbd-4318-8877-387a8482763d",
-      "EntityB_Id": "bbc61a26-703e-46db-9a7d-de188afe27da",
+      "Id": "8519ad34-cec5-4198-b825-989be9c9eaf6",
+      "EntityA_Id": "6e3fd8fd-119c-4815-82e9-97ae727b0201",
+      "EntityB_Id": "fa3db9de-9893-4d27-9eb3-2203fb0deb6c",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2743,9 +2744,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "ee1cf1ec-603a-485c-8356-151ec25afc23",
-      "EntityA_Id": "2a8a2eb6-1079-4dc3-a964-76006485e46e",
-      "EntityB_Id": "388c3736-2c20-4273-8a82-a8b4d671e3d6",
+      "Id": "372db4a3-9d9d-4be1-84ef-288923110f94",
+      "EntityA_Id": "2a22a707-eba4-44f5-b62c-43ba4aa5a906",
+      "EntityB_Id": "b866e5dd-5b9c-4043-b3c3-994df81e4d0e",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2759,9 +2760,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "61208e47-b9ec-4600-b856-92536136b971",
-      "EntityA_Id": "388c3736-2c20-4273-8a82-a8b4d671e3d6",
-      "EntityB_Id": "33a34723-ae96-4690-baaa-6043ffe2510c",
+      "Id": "27dbed82-80e5-47bf-8ebc-a8f14921e226",
+      "EntityA_Id": "b866e5dd-5b9c-4043-b3c3-994df81e4d0e",
+      "EntityB_Id": "b8a977fc-069a-4a7a-b1cd-a3e6aa35f8d4",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2775,9 +2776,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "a1b9f2eb-2b13-432b-82fb-31ad92fb19d0",
-      "EntityA_Id": "33a34723-ae96-4690-baaa-6043ffe2510c",
-      "EntityB_Id": "c622d12b-5d5b-49ba-be20-f0795e57694f",
+      "Id": "836cf4bb-045e-4c9b-a4ec-d5e59f67ed11",
+      "EntityA_Id": "b8a977fc-069a-4a7a-b1cd-a3e6aa35f8d4",
+      "EntityB_Id": "6452be2c-2956-40f5-b7dc-cd8dddcf41f9",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2791,9 +2792,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "9fb7319b-f30c-48f3-b308-7326efdc02c2",
-      "EntityA_Id": "c622d12b-5d5b-49ba-be20-f0795e57694f",
-      "EntityB_Id": "c3d8bac6-953e-4ee7-b149-baa2c49710d5",
+      "Id": "1f28aed1-efc5-42db-b625-c573f094a552",
+      "EntityA_Id": "6452be2c-2956-40f5-b7dc-cd8dddcf41f9",
+      "EntityB_Id": "f151b774-6bd6-4c5f-ad2c-084e37ec7ab6",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2807,9 +2808,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "443a9e96-c5f9-4068-a1f8-eba1c387b27e",
-      "EntityA_Id": "114cab61-af6b-4d77-8bf2-802b70e096c9",
-      "EntityB_Id": "1292da10-b5e7-403c-b208-6a3bf307dc02",
+      "Id": "aa6ade93-5d09-47c7-8e5e-dfdf66775216",
+      "EntityA_Id": "4aa66f42-8c5d-44c3-9312-4a145dc2d192",
+      "EntityB_Id": "3a243e77-9e90-4e89-bfbb-fa5bb67f2af7",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2823,9 +2824,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "6e04a4ed-e22d-4c93-a7fb-2ec0edfeeef9",
-      "EntityA_Id": "1292da10-b5e7-403c-b208-6a3bf307dc02",
-      "EntityB_Id": "f2c78c6f-1927-4b5a-9d42-5ac2fe6867ba",
+      "Id": "bf246f85-92f7-479a-bbf7-b726417995fd",
+      "EntityA_Id": "3a243e77-9e90-4e89-bfbb-fa5bb67f2af7",
+      "EntityB_Id": "4ab36b63-3b45-44df-a408-100095574585",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2839,9 +2840,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "9e4ab7ef-19b9-4451-aa87-66d612683bfa",
-      "EntityA_Id": "f2c78c6f-1927-4b5a-9d42-5ac2fe6867ba",
-      "EntityB_Id": "c815ac6f-4a20-43fd-ab09-4cb5a18b0979",
+      "Id": "5dd59ba7-294c-4ade-930d-b5b5f26bc42a",
+      "EntityA_Id": "4ab36b63-3b45-44df-a408-100095574585",
+      "EntityB_Id": "2b9bee12-72ec-4591-b930-e00820e2b4c8",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2855,9 +2856,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "0a3fbb84-140c-4623-ba1b-c2f89f1c55dd",
-      "EntityA_Id": "c815ac6f-4a20-43fd-ab09-4cb5a18b0979",
-      "EntityB_Id": "bd549cc4-523f-42c9-8e89-8a7721ec08b0",
+      "Id": "a6d9efa6-50a9-454e-9fdd-f297c4c6e2c6",
+      "EntityA_Id": "2b9bee12-72ec-4591-b930-e00820e2b4c8",
+      "EntityB_Id": "c0cbbb68-0efc-4046-b8bd-11d9a9c6746d",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2871,9 +2872,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "0b3a162e-dd38-4700-8995-e96484bcbac9",
-      "EntityA_Id": "bd549cc4-523f-42c9-8e89-8a7721ec08b0",
-      "EntityB_Id": "0b1cb975-6714-4915-baf2-6385a591de64",
+      "Id": "d3d32912-1967-469f-ac4f-282bd07101bb",
+      "EntityA_Id": "c0cbbb68-0efc-4046-b8bd-11d9a9c6746d",
+      "EntityB_Id": "5e484e74-893b-4046-b6e6-b8788387876f",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2887,9 +2888,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "6118f45e-6876-40b0-94e7-10b0cb8625d4",
-      "EntityA_Id": "0b1cb975-6714-4915-baf2-6385a591de64",
-      "EntityB_Id": "18906e77-b0c2-459c-9d07-c4af637b0f25",
+      "Id": "352f8337-0394-4887-b197-34ff05e7d056",
+      "EntityA_Id": "5e484e74-893b-4046-b6e6-b8788387876f",
+      "EntityB_Id": "f1065051-6b37-481b-b555-20e9155bc619",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2903,9 +2904,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "c74b1815-4e47-447b-97a3-d8c1eb290ea9",
-      "EntityA_Id": "97476e9b-028b-4e19-bf52-37a5e313fe08",
-      "EntityB_Id": "41b08beb-508a-4a40-9185-7e9bea278925",
+      "Id": "698a75ec-3dd8-49c6-b5c1-141d775e4792",
+      "EntityA_Id": "c28f47a5-4b5d-44a6-8702-75371167e613",
+      "EntityB_Id": "bbdf4396-22b9-4ecf-9d57-b81d4208f01c",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2919,9 +2920,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "90dbd4e9-88bc-4f06-96b8-9e446c25fad9",
-      "EntityA_Id": "97476e9b-028b-4e19-bf52-37a5e313fe08",
-      "EntityB_Id": "5fcd3898-9e35-495b-a542-d783854e17b6",
+      "Id": "2db9429d-a769-4a85-a74b-2c5cb8acd944",
+      "EntityA_Id": "c28f47a5-4b5d-44a6-8702-75371167e613",
+      "EntityB_Id": "9783e437-f6fb-4a94-9a37-542d7299a51a",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2935,9 +2936,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "1215428c-e299-406a-8d9b-1952849ed583",
-      "EntityA_Id": "f1adbb9e-ea96-46e3-82c7-01c1ad663dbb",
-      "EntityB_Id": "564d6259-d31a-4baa-82fe-c3d07a86d706",
+      "Id": "d1babc5a-4528-4dbd-a3c9-8da4b9389b55",
+      "EntityA_Id": "d1c754a2-d43b-4882-8374-20a6c28433fb",
+      "EntityB_Id": "66528979-4cb3-4220-90fa-3432a4568f9b",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2951,9 +2952,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "c323ffe2-8707-4e15-8037-1f7cd4d18868",
-      "EntityA_Id": "f1adbb9e-ea96-46e3-82c7-01c1ad663dbb",
-      "EntityB_Id": "ea2bdf6d-389d-4f79-9a31-44257e35e903",
+      "Id": "c8c2b88d-bf8c-4075-bfd2-8b376338b8ee",
+      "EntityA_Id": "d1c754a2-d43b-4882-8374-20a6c28433fb",
+      "EntityB_Id": "ed2c3ebd-a97e-433a-be93-1ff9adc4f197",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2967,9 +2968,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "4dbc9801-5632-453d-a6ed-b03fdfb02df3",
-      "EntityA_Id": "5fcd3898-9e35-495b-a542-d783854e17b6",
-      "EntityB_Id": "8e5309ef-98ca-43e9-a611-19352af7ef4d",
+      "Id": "501ca836-6001-42bc-af1c-ce022470140e",
+      "EntityA_Id": "9783e437-f6fb-4a94-9a37-542d7299a51a",
+      "EntityB_Id": "361ec710-cbd0-4e34-af0e-b3a820f77a4c",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2983,9 +2984,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "33a307a3-5660-4628-8a56-7e069486b1fe",
-      "EntityA_Id": "5fcd3898-9e35-495b-a542-d783854e17b6",
-      "EntityB_Id": "8dceb48d-4cf5-471b-8772-c3b6db671db9",
+      "Id": "7fb574a1-67ce-48f9-86b1-7b57484c8afe",
+      "EntityA_Id": "9783e437-f6fb-4a94-9a37-542d7299a51a",
+      "EntityB_Id": "c1682509-2330-48ce-bfb8-f29e981f909c",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -2999,9 +3000,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "9c76569e-a05c-4c02-94fb-47b489798d9f",
-      "EntityA_Id": "8dceb48d-4cf5-471b-8772-c3b6db671db9",
-      "EntityB_Id": "2a8a2eb6-1079-4dc3-a964-76006485e46e",
+      "Id": "480972dc-5ac1-437b-b216-e7d5f95b3ae4",
+      "EntityA_Id": "c1682509-2330-48ce-bfb8-f29e981f909c",
+      "EntityB_Id": "2a22a707-eba4-44f5-b62c-43ba4aa5a906",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,
@@ -3015,9 +3016,9 @@
       "Weight": 1.0
     },
     {
-      "Id": "134e498e-a7bb-433d-995a-7a56ab75e694",
-      "EntityA_Id": "8dceb48d-4cf5-471b-8772-c3b6db671db9",
-      "EntityB_Id": "114cab61-af6b-4d77-8bf2-802b70e096c9",
+      "Id": "0cc4d77f-7a0b-4c03-b2b5-85af2ad8eaeb",
+      "EntityA_Id": "c1682509-2330-48ce-bfb8-f29e981f909c",
+      "EntityB_Id": "4aa66f42-8c5d-44c3-9312-4a145dc2d192",
       "AnchorA": {
         "Mode": "AxonCapEnd",
         "AxialT": 1.0,

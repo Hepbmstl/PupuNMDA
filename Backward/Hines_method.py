@@ -13,26 +13,26 @@ import matplotlib.animation as animation
 
 FARADAY = 96485.3       # 库仑/摩尔 (C/mol)
 R_GAS = 8.314           # 焦耳/(摩尔·开尔文) (J/(mol*K))
-CELSIUS = 36.0          # 模拟温度 (degC)
+CELSIUS = 24.0          # 模拟温度 (degC) — tcD_vc.oc: celsius=24
 TEMP_K = CELSIUS + 273.15
 Z_CA = 2.0              # 钙离子化合价
 
 CA_OUT = 2.0            # 胞外钙浓度 (mM)
-CA_INF = 2.4e-4         # 胞内稳态游离钙浓度 (mM)
-TAU_CA = 5.0            # 钙离子衰减时间常数 (ms)
+CA_INF = 2.4e-4         # 胞内稳态游离钙浓度 (mM) — cadecay.mod: cainf=2.4e-4
+TAU_CA = 5.0            # 钙离子衰减时间常数 (ms) — cadecay.mod: taur=5
 
 E_TABLE = {
-    "Na": {"E": 55.0},
-    "K": {"E": -72.0},
-    "L": {"E": -54.3}
+    "Na": {"E": 50.0},
+    "K": {"E": -90.0},
+    "L": {"E": -76.5}
 }
 
 SEGMENT = {}
 
-V = -65.0
-DT = 0.02
+V = -70.0
+DT = 0.1
 DEL = DT / 2
-STEPS = 1000
+STEPS = 10000
 N_NODE = 0
 
 HISTORY_V = None
@@ -51,34 +51,42 @@ PROBE_LIST = []
 STIMULATION = []
 #(stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration)
 
+VOLTAGE_CLAMP = []
+# Each entry: (vc_id, segment_id, rs_MOhm, protocol)
+# protocol is a list of (duration_ms, amplitude_mV) tuples, executed sequentially.
+# E.g. [(1000, -115), (1000, -65), (1000, -65)] mimics SEClamp with 3 steps.
+
 PROBE_SAVE_DATA = {}
 #key:stimulation_id value:{all_params_name:params_value}
 
 CURRENT_STEP = -1
 SIMULATION_RUNNING = False
 
-# HH gating parameters (modifiable via C# Ion Channel Setting)
+# HH gating parameters — Traub-modified (hh2.mod)
+# v2 = V - vtraub;  rate functions use v2 instead of V directly.
 HH_PARAMS = {
-    "alpha_m_A": 0.1, "alpha_m_Vs": 35.0, "alpha_m_k": 10.0,
-    "beta_m_A": 4.0, "beta_m_Vs": 60.0, "beta_m_k": 18.0,
-    "alpha_h_A": 0.07, "alpha_h_Vs": 60.0, "alpha_h_k": 20.0,
-    "beta_h_A": 1.0, "beta_h_Vs": 30.0, "beta_h_k": 10.0,
-    "alpha_n_A": 0.01, "alpha_n_Vs": 50.0, "alpha_n_k": 10.0,
-    "beta_n_A": 0.125, "beta_n_Vs": 60.0, "beta_n_k": 80.0,
+    "vtraub": -63.0,
+    "alpha_m_A": 0.32,  "alpha_m_V": 13.0, "alpha_m_k": 4.0,
+    "beta_m_A":  0.28,  "beta_m_V":  40.0, "beta_m_k":  5.0,
+    "alpha_h_A": 0.128, "alpha_h_V": 17.0, "alpha_h_k": 18.0,
+    "beta_h_A":  4.0,   "beta_h_V":  40.0, "beta_h_k":  5.0,
+    "alpha_n_A": 0.032, "alpha_n_V": 15.0, "alpha_n_k":  5.0,
+    "beta_n_A":  0.5,   "beta_n_V":  10.0, "beta_n_k": 40.0,
 }
 
-# Ca T-type channel parameters (modifiable via C# Ion Channel Setting)
-# Raw Vh values from ITGHK.mod; shift/actshift applied in kinetic functions
+# Ca T-type channel parameters — ITGHK.mod + tcD_vc.oc overrides
+# Raw Vh values; shift/actshift applied in kinetic functions.
+# Q10 values: qm=2.5, qh=2.5 (tcD_vc.oc), shift=-1 (tcD_vc.oc)
 CA_PARAMS = {
-    "shift": 2.0, "actshift": 0.0,
+    "shift": -1.0, "actshift": 0.0,
     "inf_mT_Vh": 57.0, "inf_mT_k": 6.2,
     "inf_hT_Vh": 81.0, "inf_hT_k": 4.0,
     "tau_mT_base": 0.612, "tau_mT_V1": 132.0, "tau_mT_k1": 16.7,
-    "tau_mT_V2": 16.8, "tau_mT_k2": 18.2, "tau_mT_Q10": 5.0, "tau_mT_Tref": 24.0,
+    "tau_mT_V2": 16.8, "tau_mT_k2": 18.2, "tau_mT_Q10": 2.5, "tau_mT_Tref": 24.0,
     "tau_hT_Vthresh": -80.0,
     "tau_hT_V1": 467.0, "tau_hT_k1": 66.6,
     "tau_hT_base": 28.0, "tau_hT_V2": 22.0, "tau_hT_k2": 10.5,
-    "tau_hT_Q10": 3.0, "tau_hT_Tref": 24.0,
+    "tau_hT_Q10": 2.5, "tau_hT_Tref": 24.0,
 }
 
 _HH_PARAMS_DEFAULT = dict(HH_PARAMS)
@@ -98,11 +106,11 @@ def save_data_HH(prob_id, data: dict):
 # init：
 
 # env set
-def set_env(V_init: float= -65.0,
-        dt: float = 0.02,
-        steps: int = 1000,
+def set_env(V_init: float= -70.0,
+        dt: float = 0.1,
+        steps: int = 10000,
         n_node:int = 0,
-        celsius: float = 36.0,
+        celsius: float = 24.0,
         ca_out: float = 2.0,
         ca_inf: float = 2.4e-4,
         tau_ca: float = 5.0):
@@ -161,6 +169,26 @@ def insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms):
 def insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration):
     global STIMULATION
     STIMULATION.append((stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration))
+
+def insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol):
+    """
+    注册一个电压钳装置，模拟 NEURON 的 SEClamp。
+
+    参数:
+    - vc_id:       电压钳唯一标识 (int)
+    - segment_id:  钳制的区室 id (int)
+    - rs_MOhm:     串联电阻 (MΩ)，对应 SEClamp.rs
+    - protocol:    协议列表，每个元素是 [duration_ms, amplitude_mV]
+                   按顺序执行，例如 [[100, -115], [1000, -65], [1000, -65]]
+
+    在 Hines 矩阵中的实现:
+      g_vc = 1 / rs (单位 mS，因 rs 输入为 MΩ，1/MΩ = µS = 10^-3 mS → 但
+                      此处直接当作绝对电导加入矩阵行，与 g_Na_half 等相同量纲)
+      A[i,i] += g_vc
+      b[i]   += g_vc * V_cmd
+    """
+    global VOLTAGE_CLAMP
+    VOLTAGE_CLAMP.append((vc_id, segment_id, rs_MOhm, protocol))
 
 @dataclass
 class Segment:
@@ -247,14 +275,14 @@ def clear_environment():
     global SEGMENT, V, DT, DEL, STEPS, N_NODE
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
-    global PROBE_LIST, STIMULATION, PROBE_SAVE_DATA
+    global PROBE_LIST, STIMULATION, VOLTAGE_CLAMP, PROBE_SAVE_DATA
     global CURRENT_STEP, SIMULATION_RUNNING, E_TABLE
 
     SEGMENT = {}
-    V = -65.0
-    DT = 0.02
+    V = -70.0
+    DT = 0.1
     DEL = DT / 2
-    STEPS = 1000
+    STEPS = 10000
     N_NODE = 0
     HISTORY_V = None
     HISTORY_M = None
@@ -265,13 +293,14 @@ def clear_environment():
     HISTORY_HT = None
     PROBE_LIST = []
     STIMULATION = []
+    VOLTAGE_CLAMP = []
     PROBE_SAVE_DATA = {}
     CURRENT_STEP = -1
     SIMULATION_RUNNING = False
     E_TABLE = {
-        "Na": {"E": 55.0},
-        "K":  {"E": -72.0},
-        "L":  {"E": -54.3}
+        "Na": {"E": 50.0},
+        "K":  {"E": -90.0},
+        "L":  {"E": -76.5}
     }
     HH_PARAMS.update(_HH_PARAMS_DEFAULT)
     CA_PARAMS.update(_CA_PARAMS_DEFAULT)
@@ -299,44 +328,67 @@ def calculate_Kij(seg_i: Segment, seg_j: Segment):
     return 1.0 / (R_i + R_j)
 
 def alpha_m(V):
+    """hh2.mod Traub: alpha_m = A*(V0-v2)/(exp((V0-v2)/k)-1), v2=V-vtraub"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["alpha_m_A"]
-    Vs = HH_PARAMS["alpha_m_Vs"]
+    V0 = HH_PARAMS["alpha_m_V"]
     k  = HH_PARAMS["alpha_m_k"]
-    if abs(V + Vs) < 1e-6:
-        return A * k
-    return (A * (V + Vs)) / (1 - np.exp(-((V + Vs) / k)))
+    v2 = V - vtraub
+    x = V0 - v2
+    if abs(x) < 1e-6:
+        return A * k          # L'Hôpital limit
+    return A * x / (np.exp(x / k) - 1.0)
 
 def alpha_n(V):
+    """hh2.mod Traub: alpha_n = A*(V0-v2)/(exp((V0-v2)/k)-1)"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["alpha_n_A"]
-    Vs = HH_PARAMS["alpha_n_Vs"]
+    V0 = HH_PARAMS["alpha_n_V"]
     k  = HH_PARAMS["alpha_n_k"]
-    if abs(V + Vs) < 1e-6:
+    v2 = V - vtraub
+    x = V0 - v2
+    if abs(x) < 1e-6:
         return A * k
-    return (A * (V + Vs)) / (1 - np.exp(-((V + Vs) / k)))
+    return A * x / (np.exp(x / k) - 1.0)
 
 def beta_m(V):
+    """hh2.mod Traub: beta_m = A*(v2-V0)/(exp((v2-V0)/k)-1)"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["beta_m_A"]
-    Vs = HH_PARAMS["beta_m_Vs"]
+    V0 = HH_PARAMS["beta_m_V"]
     k  = HH_PARAMS["beta_m_k"]
-    return A * np.exp(-(V + Vs) / k)
+    v2 = V - vtraub
+    x = v2 - V0
+    if abs(x) < 1e-6:
+        return A * k
+    return A * x / (np.exp(x / k) - 1.0)
 
 def alpha_h(V):
+    """hh2.mod Traub: alpha_h = A*exp((V0-v2)/k)"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["alpha_h_A"]
-    Vs = HH_PARAMS["alpha_h_Vs"]
+    V0 = HH_PARAMS["alpha_h_V"]
     k  = HH_PARAMS["alpha_h_k"]
-    return A * np.exp(-(V + Vs) / k)
+    v2 = V - vtraub
+    return A * np.exp((V0 - v2) / k)
 
 def beta_h(V):
+    """hh2.mod Traub: beta_h = A/(1+exp((V0-v2)/k))"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["beta_h_A"]
-    Vs = HH_PARAMS["beta_h_Vs"]
+    V0 = HH_PARAMS["beta_h_V"]
     k  = HH_PARAMS["beta_h_k"]
-    return A / (1 + np.exp(-((V + Vs) / k)))
+    v2 = V - vtraub
+    return A / (1.0 + np.exp((V0 - v2) / k))
 
 def beta_n(V):
+    """hh2.mod Traub: beta_n = A*exp((V0-v2)/k)"""
+    vtraub = HH_PARAMS["vtraub"]
     A  = HH_PARAMS["beta_n_A"]
-    Vs = HH_PARAMS["beta_n_Vs"]
+    V0 = HH_PARAMS["beta_n_V"]
     k  = HH_PARAMS["beta_n_k"]
-    return A * np.exp(-(V + Vs) / k)
+    v2 = V - vtraub
+    return A * np.exp((V0 - v2) / k)
 
 def inf_mT(V):
     shift = CA_PARAMS["shift"]
@@ -446,6 +498,32 @@ def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
 # -----------------------------------------------------------------------------------
 
 
+def _compute_vc_current(segment_id, V_membrane, t_current):
+    """
+    计算指定区室在给定时间点的电压钳电流 (µA)。
+    I_vc = g_vc * (V_cmd - V_membrane)，g_vc = 1e-3 / rs_MOhm (mS)
+    正值 = 注入电流，负值 = 吸出电流。
+    若该区室不受任何电压钳作用，返回 0.0。
+    """
+    total_I = 0.0
+    for vc in VOLTAGE_CLAMP:
+        vc_id, vc_seg_id, rs_MOhm, protocol = vc
+        if segment_id != vc_seg_id:
+            continue
+        t_acc = 0.0
+        v_cmd = None
+        for step_dur, step_amp in protocol:
+            if t_current < t_acc + step_dur:
+                v_cmd = step_amp
+                break
+            t_acc += step_dur
+        if v_cmd is None:
+            v_cmd = protocol[-1][1] if protocol else V
+        g_vc = 1e-3 / rs_MOhm
+        total_I += g_vc * (v_cmd - V_membrane)
+    return total_I
+
+
 # 状态容器：维度为 (steps + 1, N_NODE)
 def start_simulation(progress_callback=None):
     global CURRENT_STEP, SIMULATION_RUNNING
@@ -548,13 +626,41 @@ def start_simulation(progress_callback=None):
                         g_L_abs[i] * E_TABLE["L"]["E"] -
                         I_T_abs[i] + g_Ca_eq[i] * V_t[i])
                 
-                # --- 外部刺激数据流 ---
+                # --- 外部刺激数据流 (电流钳) ---
                 # 遍历所有刺激配置，若命中当前空间位置与时间窗口，叠加电流至已知项向量 b
                 for stim in STIMULATION:
                     stim_id, s_id, stim_uA, stim_start, stim_duration = stim
                     if seg.id == s_id:
                         if stim_start <= t_current <= (stim_start + stim_duration):
                             b[i] += stim_uA
+
+                # --- 电压钳数据流 ---
+                # 遍历所有电压钳配置，在目标区室注入大电导以钳制电压
+                # g_vc = 1/rs (rs in MΩ → g_vc in µS = 10^-3 mS)
+                # 注意此处需要与矩阵中其他电导量纲对齐:
+                # g_Na_half 等为 mS (由 surface_area_cm2 * g_max_mS/cm2)
+                # SEClamp 的 rs 单位是 MΩ, 所以 g_vc = 1/rs MΩ = 1e-3/rs mS → 不对
+                # 实际上 NEURON SEClamp: i = (V_cmd - V) / rs，i 单位 nA
+                # 我们的电流单位是 µA，所以 i = (V_cmd - V) / rs * 1e-3 (nA→µA)
+                # 等价于 g_vc = 1e-3 / rs (mS 量纲，匹配矩阵)
+                for vc in VOLTAGE_CLAMP:
+                    vc_id, vc_seg_id, rs_MOhm, protocol = vc
+                    if seg.id == vc_seg_id:
+                        # 确定当前时间对应的协议步骤
+                        t_elapsed = t_current
+                        v_cmd = None
+                        t_acc = 0.0
+                        for step_dur, step_amp in protocol:
+                            if t_elapsed < t_acc + step_dur:
+                                v_cmd = step_amp
+                                break
+                            t_acc += step_dur
+                        if v_cmd is None:
+                            # 超出协议总时长，使用最后一步的电压
+                            v_cmd = protocol[-1][1] if protocol else V
+                        g_vc = 1e-3 / rs_MOhm  # mS
+                        A[i, i] += g_vc
+                        b[i] += g_vc * v_cmd
 
             # 步骤 3: 隐式求解与时间步推进
             V_half = linalg.solve(A, b)
@@ -619,7 +725,8 @@ def start_simulation(progress_callback=None):
                         "A_matrix_row": A[idx, :].tolist(),
                         "b_vector_val": float(b[idx]),
                         "V_half_val": float(V_half[idx]),
-                        "V_t_next": float(HISTORY_V[step + 1, idx])
+                        "V_t_next": float(HISTORY_V[step + 1, idx]),
+                        "I_vc": float(_compute_vc_current(p_seg_id, V_t[idx], t_current))
                     }
                     save_data_HH(probe_id, probe_data)
         CURRENT_STEP = STEPS

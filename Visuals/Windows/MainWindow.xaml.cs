@@ -282,12 +282,16 @@ namespace NeuronCAD.Visuals.Windows
             }
 
             // 读取仿真参数
-            if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -65.0;
-            if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.02;
+            if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -70.0;
+            if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.1;
             if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
-            if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 55.0;
-            if (!double.TryParse(TbEK.Text, out double eK)) eK = -72.0;
-            if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.3;
+            if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 50.0;
+            if (!double.TryParse(TbEK.Text, out double eK)) eK = -90.0;
+            if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -76.5;
+            if (!double.TryParse(TbCelsius.Text, out double celsius)) celsius = 24.0;
+            if (!double.TryParse(TbCaOut.Text, out double caOut)) caOut = 2.0;
+            if (!double.TryParse(TbCaInf.Text, out double caInf)) caInf = 2.4e-4;
+            if (!double.TryParse(TbTauCa.Text, out double tauCa)) tauCa = 5.0;
 
             // ── 进入仿真状态：禁用交互，显示进度面板 ──
             _isSimulating = true;
@@ -316,7 +320,7 @@ namespace NeuronCAD.Visuals.Windows
 
             try
             {
-                await _simulationRunner.RunAsync(simData, vInit, dt, steps, eNa, eK, eLeak);
+                await _simulationRunner.RunAsync(simData, vInit, dt, steps, eNa, eK, eLeak, celsius, caOut, caInf, tauCa);
 
                 // ── 仿真完成 ──
                 SimStatusText.Text = "Simulation Complete";
@@ -330,7 +334,8 @@ namespace NeuronCAD.Visuals.Windows
                 MessageBox.Show(
                     $"仿真完成：\n" +
                     $"  区室数: {simData.Compartments.Count}\n" +
-                    $"  刺激数: {simData.Stimulations.Count}\n" +
+                    $"  电流钳数: {simData.Stimulations.Count}\n" +
+                    $"  电压钳数: {simData.VoltageClamps.Count}\n" +
                     $"  探针数: {simData.Probes.Count}\n" +
                     $"  总步数: {steps}",
                     "Simulation",
@@ -590,6 +595,14 @@ namespace NeuronCAD.Visuals.Windows
             _simulationInteraction.StartPlacingDevice(DeviceType.Probe);
         }
 
+        /// <summary>
+        /// 点击 "Add VoltageClamp" 按钮，在仿真模式下启动电压钳设备放置流程。
+        /// </summary>
+        private void OnAddVoltageClampClick(object sender, RoutedEventArgs e)
+        {
+            _simulationInteraction.StartPlacingDevice(DeviceType.VoltageClamp);
+        }
+
         #endregion
 
         #region Reporting Sub-tab Switching
@@ -661,6 +674,10 @@ namespace NeuronCAD.Visuals.Windows
                     v => TbENa.Text = v,
                     v => TbEK.Text = v,
                     v => TbELeak.Text = v,
+                    v => TbCelsius.Text = v,
+                    v => TbCaOut.Text = v,
+                    v => TbCaInf.Text = v,
+                    v => TbTauCa.Text = v,
                     v => TbNSeg.Text = v,
                     v => TbLSeg.Text = v,
                     isNSeg => { RbNSeg.IsChecked = isNSeg; RbLSeg.IsChecked = !isNSeg; });
@@ -718,12 +735,16 @@ namespace NeuronCAD.Visuals.Windows
         {
             try
             {
-                if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -65.0;
-                if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.02;
+                if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -70.0;
+                if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.1;
                 if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
-                if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 55.0;
-                if (!double.TryParse(TbEK.Text, out double eK)) eK = -72.0;
-                if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -54.3;
+                if (!double.TryParse(TbENa.Text, out double eNa)) eNa = 50.0;
+                if (!double.TryParse(TbEK.Text, out double eK)) eK = -90.0;
+                if (!double.TryParse(TbELeak.Text, out double eLeak)) eLeak = -76.5;
+                if (!double.TryParse(TbCelsius.Text, out double celsius)) celsius = 24.0;
+                if (!double.TryParse(TbCaOut.Text, out double caOut)) caOut = 2.0;
+                if (!double.TryParse(TbCaInf.Text, out double caInf)) caInf = 2.4e-4;
+                if (!double.TryParse(TbTauCa.Text, out double tauCa)) tauCa = 5.0;
 
                 string segMode = RbNSeg.IsChecked == true ? "NSeg" : "LSeg";
                 if (!int.TryParse(TbNSeg.Text, out int nSeg) || nSeg <= 0) nSeg = 5;
@@ -731,7 +752,7 @@ namespace NeuronCAD.Visuals.Windows
 
                 SaveLoadManager.Save(filePath, _scene,
                     vInit, dt, steps, eNa, eK, eLeak,
-                    36.0, 2.0, 2.4e-4, 5.0,
+                    celsius, caOut, caInf, tauCa,
                     segMode, nSeg, lSeg);
             }
             catch (Exception ex)

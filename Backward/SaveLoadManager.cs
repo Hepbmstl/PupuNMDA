@@ -34,10 +34,10 @@ namespace NeuronCAD.Backward
 
     public class GlobalEnvironmentData
     {
-        public double V_init { get; set; } = -65.0;
-        public double dt { get; set; } = 0.02;
+        public double V_init { get; set; } = -70.0;
+        public double dt { get; set; } = 0.1;
         public int STEPS { get; set; } = 10000;
-        public double celsius { get; set; } = 36.0;
+        public double celsius { get; set; } = 24.0;
         public double CA_OUT { get; set; } = 2.0;
         public double CA_INF { get; set; } = 2.4e-4;
         public double TAU_CA { get; set; } = 5.0;
@@ -98,13 +98,22 @@ namespace NeuronCAD.Backward
         public string Type { get; set; } = "";
         public string TargetEntityId { get; set; } = "";
         public AnchorData Anchor { get; set; } = new();
-        // Stimulation params
+        // Stimulation (current clamp) params
         public double? Stimulation_uA { get; set; }
         public double? StimStart { get; set; }
         public double? StimDuration { get; set; }
         // Probe params
         public double? StartMs { get; set; }
         public double? DurationMs { get; set; }
+        // Voltage clamp params
+        public double? Rs { get; set; }
+        public List<VCStepData>? Protocol { get; set; }
+    }
+
+    public class VCStepData
+    {
+        public double Duration { get; set; }
+        public double Amplitude { get; set; }
     }
 
     #endregion
@@ -155,32 +164,35 @@ namespace NeuronCAD.Backward
             project.E_TABLE["K"] = new ETableEntry { E = eK };
             project.E_TABLE["L"] = new ETableEntry { E = eLeak };
 
-            // ── HH_PARAMS ──
+            // ── HH_PARAMS (Traub-modified hh2.mod) ──
             project.HH_PARAMS = new Dictionary<string, double>
             {
+                ["vtraub"] = IonChannelParams.Vtraub,
                 ["alpha_m_A"] = IonChannelParams.AlphaM_A,
-                ["alpha_m_Vs"] = IonChannelParams.AlphaM_Vs,
+                ["alpha_m_V"] = IonChannelParams.AlphaM_V,
                 ["alpha_m_k"] = IonChannelParams.AlphaM_k,
                 ["beta_m_A"] = IonChannelParams.BetaM_A,
-                ["beta_m_Vs"] = IonChannelParams.BetaM_Vs,
+                ["beta_m_V"] = IonChannelParams.BetaM_V,
                 ["beta_m_k"] = IonChannelParams.BetaM_k,
                 ["alpha_h_A"] = IonChannelParams.AlphaH_A,
-                ["alpha_h_Vs"] = IonChannelParams.AlphaH_Vs,
+                ["alpha_h_V"] = IonChannelParams.AlphaH_V,
                 ["alpha_h_k"] = IonChannelParams.AlphaH_k,
                 ["beta_h_A"] = IonChannelParams.BetaH_A,
-                ["beta_h_Vs"] = IonChannelParams.BetaH_Vs,
+                ["beta_h_V"] = IonChannelParams.BetaH_V,
                 ["beta_h_k"] = IonChannelParams.BetaH_k,
                 ["alpha_n_A"] = IonChannelParams.AlphaN_A,
-                ["alpha_n_Vs"] = IonChannelParams.AlphaN_Vs,
+                ["alpha_n_V"] = IonChannelParams.AlphaN_V,
                 ["alpha_n_k"] = IonChannelParams.AlphaN_k,
                 ["beta_n_A"] = IonChannelParams.BetaN_A,
-                ["beta_n_Vs"] = IonChannelParams.BetaN_Vs,
+                ["beta_n_V"] = IonChannelParams.BetaN_V,
                 ["beta_n_k"] = IonChannelParams.BetaN_k,
             };
 
-            // ── CA_PARAMS ──
+            // ── CA_PARAMS (ITGHK.mod + tcD_vc.oc overrides) ──
             project.CA_PARAMS = new Dictionary<string, double>
             {
+                ["shift"] = IonChannelParams.Shift,
+                ["actshift"] = IonChannelParams.ActShift,
                 ["inf_mT_Vh"] = IonChannelParams.InfMT_Vh,
                 ["inf_mT_k"] = IonChannelParams.InfMT_k,
                 ["inf_hT_Vh"] = IonChannelParams.InfHT_Vh,
@@ -276,6 +288,15 @@ namespace NeuronCAD.Backward
                     dd.StartMs = probe.StartMs;
                     dd.DurationMs = probe.DurationMs;
                 }
+                else if (device is VoltageClampDevice vc)
+                {
+                    dd.Rs = vc.Rs;
+                    dd.Protocol = vc.Protocol.Select(s => new VCStepData
+                    {
+                        Duration = s.Duration,
+                        Amplitude = s.Amplitude
+                    }).ToList();
+                }
 
                 project.Devices.Add(dd);
             }
@@ -312,6 +333,10 @@ namespace NeuronCAD.Backward
             Action<string> setTbENa,
             Action<string> setTbEK,
             Action<string> setTbELeak,
+            Action<string> setTbCelsius,
+            Action<string> setTbCaOut,
+            Action<string> setTbCaInf,
+            Action<string> setTbTauCa,
             Action<string> setTbNSeg,
             Action<string> setTbLSeg,
             Action<bool> setRbNSeg)
@@ -353,6 +378,11 @@ namespace NeuronCAD.Backward
                 setTbEK(eK.E.ToString(CultureInfo.InvariantCulture));
             if (project.E_TABLE.TryGetValue("L", out var eL))
                 setTbELeak(eL.E.ToString(CultureInfo.InvariantCulture));
+
+            setTbCelsius(env.celsius.ToString(CultureInfo.InvariantCulture));
+            setTbCaOut(env.CA_OUT.ToString(CultureInfo.InvariantCulture));
+            setTbCaInf(env.CA_INF.ToString(CultureInfo.InvariantCulture));
+            setTbTauCa(env.TAU_CA.ToString(CultureInfo.InvariantCulture));
 
             // ── 3. 恢复区室化参数 ──
             var seg = project.Segmentation;
@@ -468,6 +498,24 @@ namespace NeuronCAD.Backward
                     stim.StimDuration = dd.StimDuration ?? 5.0;
                     device = stim;
                 }
+                else if (dd.Type == "VoltageClamp")
+                {
+                    var vc = new VoltageClampDevice(targetEntity, anchor);
+                    vc.Rs = dd.Rs ?? 5.0;
+                    if (dd.Protocol != null && dd.Protocol.Count > 0)
+                    {
+                        vc.Protocol.Clear();
+                        foreach (var stepData in dd.Protocol)
+                        {
+                            vc.Protocol.Add(new VCStep
+                            {
+                                Duration = stepData.Duration,
+                                Amplitude = stepData.Amplitude
+                            });
+                        }
+                    }
+                    device = vc;
+                }
                 else
                 {
                     var probe = new ProbeDevice(targetEntity, anchor);
@@ -544,30 +592,33 @@ namespace NeuronCAD.Backward
         private static void ApplyHHParams(Dictionary<string, double> p)
         {
             if (p == null || p.Count == 0) return;
-            if (p.TryGetValue("alpha_m_A", out var v)) IonChannelParams.AlphaM_A = v;
-            if (p.TryGetValue("alpha_m_Vs", out v)) IonChannelParams.AlphaM_Vs = v;
+            if (p.TryGetValue("vtraub", out var v)) IonChannelParams.Vtraub = v;
+            if (p.TryGetValue("alpha_m_A", out v)) IonChannelParams.AlphaM_A = v;
+            if (p.TryGetValue("alpha_m_V", out v)) IonChannelParams.AlphaM_V = v;
             if (p.TryGetValue("alpha_m_k", out v)) IonChannelParams.AlphaM_k = v;
             if (p.TryGetValue("beta_m_A", out v)) IonChannelParams.BetaM_A = v;
-            if (p.TryGetValue("beta_m_Vs", out v)) IonChannelParams.BetaM_Vs = v;
+            if (p.TryGetValue("beta_m_V", out v)) IonChannelParams.BetaM_V = v;
             if (p.TryGetValue("beta_m_k", out v)) IonChannelParams.BetaM_k = v;
             if (p.TryGetValue("alpha_h_A", out v)) IonChannelParams.AlphaH_A = v;
-            if (p.TryGetValue("alpha_h_Vs", out v)) IonChannelParams.AlphaH_Vs = v;
+            if (p.TryGetValue("alpha_h_V", out v)) IonChannelParams.AlphaH_V = v;
             if (p.TryGetValue("alpha_h_k", out v)) IonChannelParams.AlphaH_k = v;
             if (p.TryGetValue("beta_h_A", out v)) IonChannelParams.BetaH_A = v;
-            if (p.TryGetValue("beta_h_Vs", out v)) IonChannelParams.BetaH_Vs = v;
+            if (p.TryGetValue("beta_h_V", out v)) IonChannelParams.BetaH_V = v;
             if (p.TryGetValue("beta_h_k", out v)) IonChannelParams.BetaH_k = v;
             if (p.TryGetValue("alpha_n_A", out v)) IonChannelParams.AlphaN_A = v;
-            if (p.TryGetValue("alpha_n_Vs", out v)) IonChannelParams.AlphaN_Vs = v;
+            if (p.TryGetValue("alpha_n_V", out v)) IonChannelParams.AlphaN_V = v;
             if (p.TryGetValue("alpha_n_k", out v)) IonChannelParams.AlphaN_k = v;
             if (p.TryGetValue("beta_n_A", out v)) IonChannelParams.BetaN_A = v;
-            if (p.TryGetValue("beta_n_Vs", out v)) IonChannelParams.BetaN_Vs = v;
+            if (p.TryGetValue("beta_n_V", out v)) IonChannelParams.BetaN_V = v;
             if (p.TryGetValue("beta_n_k", out v)) IonChannelParams.BetaN_k = v;
         }
 
         private static void ApplyCaParams(Dictionary<string, double> p)
         {
             if (p == null || p.Count == 0) return;
-            if (p.TryGetValue("inf_mT_Vh", out var v)) IonChannelParams.InfMT_Vh = v;
+            if (p.TryGetValue("shift", out var v)) IonChannelParams.Shift = v;
+            if (p.TryGetValue("actshift", out v)) IonChannelParams.ActShift = v;
+            if (p.TryGetValue("inf_mT_Vh", out v)) IonChannelParams.InfMT_Vh = v;
             if (p.TryGetValue("inf_mT_k", out v)) IonChannelParams.InfMT_k = v;
             if (p.TryGetValue("inf_hT_Vh", out v)) IonChannelParams.InfHT_Vh = v;
             if (p.TryGetValue("inf_hT_k", out v)) IonChannelParams.InfHT_k = v;

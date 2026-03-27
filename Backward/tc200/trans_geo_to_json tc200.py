@@ -4,7 +4,7 @@ import math
 import re
 
 # ==========================================
-# 1. 基础数学与几何工具
+# 1. 基础数学与几何工具 (与 tcD 版本相同)
 # ==========================================
 def rescale_diam(d):
     """
@@ -47,17 +47,13 @@ def get_transform_matrix(p1, p2):
     if length == 0:
         return [1,0,0,0, 0,1,0,0, 0,0,1,0, p1[0],p1[1],p1[2],1]
 
-    # 目标方向 = 局部 Z 轴映射到的世界方向
     fwd = [x / length for x in v]       # new Z axis
 
-    # 构建正交基：选一个不与 fwd 平行的辅助向量
     local_z = [0, 0, 1]
     dot = fwd[0]*local_z[0] + fwd[1]*local_z[1] + fwd[2]*local_z[2]
 
     if abs(dot) > 0.9999:
-        # fwd 与 (0,0,1) 几乎平行或反平行
         if dot < 0:
-            # 反向：绕 X 轴 180° → X 不变, Y 取反, Z 取反
             return [
                 1, 0, 0, 0,
                 0, -1, 0, 0,
@@ -65,7 +61,6 @@ def get_transform_matrix(p1, p2):
                 p1[0], p1[1], p1[2], 1
             ]
         else:
-            # 同向：单位旋转
             return [
                 1, 0, 0, 0,
                 0, 1, 0, 0,
@@ -73,13 +68,10 @@ def get_transform_matrix(p1, p2):
                 p1[0], p1[1], p1[2], 1
             ]
 
-    # 一般情况：通过 Rodrigues 旋转公式 (column-vector convention)
-    # 旋转轴 = cross(localZ, fwd)，旋转角 = acos(dot)
     axis = cross_product(local_z, fwd)
     axis = normalize(axis)
     angle = math.acos(max(-1, min(1, dot)))
 
-    # Rodrigues' rotation matrix R (column-vector: v' = R*v)
     c = math.cos(angle)
     s = math.sin(angle)
     t = 1.0 - c
@@ -89,8 +81,6 @@ def get_transform_matrix(p1, p2):
     r10 = t*ky*kx + s*kz; r11 = c + t*ky*ky;      r12 = t*ky*kz - s*kx
     r20 = t*kz*kx - s*ky; r21 = t*kz*ky + s*kx;   r22 = c + t*kz*kz
 
-    # WPF 使用 row-vector 约定 (v' = v * M)，因此输出 R 的转置
-    # M 的 Row3 = R 的 Column3 = local Z 映射到的世界方向
     return [
         r00, r10, r20, 0.0,
         r01, r11, r21, 0.0,
@@ -101,7 +91,7 @@ def get_transform_matrix(p1, p2):
 # ==========================================
 # 2. 生成 NeuronCAD 对象
 # ==========================================
-def create_entity(p1, p2, type_name, color, channels):
+def create_entity(p1, p2, type_name, color, channels, Ra, Cm):
     length = distance(p1[:3], p2[:3])
     r1, r2 = p1[3] / 2.0, p2[3] / 2.0
     transform = get_transform_matrix(p1[:3], p2[:3])
@@ -112,8 +102,8 @@ def create_entity(p1, p2, type_name, color, channels):
         "BaseRadius": r1,
         "TopRadius": r2,
         "Length": length,
-        "Ra": 100.0,
-        "Cm": 1.0,
+        "Ra": Ra,
+        "Cm": Cm,
         "Color": color,
         "Transform": transform,
         "Channels": channels
@@ -136,26 +126,112 @@ def create_connection(ent_a_id, ent_b_id, axial_a, axial_b=0.0):
 # ==========================================
 # 3. 主解析逻辑
 # ==========================================
-def parse_geo_to_json(geo_filepath, out_filepath):
+def load_biophy(biophy_filepath):
+    """加载 Biophy.json，返回解析后的字典。"""
+    with open(biophy_filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def build_channels_from_biophy(region_params):
+    """
+    从 Biophy.json 的 biophysical_assignments 区域参数构建 NeuronCAD channels 字典。
+    单位转换：g_pas / gnabar / gkbar: S/cm² → mS/cm² (×1000)
+              pcabar: cm/s → cm/s (不变, IsPermeability=True)
+    """
+    channels = {}
+    passive = region_params.get("passive", {})
+    hh2 = region_params.get("hh2", {})
+    it = region_params.get("itGHK", {})
+
+    # Na (hh2 gnabar S/cm² → mS/cm²)
+    if "gnabar" in hh2:
+        channels["Na"] = {"G": hh2["gnabar"] * 1000.0, "IsPermeability": False}
+    # K (hh2 gkbar S/cm² → mS/cm²)
+    if "gkbar" in hh2:
+        channels["K"] = {"G": hh2["gkbar"] * 1000.0, "IsPermeability": False}
+    # L (passive g_pas S/cm² → mS/cm²)
+    if "g_pas" in passive:
+        channels["L"] = {"G": passive["g_pas"] * 1000.0, "IsPermeability": False}
+    # CaT (itGHK pcabar cm/s, 保持原值)
+    if "pcabar" in it:
+        channels["CaT"] = {"G": it["pcabar"], "IsPermeability": True}
+
+    return channels
+
+
+def build_region_lookup(biophy):
+    """
+    从 Biophy.json 的 spatial_regions 构建 segment_name → region_name 的查找表。
+    如果某个 region 的 segments 为 "_remainder"，则标记为默认区域。
+    返回 (lookup_dict, default_region_name)。
+    """
+    lookup = {}
+    default_region = None
+    for region_name, region_info in biophy["spatial_regions"].items():
+        segs = region_info.get("segments", [])
+        if segs == "_remainder":
+            default_region = region_name
+        else:
+            for seg_name in segs:
+                lookup[seg_name] = region_name
+    return lookup, default_region
+
+
+def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.json"):
+    # ---- 加载 Biophy.json ----
+    biophy = load_biophy(biophy_filepath)
+    bio_env = biophy["global_environment"]
+    bio_assign = biophy["biophysical_assignments"]
+
+    # 构建 segment_name → region_name 查找表
+    region_lookup, default_region = build_region_lookup(biophy)
+
+    # 预构建每个区域的 channels / Ra / Cm
+    region_channels = {}
+    region_Ra = {}
+    region_Cm = {}
+    region_depth = {}
+    for region_name, region_params in bio_assign.items():
+        if region_name.startswith("_"):
+            continue
+        region_channels[region_name] = build_channels_from_biophy(region_params)
+        region_Ra[region_name] = region_params["passive"]["Ra"]
+        region_Cm[region_name] = region_params["passive"]["cm"]
+        region_depth[region_name] = region_params.get("cadecay", {}).get("depth", 0.1)
+
     with open(geo_filepath, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
     # ---- 3.1 从 create 语句自动识别树突结构 ----
-    # 例: "create soma, dend1[3], dend2[5]"  → dend_group_sizes = [3, 5]
+    # 例: "create soma,\  dend1[1],\  dend2[3], ..."  (可能跨多行)
+    # 同时记录 dend 编号以便后续构建 segment name
     dend_group_sizes = []
+    dend_group_numbers = []  # 实际的编号 (1, 2, 3, ...)
+
+    # 先将多行 create 语句拼接为一行
+    create_stmt = ""
+    capturing = False
     for line in lines:
         ls = line.strip()
-        if ls.startswith("create "):
-            for part in ls[len("create "):].split(","):
-                m = re.match(r'dend\d+\[(\d+)\]', part.strip())
-                if m:
-                    dend_group_sizes.append(int(m.group(1)))
-            break
+        if not capturing and ls.startswith("create "):
+            capturing = True
+        if capturing:
+            # 去掉行尾续行符 '\'
+            stripped = ls.rstrip("\\").strip()
+            create_stmt += " " + stripped
+            if not ls.endswith("\\"):
+                break  # 最后一行（无续行符）
+
+    for part in create_stmt.split(","):
+        part = part.strip()
+        m = re.match(r'dend(\d+)\[(\d+)\]', part)
+        if m:
+            dend_group_numbers.append(int(m.group(1)))
+            dend_group_sizes.append(int(m.group(2)))
 
     # ---- 3.2 逐段解析数据 ----
     soma_points = []
-    dend_blocks = []          # 全部树突 section 的点列表 (平铺)
-    topo_connections = []     # (parent_section_idx, connect_t) 拓扑对
+    dend_blocks = []
+    topo_connections = []
 
     state = "SEEK"
     idx = 0
@@ -173,7 +249,7 @@ def parse_geo_to_json(geo_filepath, out_filepath):
             idx += 1
             for _ in range(num_pts):
                 parts = list(map(float, lines[idx].strip().split()))
-                soma_points.append(parts)       # Soma 不做 rescale
+                soma_points.append(parts)
                 idx += 1
 
         # -- 树突数据 --
@@ -194,7 +270,7 @@ def parse_geo_to_json(geo_filepath, out_filepath):
                 block = []
                 for _ in range(num_pts):
                     pt = list(map(float, lines[idx].strip().split()))
-                    pt[3] = rescale_diam(pt[3])   # 树突直径缩放
+                    pt[3] = rescale_diam(pt[3])
                     block.append(pt)
                     idx += 1
                 dend_blocks.append(block)
@@ -212,7 +288,7 @@ def parse_geo_to_json(geo_filepath, out_filepath):
                     pass
 
     # ---- 3.3 按 create 声明分组树突 blocks ----
-    dend_groups = []     # dend_groups[g][sec] = [pt_list]
+    dend_groups = []
     blk_idx = 0
     for size in dend_group_sizes:
         group = []
@@ -222,31 +298,26 @@ def parse_geo_to_json(geo_filepath, out_filepath):
                 blk_idx += 1
         dend_groups.append(group)
 
-    # ---- 3.4 通道模板 (对齐 .mod 默认值) ----
-    # hh2.mod:   gnabar = 0.003 S/cm² = 3 mS/cm²,  gkbar = 0.005 S/cm² = 5 mS/cm²
-    # ITGHK.mod: pcabar = 0.2e-3 cm/s = 2e-4 cm/s
-    soma_channels = {
-        "Na":  {"G": 3,      "IsPermeability": False},
-        "K":   {"G": 5,      "IsPermeability": False},
-        "L":   {"G": 0.3,    "IsPermeability": False},
-        "CaT": {"G": 0.0002, "IsPermeability": True}
-    }
-    dend_channels = {
-        "Na":  {"G": 3,      "IsPermeability": False},
-        "K":   {"G": 5,      "IsPermeability": False},
-        "L":   {"G": 0.3,    "IsPermeability": False},
-        "CaT": {"G": 0.0002, "IsPermeability": True}
-    }
-
     entities = []
     connections_list = []
 
+    # ---- 3.4 根据 segment name 查找区域 ----
+    def get_region_for_segment(seg_name):
+        """查找 segment_name 对应的区域，未命中则返回 default_region。"""
+        return region_lookup.get(seg_name, default_region)
+
     # ---- 3.5 Soma 实体 ----
+    soma_region = get_region_for_segment("soma")
+    soma_channels = region_channels[soma_region]
+    soma_Ra = region_Ra[soma_region]
+    soma_Cm = region_Cm[soma_region]
+
     soma_entities = []
     soma_lengths = []
     for i in range(len(soma_points) - 1):
         ent = create_entity(soma_points[i], soma_points[i+1],
-                            "Soma", "#FF1E90FF", soma_channels)
+                            "Soma", "#FF1E90FF", soma_channels,
+                            soma_Ra, soma_Cm)
         entities.append(ent)
         soma_entities.append(ent)
         soma_lengths.append(ent["Length"])
@@ -257,25 +328,33 @@ def parse_geo_to_json(geo_filepath, out_filepath):
     total_soma_length = sum(soma_lengths)
 
     # ---- 3.6 树突实体 ----
-    # dend_entities_map[g_id][sec_idx] = [entity_list]
+    # dend_entities_map[g_local_idx][sec_idx] = [entity_list]
+    # 通过 segment name "dendN[sec_idx]" 查找 Biophy 区域
     dend_entities_map = {}
-    for g_id, group in enumerate(dend_groups):
-        dend_entities_map[g_id] = []
+    for g_local_idx, (dend_num, group) in enumerate(zip(dend_group_numbers, dend_groups)):
+        dend_entities_map[g_local_idx] = []
         for sec_idx, pts in enumerate(group):
+            # 构建 NEURON 风格的 segment name
+            seg_name = f"dend{dend_num}[{sec_idx}]"
+            region = get_region_for_segment(seg_name)
+
+            ch = region_channels[region]
+            ra = region_Ra[region]
+            cm = region_Cm[region]
+
             section_ents = []
             for i in range(len(pts) - 1):
                 ent = create_entity(pts[i], pts[i+1],
-                                    "Dend", "#FF9370DB", dend_channels)
+                                    "Dend", "#FF9370DB", ch, ra, cm)
                 entities.append(ent)
                 section_ents.append(ent)
                 if i > 0:
                     connections_list.append(
                         create_connection(section_ents[i-1]["Id"], ent["Id"], 1.0, 0.0))
-            dend_entities_map[g_id].append(section_ents)
+            dend_entities_map[g_local_idx].append(section_ents)
 
     # ---- 3.7 Soma ↔ Dendrite 主干连接 ----
-    # .geo: "soma connect dendN[0] (0), 0.5"  —— 各主干 section[0] 的 0-端连到 soma 50% 处
-    # 找到 soma 中点所在的 entity，连接该 entity 的 AxialT=1.0 端
+    # .geo: "soma connect dendN[0] (0), 0.5"
     soma_mid_ent_idx = 0
     accumulated = 0.0
     half_len = total_soma_length * 0.5
@@ -285,86 +364,80 @@ def parse_geo_to_json(geo_filepath, out_filepath):
             break
         accumulated += l
 
-    for g_id in range(len(dend_groups)):
-        if dend_entities_map[g_id] and dend_entities_map[g_id][0]:
+    for g_local_idx in range(len(dend_groups)):
+        if dend_entities_map[g_local_idx] and dend_entities_map[g_local_idx][0]:
             connections_list.append(
                 create_connection(soma_entities[soma_mid_ent_idx]["Id"],
-                                  dend_entities_map[g_id][0][0]["Id"],
+                                  dend_entities_map[g_local_idx][0][0]["Id"],
                                   1.0, 0.0))
 
     # ---- 3.8 组内 section 间拓扑 ----
-    # .geo: for i = 1,N-1 { dendK[fscan()] connect dendK[i] (0), fscan() }
     conn_idx = 0
-    for g_id, size in enumerate(dend_group_sizes):
+    for g_local_idx, size in enumerate(dend_group_sizes):
         for child_sec_idx in range(1, size):
             if conn_idx >= len(topo_connections):
                 break
             parent_sec_idx, connect_t = topo_connections[conn_idx]
             conn_idx += 1
 
-            parent_ents = dend_entities_map[g_id][parent_sec_idx]
-            child_ents  = dend_entities_map[g_id][child_sec_idx]
+            parent_ents = dend_entities_map[g_local_idx][parent_sec_idx]
+            child_ents  = dend_entities_map[g_local_idx][child_sec_idx]
 
             if not parent_ents or not child_ents:
                 continue
 
-            # connect_t == 1.0 → 子 section 接在父 section 的末端
             if connect_t == 1.0:
                 connections_list.append(
                     create_connection(parent_ents[-1]["Id"],
                                       child_ents[0]["Id"], 1.0, 0.0))
             else:
-                # connect_t == 0.0 → 子 section 接在父 section 的起始端
                 connections_list.append(
                     create_connection(parent_ents[0]["Id"],
                                       child_ents[0]["Id"], 0.0, 0.0))
 
-    # ---- 3.9 构建 JSON ----
+    # ---- 3.9 构建 JSON (从 Biophy.json 填充全局参数) ----
+    e_tbl = biophy["e_table"]
+    hh2_kin = biophy["hh2_kinetics"]
+    ca_kin = biophy["ca_kinetics"]
+
     neuron_cad_data = {
         "GlobalEnvironment": {
-            "V_init": -65,
-            "dt": 0.02,
-            "STEPS": 10000,
-            "celsius": 36,                # hh2.mod / ITGHK.mod: celsius=36
-            "CA_OUT": 2,                  # ITGHK.mod: cao=2
-            "CA_INF": 0.0002,             # cadecay.mod: cainf=2e-4
-            "TAU_CA": 5                   # cadecay.mod: taur=5
+            "V_init": bio_env["v_init_mV"],
+            "dt": bio_env["dt_ms"],
+            "STEPS": bio_env["STEPS"],
+            "celsius": bio_env["celsius"],
+            "CA_OUT": bio_env["ca_out_mM"],
+            "CA_INF": bio_env["ca_inf_mM"],
+            "TAU_CA": bio_env["tau_ca_ms"]
         },
         "E_TABLE": {
-            "Na": {"E": 50},              # hh2.mod: ena=50
-            "K":  {"E": -90},             # hh2.mod: ek=-90
-            "L":  {"E": -54.3}
+            "Na": {"E": e_tbl["Na"]},
+            "K":  {"E": e_tbl["K"]},
+            "L":  {"E": e_tbl["L"]}
         },
         "HH_PARAMS": {
-            "alpha_m_A": 0.1,  "alpha_m_Vs": 35, "alpha_m_k": 10,
-            "beta_m_A": 4,     "beta_m_Vs": 60,  "beta_m_k": 18,
-            "alpha_h_A": 0.07, "alpha_h_Vs": 60, "alpha_h_k": 20,
-            "beta_h_A": 1,     "beta_h_Vs": 30,  "beta_h_k": 10,
-            "alpha_n_A": 0.01, "alpha_n_Vs": 50, "alpha_n_k": 10,
-            "beta_n_A": 0.125, "beta_n_Vs": 60,  "beta_n_k": 80
+            "vtraub":    hh2_kin["vtraub"],
+            "alpha_m_A": hh2_kin["alpha_m_A"], "alpha_m_V": hh2_kin["alpha_m_V"], "alpha_m_k": hh2_kin["alpha_m_k"],
+            "beta_m_A":  hh2_kin["beta_m_A"],  "beta_m_V":  hh2_kin["beta_m_V"],  "beta_m_k":  hh2_kin["beta_m_k"],
+            "alpha_h_A": hh2_kin["alpha_h_A"], "alpha_h_V": hh2_kin["alpha_h_V"], "alpha_h_k": hh2_kin["alpha_h_k"],
+            "beta_h_A":  hh2_kin["beta_h_A"],  "beta_h_V":  hh2_kin["beta_h_V"],  "beta_h_k":  hh2_kin["beta_h_k"],
+            "alpha_n_A": hh2_kin["alpha_n_A"], "alpha_n_V": hh2_kin["alpha_n_V"], "alpha_n_k": hh2_kin["alpha_n_k"],
+            "beta_n_A":  hh2_kin["beta_n_A"],  "beta_n_V":  hh2_kin["beta_n_V"],  "beta_n_k":  hh2_kin["beta_n_k"]
         },
         "CA_PARAMS": {
-            "shift": 2.0,                 # ITGHK.mod: shift=2
-            "actshift": 0.0,              # ITGHK.mod: actshift=0
-            "inf_mT_Vh": 57,              # ITGHK.mod: 57
-            "inf_mT_k": 6.2,              # ITGHK.mod: 6.2
-            "inf_hT_Vh": 81,              # ITGHK.mod: 81
-            "inf_hT_k": 4,                # ITGHK.mod: 4.0
-            "tau_mT_base": 0.612,
-            "tau_mT_V1": 132,
-            "tau_mT_k1": 16.7,
-            "tau_mT_V2": 16.8,
-            "tau_mT_k2": 18.2,
-            "tau_mT_Q10": 5,              # ITGHK.mod: qm=5
-            "tau_mT_Tref": 24,
-            "tau_hT_Vthresh": -80,
-            "tau_hT_V1": 467,
-            "tau_hT_k1": 66.6,
-            "tau_hT_base": 28,
-            "tau_hT_V2": 22,
-            "tau_hT_k2": 10.5,
-            "tau_hT_Q10": 3,              # ITGHK.mod: qh=3
-            "tau_hT_Tref": 24
+            "shift":    ca_kin["shift"],
+            "actshift": ca_kin["actshift"],
+            "inf_mT_Vh": ca_kin["inf_mT_Vh"], "inf_mT_k": ca_kin["inf_mT_k"],
+            "inf_hT_Vh": ca_kin["inf_hT_Vh"], "inf_hT_k": ca_kin["inf_hT_k"],
+            "tau_mT_base": ca_kin["tau_mT_base"],
+            "tau_mT_V1": ca_kin["tau_mT_V1"], "tau_mT_k1": ca_kin["tau_mT_k1"],
+            "tau_mT_V2": ca_kin["tau_mT_V2"], "tau_mT_k2": ca_kin["tau_mT_k2"],
+            "tau_mT_Q10": ca_kin["tau_mT_Q10"], "tau_mT_Tref": ca_kin["tau_mT_Tref"],
+            "tau_hT_Vthresh": ca_kin["tau_hT_Vthresh"],
+            "tau_hT_V1": ca_kin["tau_hT_V1"], "tau_hT_k1": ca_kin["tau_hT_k1"],
+            "tau_hT_base": ca_kin["tau_hT_base"],
+            "tau_hT_V2": ca_kin["tau_hT_V2"], "tau_hT_k2": ca_kin["tau_hT_k2"],
+            "tau_hT_Q10": ca_kin["tau_hT_Q10"], "tau_hT_Tref": ca_kin["tau_hT_Tref"]
         },
         "Segmentation": {
             "Mode": "NSeg",
@@ -383,4 +456,4 @@ def parse_geo_to_json(geo_filepath, out_filepath):
     print(f"文件已保存至: {out_filepath}")
 
 if __name__ == "__main__":
-    parse_geo_to_json("tcD.geo", "tcD_NeuronCAD.json")
+    parse_geo_to_json("tc200.geo", "tc200_NeuronCAD.json", "Biophy_tc200.json")

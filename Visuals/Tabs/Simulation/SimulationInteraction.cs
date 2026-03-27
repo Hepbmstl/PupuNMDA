@@ -17,10 +17,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
     {
         /// <summary>空闲状态，可点击拖拽或右键删除设备</summary>
         Idle,
-        /// <summary>放置刺激设备中（跟随鼠标吸附到实体表面）</summary>
+        /// <summary>放置电流钳设备中（跟随鼠标吸附到实体表面）</summary>
         PlacingStimulation,
         /// <summary>放置探针设备中（跟随鼠标吸附到实体表面）</summary>
         PlacingProbe,
+        /// <summary>放置电压钳设备中（跟随鼠标吸附到实体表面）</summary>
+        PlacingVoltageClamp,
         /// <summary>拖拽已放置设备中（沿目标实体表面滑动）</summary>
         DraggingDevice
     }
@@ -88,9 +90,18 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         public void StartPlacingDevice(DeviceType type)
         {
             if (_currentState != SimulationState.Idle) return;
-            _currentState = type == DeviceType.Stimulation
-                ? SimulationState.PlacingStimulation
-                : SimulationState.PlacingProbe;
+            switch (type)
+            {
+                case DeviceType.Stimulation:
+                    _currentState = SimulationState.PlacingStimulation;
+                    break;
+                case DeviceType.VoltageClamp:
+                    _currentState = SimulationState.PlacingVoltageClamp;
+                    break;
+                default:
+                    _currentState = SimulationState.PlacingProbe;
+                    break;
+            }
             _placingDevice = null;
         }
 
@@ -165,7 +176,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             }
 
             // ===== 放置模式：确认/取消 =====
-            if (_currentState == SimulationState.PlacingStimulation || _currentState == SimulationState.PlacingProbe)
+            if (_currentState == SimulationState.PlacingStimulation || _currentState == SimulationState.PlacingProbe || _currentState == SimulationState.PlacingVoltageClamp)
             {
                 e.Handled = true;
                 if (e.ChangedButton == MouseButton.Left)
@@ -206,7 +217,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 return;
             }
 
-            if (_currentState == SimulationState.PlacingStimulation || _currentState == SimulationState.PlacingProbe)
+            if (_currentState == SimulationState.PlacingStimulation || _currentState == SimulationState.PlacingProbe || _currentState == SimulationState.PlacingVoltageClamp)
             {
                 UpdatePlacingDevice(mousePos);
                 return;
@@ -347,6 +358,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
                         if (_currentState == SimulationState.PlacingStimulation)
                             _placingDevice = new StimulationDevice(targetEntity, anchor);
+                        else if (_currentState == SimulationState.PlacingVoltageClamp)
+                            _placingDevice = new VoltageClampDevice(targetEntity, anchor);
                         else
                             _placingDevice = new ProbeDevice(targetEntity, anchor);
 

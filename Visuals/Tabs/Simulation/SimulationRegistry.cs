@@ -63,6 +63,36 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
     }
 
     /// <summary>
+    /// 电压钳协议步骤数据。
+    /// </summary>
+    public class SimVCStep
+    {
+        public double Duration { get; set; }
+        public double Amplitude { get; set; }
+    }
+
+    /// <summary>
+    /// 仿真电压钳数据类，对应 Hines_method.py 的 insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol)。
+    /// </summary>
+    public class SimVoltageClamp
+    {
+        /// <summary>电压钳自动分配的全局编号 (0-based)。</summary>
+        public int VCId { get; set; }
+
+        /// <summary>电压钳绑定的区室全局编号 (Compartment.GlobalId)。</summary>
+        public int SegmentId { get; set; }
+
+        /// <summary>串联电阻 (MΩ)。</summary>
+        public double Rs { get; set; }
+
+        /// <summary>电压钳协议步骤列表。</summary>
+        public List<SimVCStep> Protocol { get; set; } = new();
+
+        /// <summary>关联的视觉设备 ID (GUID)。</summary>
+        public string SourceDeviceId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// 仿真完整数据包，包含区室化切分结果和设备绑定结果。
     /// 由 SimulationRegistry.BuildSimulationData 一次性生成，可直接传入 Hines_method.py。
     /// </summary>
@@ -74,8 +104,11 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         /// <summary>所有探针绑定列表。</summary>
         public List<SimProbe> Probes { get; set; } = new();
 
-        /// <summary>所有刺激绑定列表。</summary>
+        /// <summary>所有电流钳绑定列表。</summary>
         public List<SimStimulation> Stimulations { get; set; } = new();
+
+        /// <summary>所有电压钳绑定列表。</summary>
+        public List<SimVoltageClamp> VoltageClamps { get; set; } = new();
     }
 
     /// <summary>
@@ -332,11 +365,13 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 }
             }
 
-            // 2. 设备绑定：将 Probe/Stimulation 按空间位置映射到最近的区室
+            // 2. 设备绑定：将 Probe/Stimulation/VoltageClamp 按空间位置映射到最近的区室
             var probes = new List<SimProbe>();
             var stimulations = new List<SimStimulation>();
+            var voltageClamps = new List<SimVoltageClamp>();
             int probeId = 0;
             int stimId = 0;
+            int vcId = 0;
 
             foreach (var device in devices)
             {
@@ -369,13 +404,33 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                         SourceDeviceId = device.Id
                     });
                 }
+                else if (device is VoltageClampDevice vc)
+                {
+                    var simVC = new SimVoltageClamp
+                    {
+                        VCId = vcId++,
+                        SegmentId = segmentId,
+                        Rs = vc.Rs,
+                        SourceDeviceId = device.Id
+                    };
+                    foreach (var step in vc.Protocol)
+                    {
+                        simVC.Protocol.Add(new SimVCStep
+                        {
+                            Duration = step.Duration,
+                            Amplitude = step.Amplitude
+                        });
+                    }
+                    voltageClamps.Add(simVC);
+                }
             }
 
             return new SimulationData
             {
                 Compartments = compartments,
                 Probes = probes,
-                Stimulations = stimulations
+                Stimulations = stimulations,
+                VoltageClamps = voltageClamps
             };
         }
     }

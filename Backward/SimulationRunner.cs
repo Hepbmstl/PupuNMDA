@@ -60,10 +60,16 @@ namespace NeuronCAD.Backward
         /// <param name="eNa">钠离子平衡电位 (mV)。</param>
         /// <param name="eK">钾离子平衡电位 (mV)。</param>
         /// <param name="eLeak">漏电流平衡电位 (mV)。</param>
+        /// <param name="celsius">仿真温度 (°C)，默认 24.0。</param>
+        /// <param name="caOut">胞外钙浓度 (mM)，默认 2.0。</param>
+        /// <param name="caInf">胞内稳态钙浓度 (mM)，默认 2.4e-4。</param>
+        /// <param name="tauCa">钙离子衰减时间常数 (ms)，默认 5.0。</param>
         public async Task RunAsync(
             SimulationData simData,
             double vInit, double dt, int steps,
-            double eNa, double eK, double eLeak)
+            double eNa, double eK, double eLeak,
+            double celsius = 24.0, double caOut = 2.0,
+            double caInf = 2.4e-4, double tauCa = 5.0)
         {
             _totalSteps = steps;
             _isRunning = true;
@@ -92,7 +98,11 @@ namespace NeuronCAD.Backward
                         V_init: vInit,
                         dt: dt,
                         steps: steps,
-                        n_node: simData.Compartments.Count);
+                        n_node: simData.Compartments.Count,
+                        celsius: celsius,
+                        ca_out: caOut,
+                        ca_inf: caInf,
+                        tau_ca: tauCa);
 
                     // ── 3. set_E（通过 JSON 传递字典） ──
                     dynamic json = Py.Import("json");
@@ -136,7 +146,7 @@ namespace NeuronCAD.Backward
                         }
                     }
 
-                    // ── 6. insert_stimulation ──
+                    // ── 6. insert_stimulation (电流钳) ──
                     foreach (var stim in simData.Stimulations)
                     {
                         sim.insert_stimulation(
@@ -145,6 +155,27 @@ namespace NeuronCAD.Backward
                             stim.Stimulation_uA,
                             stim.StimStart,
                             stim.StimDuration);
+                    }
+
+                    // ── 6b. insert_voltage_clamp (电压钳) ──
+                    foreach (var vc in simData.VoltageClamps)
+                    {
+                        // 构建 Python 端需要的 protocol 列表: [[dur, amp], ...]
+                        dynamic builtins = Py.Import("builtins");
+                        using var pyProtocol = new PyList();
+                        foreach (var step in vc.Protocol)
+                        {
+                            using var pyStep = new PyList();
+                            pyStep.Append(new PyFloat(step.Duration));
+                            pyStep.Append(new PyFloat(step.Amplitude));
+                            pyProtocol.Append(pyStep);
+                        }
+
+                        sim.insert_voltage_clamp(
+                            vc.VCId,
+                            vc.SegmentId,
+                            vc.Rs,
+                            pyProtocol);
                     }
 
                     // ── 7. insert_probe ──

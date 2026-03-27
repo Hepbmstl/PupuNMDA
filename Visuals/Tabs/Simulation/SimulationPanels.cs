@@ -118,7 +118,13 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         /// <returns>构建完成的 Expander 控件</returns>
         private Expander BuildDeviceNode(IAttachedDevice device)
         {
-            string devType = device.Type == DeviceType.Stimulation ? "Stimulation" : "Probe";
+            string devType;
+            switch (device.Type)
+            {
+                case DeviceType.Stimulation: devType = "CurrentClamp"; break;
+                case DeviceType.VoltageClamp: devType = "VoltageClamp"; break;
+                default: devType = "Probe"; break;
+            }
 
             var expander = new Expander
             {
@@ -197,6 +203,50 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                     else tbDur.Text = probe.DurationMs.ToString("F2");
                 };
                 panel.Children.Add(tbDur);
+            }
+            else if (device is VoltageClampDevice vc)
+            {
+                // Rs (MΩ)
+                panel.Children.Add(new TextBlock { Text = "Rs (MΩ):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                var tbRs = new TextBox { Text = vc.Rs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
+                tbRs.LostFocus += (s, e) =>
+                {
+                    if (double.TryParse(tbRs.Text, out double v) && v > 0) vc.Rs = v;
+                    else tbRs.Text = vc.Rs.ToString("F2");
+                };
+                panel.Children.Add(tbRs);
+
+                // Protocol steps
+                panel.Children.Add(new TextBlock { Text = "Protocol Steps:", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) });
+                for (int si = 0; si < vc.Protocol.Count; si++)
+                {
+                    var step = vc.Protocol[si];
+                    var stepPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 0) };
+                    stepPanel.Children.Add(new TextBlock { Text = $"Step {si + 1}: ", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center, Width = 50 });
+
+                    var tbAmp = new TextBox { Text = step.Amplitude.ToString("F1"), Background = Brushes.DarkGray, Foreground = Brushes.White, Width = 60 };
+                    stepPanel.Children.Add(new TextBlock { Text = "mV ", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+                    int capturedIdx = si;
+                    tbAmp.LostFocus += (s, e) =>
+                    {
+                        if (double.TryParse(tbAmp.Text, out double v)) vc.Protocol[capturedIdx].Amplitude = v;
+                        else tbAmp.Text = vc.Protocol[capturedIdx].Amplitude.ToString("F1");
+                    };
+                    stepPanel.Children.Add(tbAmp);
+
+                    stepPanel.Children.Add(new TextBlock { Text = " ", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+
+                    var tbDur = new TextBox { Text = step.Duration.ToString("F1"), Background = Brushes.DarkGray, Foreground = Brushes.White, Width = 60 };
+                    tbDur.LostFocus += (s, e) =>
+                    {
+                        if (double.TryParse(tbDur.Text, out double v) && v > 0) vc.Protocol[capturedIdx].Duration = v;
+                        else tbDur.Text = vc.Protocol[capturedIdx].Duration.ToString("F1");
+                    };
+                    stepPanel.Children.Add(tbDur);
+                    stepPanel.Children.Add(new TextBlock { Text = "ms", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+
+                    panel.Children.Add(stepPanel);
+                }
             }
 
             expander.Content = panel;
