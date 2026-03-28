@@ -856,7 +856,352 @@ def compute_continuous_derivatives(segment_id: int, step: int,
     return dV_dt, dm_dt, dh_dt, dn_dt
 
 
-import numpy as np
+from scipy.optimize import fsolve
+
+# -----------------------------------------------------------------------------------
+# Phase portrait helpers (vectorized)
+
+def _get_var_range(var_name):
+    """返回变量的绘图范围。"""
+    if var_name == 'V':
+        return -100.0, 60.0
+    elif var_name == 'Ca':
+        return 0.0, 0.01
+    else:
+        return 0.0, 1.0
+
+def _alpha_m_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A  = HH_PARAMS["alpha_m_A"]; V0 = HH_PARAMS["alpha_m_V"]; k = HH_PARAMS["alpha_m_k"]
+    v2 = V - vtraub; x = V0 - v2
+    safe = np.where(np.abs(x) < 1e-6, A * k, A * x / (np.exp(np.clip(x / k, -500, 500)) - 1.0 + 1e-30))
+    return safe
+
+def _beta_m_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A  = HH_PARAMS["beta_m_A"]; V0 = HH_PARAMS["beta_m_V"]; k = HH_PARAMS["beta_m_k"]
+    v2 = V - vtraub; x = v2 - V0
+    safe = np.where(np.abs(x) < 1e-6, A * k, A * x / (np.exp(np.clip(x / k, -500, 500)) - 1.0 + 1e-30))
+    return safe
+
+def _alpha_h_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A = HH_PARAMS["alpha_h_A"]; V0 = HH_PARAMS["alpha_h_V"]; k = HH_PARAMS["alpha_h_k"]
+    v2 = V - vtraub
+    return A * np.exp(np.clip((V0 - v2) / k, -500, 500))
+
+def _beta_h_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A = HH_PARAMS["beta_h_A"]; V0 = HH_PARAMS["beta_h_V"]; k = HH_PARAMS["beta_h_k"]
+    v2 = V - vtraub
+    return A / (1.0 + np.exp(np.clip((V0 - v2) / k, -500, 500)))
+
+def _alpha_n_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A  = HH_PARAMS["alpha_n_A"]; V0 = HH_PARAMS["alpha_n_V"]; k = HH_PARAMS["alpha_n_k"]
+    v2 = V - vtraub; x = V0 - v2
+    safe = np.where(np.abs(x) < 1e-6, A * k, A * x / (np.exp(np.clip(x / k, -500, 500)) - 1.0 + 1e-30))
+    return safe
+
+def _beta_n_vec(V):
+    vtraub = HH_PARAMS["vtraub"]
+    A = HH_PARAMS["beta_n_A"]; V0 = HH_PARAMS["beta_n_V"]; k = HH_PARAMS["beta_n_k"]
+    v2 = V - vtraub
+    return A * np.exp(np.clip((V0 - v2) / k, -500, 500))
+
+def _inf_mT_vec(V):
+    shift = CA_PARAMS["shift"]; actshift = CA_PARAMS["actshift"]
+    Vh = CA_PARAMS["inf_mT_Vh"]; k = CA_PARAMS["inf_mT_k"]
+    return 1.0 / (1.0 + np.exp(np.clip(-(V + shift + actshift + Vh) / k, -500, 500)))
+
+def _inf_hT_vec(V):
+    shift = CA_PARAMS["shift"]
+    Vh = CA_PARAMS["inf_hT_Vh"]; k = CA_PARAMS["inf_hT_k"]
+    return 1.0 / (1.0 + np.exp(np.clip((V + shift + Vh) / k, -500, 500)))
+
+def _tau_mT_vec(V):
+    shift = CA_PARAMS["shift"]; actshift = CA_PARAMS["actshift"]
+    base = CA_PARAMS["tau_mT_base"]; V1 = CA_PARAMS["tau_mT_V1"]; k1 = CA_PARAMS["tau_mT_k1"]
+    V2 = CA_PARAMS["tau_mT_V2"]; k2 = CA_PARAMS["tau_mT_k2"]
+    Q10 = CA_PARAMS["tau_mT_Q10"]; Tref = CA_PARAMS["tau_mT_Tref"]
+    phi_m = Q10 ** ((CELSIUS - Tref) / 10.0)
+    Vs = V + shift + actshift
+    return (base + 1.0 / (np.exp(np.clip(-(Vs + V1) / k1, -500, 500)) + np.exp(np.clip((Vs + V2) / k2, -500, 500)))) / phi_m
+
+def _tau_hT_vec(V):
+    shift = CA_PARAMS["shift"]; Vth = CA_PARAMS["tau_hT_Vthresh"]
+    V1 = CA_PARAMS["tau_hT_V1"]; k1 = CA_PARAMS["tau_hT_k1"]
+    base = CA_PARAMS["tau_hT_base"]; V2 = CA_PARAMS["tau_hT_V2"]; k2 = CA_PARAMS["tau_hT_k2"]
+    Q10 = CA_PARAMS["tau_hT_Q10"]; Tref = CA_PARAMS["tau_hT_Tref"]
+    phi_h = Q10 ** ((CELSIUS - Tref) / 10.0)
+    Vs = V + shift
+    branch_low  = np.exp(np.clip((Vs + V1) / k1, -500, 500)) / phi_h
+    branch_high = (base + np.exp(np.clip(-(Vs + V2) / k2, -500, 500))) / phi_h
+    return np.where(Vs < Vth, branch_low, branch_high)
+
+def _evaluate_GHK_vec(V, Cai, Cao, P_max_abs, m_T, h_T):
+    """向量化 GHK 电流计算 (仅绝对电流，不返回 Jacobian)。"""
+    if P_max_abs == 0.0:
+        return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
+    k_ghk = (Z_CA * FARADAY) / (1000.0 * R_GAS * TEMP_K)
+    z = k_ghk * V
+    GHK_prefix = P_max_abs * (m_T**2) * h_T * (Z_CA * FARADAY * 1e-3) * 1000.0
+    exp_z = np.exp(np.clip(z, -500, 500))
+    exp_minus_z = np.exp(np.clip(-z, -500, 500))
+    denom = 1.0 - exp_minus_z
+    f_z_normal = z * (Cai - Cao * exp_minus_z) / (denom + 1e-30)
+    f_z_small  = (Cai - Cao) + z * (Cai + Cao) / 2.0
+    singular = np.abs(z) < 1e-4 if isinstance(z, np.ndarray) else abs(z) < 1e-4
+    f_z = np.where(singular, f_z_small, f_z_normal)
+    return GHK_prefix * f_z
+
+
+def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
+    """
+    向量化计算相平面上网格点的导数。
+    返回 (dX_grid, dY_grid, all_derivs_dict)。
+    """
+    seg = SEGMENT[segment_id]
+    seg_list = list(SEGMENT.values())
+    seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
+    idx = seg_id_to_idx[segment_id]
+    t_current = step * DT
+
+    # 历史状态
+    V_hist = float(HISTORY_V[step, idx])
+    m_hist = float(HISTORY_M[step, idx])
+    h_hist = float(HISTORY_H[step, idx])
+    n_hist = float(HISTORY_N[step, idx])
+    Ca_hist = float(HISTORY_CA[step, idx]) if HISTORY_CA is not None else CA_INF
+    mT_hist = float(HISTORY_MT[step, idx]) if HISTORY_MT is not None else inf_mT(V_hist)
+    hT_hist = float(HISTORY_HT[step, idx]) if HISTORY_HT is not None else inf_hT(V_hist)
+
+    # 构建状态：轴上变量用网格值，其它用历史值
+    state = {'V': V_hist, 'm': m_hist, 'h': h_hist, 'n': n_hist,
+             'Ca': Ca_hist, 'mT': mT_hist, 'hT': hT_hist}
+    state[x_var] = X_grid
+    state[y_var] = Y_grid
+
+    V_s = state['V']; m_s = state['m']; h_s = state['h']; n_s = state['n']
+    Ca_s = state['Ca']; mT_s = state['mT']; hT_s = state['hT']
+
+    # 确保所有变量都能广播
+    shape = X_grid.shape
+    V_s  = np.broadcast_to(np.asarray(V_s, dtype=float), shape).copy()
+    m_s  = np.broadcast_to(np.asarray(m_s, dtype=float), shape).copy()
+    h_s  = np.broadcast_to(np.asarray(h_s, dtype=float), shape).copy()
+    n_s  = np.broadcast_to(np.asarray(n_s, dtype=float), shape).copy()
+    Ca_s = np.broadcast_to(np.asarray(Ca_s, dtype=float), shape).copy()
+    mT_s = np.broadcast_to(np.asarray(mT_s, dtype=float), shape).copy()
+    hT_s = np.broadcast_to(np.asarray(hT_s, dtype=float), shape).copy()
+
+    # --- HH 门控导数 ---
+    tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
+    am = _alpha_m_vec(V_s); bm = _beta_m_vec(V_s)
+    ah = _alpha_h_vec(V_s); bh = _beta_h_vec(V_s)
+    an = _alpha_n_vec(V_s); bn = _beta_n_vec(V_s)
+    dm = tadj_hh * (am * (1 - m_s) - bm * m_s)
+    dh = tadj_hh * (ah * (1 - h_s) - bh * h_s)
+    dn = tadj_hh * (an * (1 - n_s) - bn * n_s)
+
+    # --- CaT 门控导数 ---
+    dmT = (_inf_mT_vec(V_s) - mT_s) / _tau_mT_vec(V_s)
+    dhT = (_inf_hT_vec(V_s) - hT_s) / _tau_hT_vec(V_s)
+
+    # --- 离子电流 ---
+    g_Na = (m_s**3) * h_s * seg.get_absolute_g_max("Na")
+    g_K  = (n_s**4) * seg.get_absolute_g_max("K")
+    g_L  = seg.get_absolute_g_max("L")
+    I_ion = g_Na * (V_s - E_TABLE["Na"]["E"]) + g_K * (V_s - E_TABLE["K"]["E"]) + g_L * (V_s - E_TABLE["L"]["E"])
+
+    # T-type Ca 电流
+    P_Ca_abs = seg.get_absolute_P_max("CaT")
+    I_T = _evaluate_GHK_vec(V_s, Ca_s, CA_OUT, P_Ca_abs, mT_s, hT_s)
+    I_ion = I_ion + I_T
+
+    # 轴向电流 (邻居电压使用历史值)
+    I_axial = np.zeros(shape)
+    V_t = HISTORY_V[step]
+    for connected_id in seg.connected_segments:
+        target_seg = SEGMENT[connected_id]
+        target_idx = seg_id_to_idx[connected_id]
+        K_ij = calculate_Kij(seg, target_seg)
+        I_axial += K_ij * (V_t[target_idx] - V_s)
+
+    # 外部刺激
+    I_stim = 0.0
+    for stim in STIMULATION:
+        _, s_id, stim_uA, stim_start, stim_duration = stim
+        if seg.id == s_id and stim_start <= t_current <= stim_start + stim_duration:
+            I_stim += stim_uA
+
+    dV = (-I_ion + I_axial + I_stim) / seg.absolute_C
+
+    # Ca 衰减
+    drive_ca = np.maximum(-seg.gamma_Ca * I_T, 0.0) if P_Ca_abs > 0 else 0.0
+    dCa = drive_ca + (CA_INF - Ca_s) / TAU_CA
+
+    deriv_map = {'V': dV, 'm': dm, 'h': dh, 'n': dn, 'Ca': dCa, 'mT': dmT, 'hT': dhT}
+    return deriv_map[x_var], deriv_map[y_var], deriv_map
+
+
+def _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_val, y_val):
+    """标量版本—用于 fsolve 求解平衡点。"""
+    X_arr = np.array([[x_val]]); Y_arr = np.array([[y_val]])
+    dX, dY, _ = _phase_derivatives_grid(segment_id, step, x_var, y_var, X_arr, Y_arr)
+    return [float(dX[0, 0]), float(dY[0, 0])]
+
+
+def find_equilibria(segment_id, step, x_var, y_var, Nx=40, Ny=40, tol=1e-6):
+    """
+    在相平面上寻找平衡点 (dX=0 且 dY=0 的交点)。
+    返回符合条件的 (x, y) 坐标列表。
+    """
+    x_lo, x_hi = _get_var_range(x_var)
+    y_lo, y_hi = _get_var_range(y_var)
+    x_space = np.linspace(x_lo, x_hi, Nx)
+    y_space = np.linspace(y_lo, y_hi, Ny)
+    X_grid, Y_grid = np.meshgrid(x_space, y_space)
+
+    dX, dY, _ = _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid)
+
+    # 在网格上寻找 dX 和 dY 同时接近零或变号的候选种子
+    candidates = []
+    for i in range(Ny - 1):
+        for j in range(Nx - 1):
+            # 检查 dX 在相邻格子间是否变号
+            sx = (np.sign(dX[i, j]) != np.sign(dX[i, j+1]) or
+                  np.sign(dX[i, j]) != np.sign(dX[i+1, j]))
+            sy = (np.sign(dY[i, j]) != np.sign(dY[i, j+1]) or
+                  np.sign(dY[i, j]) != np.sign(dY[i+1, j]))
+            if sx and sy:
+                candidates.append((X_grid[i, j], Y_grid[i, j]))
+
+    # 用 fsolve 精化
+    equilibria = []
+    seen = set()
+    for x0, y0 in candidates:
+        try:
+            sol, info, ier, _ = fsolve(
+                lambda xy: _phase_derivatives_scalar(segment_id, step, x_var, y_var, xy[0], xy[1]),
+                [x0, y0], full_output=True)
+            if ier == 1:
+                sx, sy = float(sol[0]), float(sol[1])
+                if x_lo <= sx <= x_hi and y_lo <= sy <= y_hi:
+                    key = (round(sx, 4), round(sy, 4))
+                    if key not in seen:
+                        seen.add(key)
+                        equilibria.append((sx, sy))
+        except Exception:
+            pass
+
+    return equilibria
+
+
+def classify_equilibrium(eigenvalues):
+    """根据雅可比矩阵特征值分类平衡点的稳定性类型 (李雅普诺夫第一方法)。"""
+    lam1, lam2 = eigenvalues
+    re1, re2 = lam1.real, lam2.real
+    im1, im2 = lam1.imag, lam2.imag
+    # 使用特征值幅值的相对容差
+    mag = max(abs(lam1), abs(lam2), 1e-12)
+    tol = mag * 1e-6
+
+    has_imag = abs(im1) > tol or abs(im2) > tol
+
+    if has_imag:
+        if abs(re1) < tol and abs(re2) < tol:
+            return "Center", "#00bcd4"
+        elif re1 < -tol and re2 < -tol:
+            return "Stable Focus", "#66bb6a"
+        elif re1 > tol and re2 > tol:
+            return "Unstable Focus", "#ef5350"
+        else:
+            return "Spiral Saddle", "#ffd740"
+    else:
+        if re1 < -tol and re2 < -tol:
+            return "Stable Node", "#66bb6a"
+        elif re1 > tol and re2 > tol:
+            return "Unstable Node", "#ef5350"
+        elif (re1 > tol and re2 < -tol) or (re1 < -tol and re2 > tol):
+            return "Saddle Point", "#ffd740"
+        elif abs(re1) < tol and abs(re2) < tol:
+            return "Non-isolated", "#9e9e9e"
+        else:
+            return "Non-hyperbolic", "#9e9e9e"
+
+
+def compute_jacobian_at_equilibrium(segment_id, step, x_var, y_var, x_eq, y_eq):
+    """
+    在平衡点 (x_eq, y_eq) 处用中心差分法计算二维约化系统的雅可比矩阵，
+    并求特征值进行李雅普诺夫第一方法稳定性分析。
+
+    系统方程由 HH 方程、GHK 方程和 Ca 一阶衰减方程组成，
+    非相图轴的变量锁定为该时间步的历史值。
+
+    返回:
+        J:              2×2 雅可比矩阵 (numpy array)
+        eigenvalues:    特征值数组 (complex)
+        classification: 稳定性分类字符串
+        color:          对应的显示颜色
+    """
+    # 根据变量范围自适应中心差分步长
+    x_lo, x_hi = _get_var_range(x_var)
+    y_lo, y_hi = _get_var_range(y_var)
+    eps_x = max((x_hi - x_lo) * 1e-6, 1e-12)
+    eps_y = max((y_hi - y_lo) * 1e-6, 1e-12)
+
+    # 中心差分: J[i,j] = ∂f_i / ∂x_j
+    # f = (d(x_var)/dt, d(y_var)/dt),  x = (x_var, y_var)
+    fx_p = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq + eps_x, y_eq)
+    fx_m = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq - eps_x, y_eq)
+    fy_p = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq, y_eq + eps_y)
+    fy_m = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq, y_eq - eps_y)
+
+    J = np.array([
+        [(fx_p[0] - fx_m[0]) / (2 * eps_x), (fy_p[0] - fy_m[0]) / (2 * eps_y)],
+        [(fx_p[1] - fx_m[1]) / (2 * eps_x), (fy_p[1] - fy_m[1]) / (2 * eps_y)]
+    ])
+
+    eigenvalues = np.linalg.eigvals(J)
+    classification, color = classify_equilibrium(eigenvalues)
+
+    return J, eigenvalues, classification, color
+
+
+def get_biophysical_info(segment_id, step):
+    """
+    获取指定区室在给定时间步的生物物理参数摘要。
+    """
+    seg = SEGMENT[segment_id]
+    seg_list = list(SEGMENT.values())
+    seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
+    idx = seg_id_to_idx[segment_id]
+    t_ms = step * DT
+
+    V_val = float(HISTORY_V[step, idx])
+    m_val = float(HISTORY_M[step, idx])
+    h_val = float(HISTORY_H[step, idx])
+    n_val = float(HISTORY_N[step, idx])
+    Ca_val = float(HISTORY_CA[step, idx]) if HISTORY_CA is not None else CA_INF
+    mT_val = float(HISTORY_MT[step, idx]) if HISTORY_MT is not None else inf_mT(V_val)
+    hT_val = float(HISTORY_HT[step, idx]) if HISTORY_HT is not None else inf_hT(V_val)
+
+    g_Na = (m_val**3) * h_val * seg.get_absolute_g_max("Na")
+    g_K  = (n_val**4) * seg.get_absolute_g_max("K")
+    g_L  = seg.get_absolute_g_max("L")
+
+    P_Ca_abs = seg.get_absolute_P_max("CaT")
+    I_T, _ = evaluate_GHK_and_Jacobian(V_val, Ca_val, CA_OUT, P_Ca_abs, mT_val, hT_val)
+
+    return {
+        't_ms': t_ms, 'V': V_val, 'm': m_val, 'h': h_val, 'n': n_val,
+        'Ca': Ca_val, 'mT': mT_val, 'hT': hT_val,
+        'g_Na': g_Na, 'g_K': g_K, 'g_L': g_L,
+        'I_T': I_T, 'P_Ca_abs': P_Ca_abs,
+        'E_Na': E_TABLE["Na"]["E"], 'E_K': E_TABLE["K"]["E"], 'E_L': E_TABLE["L"]["E"],
+    }
+
 
 def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: int = 20):
     """
@@ -866,32 +1211,13 @@ def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: i
     global HISTORY_V
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
         raise RuntimeError("请先调用 set_env")
-    
-    # 建立网格空间
+
     v_space = np.linspace(-80, 40, Nx)
     n_space = np.linspace(0, 1, Ny)
     V_grid, N_grid = np.meshgrid(v_space, n_space)
-    
-    dV_grid = np.zeros((Ny, Nx))
-    dN_grid = np.zeros((Ny, Nx))
-    
-    # 遍历计算网格状态 (复用之前重载后的 compute_continuous_derivatives)
-    for i in range(Ny):
-        for j in range(Nx):
-            v_local = V_grid[i, j]
-            n_local = N_grid[i, j]
-            
-            dV, _, _, dn = compute_continuous_derivatives(
-                segment_id=segment_id, 
-                step=step, 
-                V_override=v_local, 
-                n_override=n_local
-            )
-            dV_grid[i, j] = dV
-            dN_grid[i, j] = dn
 
-    # 返回给 C# 端：扁平化处理或保留多维结构
-    # 为方便 pythonnet 传输，可以转为列表或一维数组
+    dV_grid, dN_grid, _ = _phase_derivatives_grid(segment_id, step, 'V', 'n', V_grid, N_grid)
+
     return (
         V_grid.flatten().tolist(),
         N_grid.flatten().tolist(),
@@ -900,24 +1226,30 @@ def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: i
     )
 
 
-def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx: int = 20, Ny: int = 20, interval: int = 50):
+def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx: int = 25, Ny: int = 25):
     """
-    基于指定参数组合重构相平面向量场。
+    预计算完整相图轨迹后，使用 tkinter 播放器显示，支持进度条拖动。
+    包含零倾线、平衡点及生物物理参数信息面板。
+
     probe_id: 探针 ID（int，与 insert_probe 的 probe_id 一致）。
-    x_var, y_var: 可选值为 'V', 'm', 'h', 'n'，不可相同。
+    x_var, y_var: 可选值为 'V', 'm', 'h', 'n', 'Ca', 'mT', 'hT'，不可相同。
     """
-    global PROBE_LIST, SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, DT, STEPS
+    import tkinter as tk
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
+    global PROBE_LIST, SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT, DT, STEPS
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
         raise RuntimeError("请先调用 set_env")
-    
-    valid_vars = ['V', 'm', 'h', 'n']
+
+    valid_vars = ['V', 'm', 'h', 'n', 'Ca', 'mT', 'hT']
     if x_var not in valid_vars or y_var not in valid_vars:
         raise ValueError(f"轴变量必须在 {valid_vars} 中选择。")
     if x_var == y_var:
         raise ValueError(f"x_var 和 y_var 不可相同: '{x_var}'。")
 
-    # 1. 探针解析 (与前版相同)
+    # ── 1. 探针解析 ──
     target_probe = None
     for p in PROBE_LIST:
         if p[0] == probe_id:
@@ -931,77 +1263,290 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     end_step = min(STEPS, int((start_ms + duration_ms) / DT))
     N_frames = end_step - start_step + 1
 
+    # 如果帧数过多，进行降采样
+    max_display_frames = 2000
+    if N_frames > max_display_frames:
+        subsample = max(1, N_frames // max_display_frames)
+    else:
+        subsample = 1
+    frame_steps = list(range(start_step, end_step + 1, subsample))
+    N_display = len(frame_steps)
+
     seg_list = list(SEGMENT.values())
     seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
     idx = seg_id_to_idx[segment_id]
 
-    # 2. 动态历史矩阵寻址流
-    history_map = {'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N}
-    traj_x = history_map[x_var][start_step : end_step + 1, idx]
-    traj_y = history_map[y_var][start_step : end_step + 1, idx]
+    # ── 2. 历史轨迹 ──
+    history_map = {
+        'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N,
+        'Ca': HISTORY_CA, 'mT': HISTORY_MT, 'hT': HISTORY_HT
+    }
+    traj_x_full = history_map[x_var][start_step:end_step + 1, idx]
+    traj_y_full = history_map[y_var][start_step:end_step + 1, idx]
 
-    # 3. 动态网格空间分配
-    def get_space(var_name, N_points):
-        # 电压轴边界为 [-80, 40]，门控变量轴边界为 [0, 1]
-        return np.linspace(-80, 40, N_points) if var_name == 'V' else np.linspace(0, 1, N_points)
-
-    x_space = get_space(x_var, Nx)
-    y_space = get_space(y_var, Ny)
+    # ── 3. 网格空间 ──
+    x_lo, x_hi = _get_var_range(x_var)
+    y_lo, y_hi = _get_var_range(y_var)
+    x_space = np.linspace(x_lo, x_hi, Nx)
+    y_space = np.linspace(y_lo, y_hi, Ny)
     X_grid, Y_grid = np.meshgrid(x_space, y_space)
-    
-    dX_grid = np.zeros((Ny, Nx))
-    dY_grid = np.zeros((Ny, Nx))
 
-    # 4. 渲染器实例化
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.set_xlim(x_space[0] - 0.05 * abs(x_space[0]), x_space[-1] + 0.05 * abs(x_space[-1]))
-    ax.set_ylim(y_space[0] - 0.05, y_space[-1] + 0.05)
-    ax.set_xlabel(f'Variable: {x_var}')
-    ax.set_ylabel(f'Variable: {y_var}')
-    ax.set_title(f'Dynamic Phase Portrait [{y_var} vs {x_var}] - Probe: {probe_id}')
-    ax.grid(True, linestyle=':', alpha=0.6)
+    # ── 4. 预计算所有帧的向量场 ──
+    all_dX = np.zeros((N_display, Ny, Nx))
+    all_dY = np.zeros((N_display, Ny, Nx))
+    for fi, step in enumerate(frame_steps):
+        dX, dY, _ = _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid)
+        all_dX[fi] = dX
+        all_dY[fi] = dY
 
-    Q = ax.quiver(X_grid, Y_grid, dX_grid, dY_grid, color='gray', alpha=0.6)
-    traj_line, = ax.plot([], [], color='blue', linewidth=2)
-    curr_point, = ax.plot([], [], 'ro', markersize=8)
+    # ── 5. 构建 tkinter 窗口 ──
+    root = tk.Tk()
+    root.title(f"Phase Portrait [{y_var} vs {x_var}] — Probe #{probe_id}")
+    root.configure(bg='#1e1e1e')
+    root.geometry("1050x820")
 
-    # 5. 状态更新回调定义
-    def update(frame):
-        current_step = start_step + frame
+    # 主绘图区
+    fig, ax = plt.subplots(figsize=(9, 6.2))
+    fig.patch.set_facecolor('#1e1e1e')
+    ax.set_facecolor('#252526')
+    ax.tick_params(colors='#cccccc')
+    for spine in ax.spines.values():
+        spine.set_color('#555555')
+    ax.set_xlabel(x_var, color='#cccccc', fontsize=12)
+    ax.set_ylabel(y_var, color='#cccccc', fontsize=12)
+    ax.set_title(f'Phase Portrait [{y_var} vs {x_var}]', color='white', fontsize=13)
+    ax.grid(True, linestyle=':', alpha=0.3, color='#555555')
+    x_margin = 0.05 * (x_hi - x_lo)
+    y_margin = 0.05 * (y_hi - y_lo)
+    ax.set_xlim(x_lo - x_margin, x_hi + x_margin)
+    ax.set_ylim(y_lo - y_margin, y_hi + y_margin)
 
-        for i in range(Ny):
-            for j in range(Nx):
-                x_val = X_grid[i, j]
-                y_val = Y_grid[i, j]
-                
-                # 动态组装 kwargs 进行状态重载
-                overrides = {
-                    'V_override': None, 'm_override': None, 
-                    'h_override': None, 'n_override': None
-                }
-                overrides[f'{x_var}_override'] = x_val
-                overrides[f'{y_var}_override'] = y_val
-                
-                # 计算全维偏导
-                dV, dm, dh, dn = compute_continuous_derivatives(
-                    segment_id=segment_id, step=current_step, **overrides
-                )
-                
-                # 输出结果字典路由
-                deriv_map = {'V': dV, 'm': dm, 'h': dh, 'n': dn}
-                dX_grid[i, j] = deriv_map[x_var]
-                dY_grid[i, j] = deriv_map[y_var]
+    # 初始图元
+    # angles='xy'  : 箭头角度按数据坐标轴方向渲染，保证视觉方向与轨迹方向一致
+    # scale_units='xy', scale=1 : 箭头长度直接使用数据单位，由 set_UVC 精确控制
+    Q = ax.quiver(X_grid, Y_grid, np.zeros_like(X_grid), np.zeros_like(Y_grid),
+                  color='#888888', alpha=0.6,
+                  angles='xy', scale_units='xy', scale=1, width=0.002)
+    traj_line, = ax.plot([], [], color='#4fc3f7', linewidth=1.8, alpha=0.85)
+    curr_point, = ax.plot([], [], 'o', color='#ff5252', markersize=7, zorder=5)
+    nullcline_x_artist = [None]
+    nullcline_y_artist = [None]
+    eq_scatter = [None]
+    eq_text_artists = [[]]
 
-        Q.set_UVC(dX_grid, dY_grid)
-        traj_line.set_data(traj_x[:frame+1], traj_y[:frame+1])
-        curr_point.set_data([traj_x[frame]], [traj_y[frame]])
+    canvas = FigureCanvasTkAgg(fig, master=root)
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+    toolbar = NavigationToolbar2Tk(canvas, root)
+    toolbar.update()
 
-        return Q, traj_line, curr_point
+    # ── 6. 信息面板 ──
+    info_frame = tk.Frame(root, bg='#1e1e1e')
+    info_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 2))
+    info_var = tk.StringVar(value="")
+    info_label = tk.Label(info_frame, textvariable=info_var, bg='#1e1e1e', fg='#cccccc',
+                          font=('Consolas', 9), justify=tk.LEFT, anchor='w', wraplength=1020)
+    info_label.pack(fill=tk.X)
 
-    ani = animation.FuncAnimation(
-        fig, update, frames=N_frames, interval=interval, blit=True, repeat=False
-    )
-    plt.show()
+    # ── 7. 控制栏 ──
+    ctrl_frame = tk.Frame(root, bg='#2d2d30')
+    ctrl_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=4, pady=4)
+
+    is_playing = [False]
+    play_speed = [50]  # ms per frame
+    current_frame = [0]
+
+    def update_display(fi):
+        current_frame[0] = fi
+        dX = all_dX[fi]
+        dY = all_dY[fi]
+
+        # ── 修复方向场箭头方向与长度 ──
+        # 问题1: 不同轴量纲 (V: ~160 mV, n: ~1) 导致归一化方向偏斜
+        # 修复: 先将导数按各轴跨度归一化到无量纲空间再求方向
+        # 问题2: 原始代码将所有箭头归一化为等长，丢失幅值信息
+        # 修复: 以95百分位幅值为满幅基准，按相对幅值缩放箭头长度
+        x_span = x_hi - x_lo
+        y_span = y_hi - y_lo
+        grid_spacing_x = x_span / max(Nx - 1, 1)
+        grid_spacing_y = y_span / max(Ny - 1, 1)
+
+        # 将导数折算为无量纲归一化坐标（消除量纲差异）
+        dX_n = dX / x_span
+        dY_n = dY / y_span
+        mag_n = np.sqrt(dX_n**2 + dY_n**2)
+
+        # 相对幅值：以有效点的95百分位为满幅基准，抑制离群值
+        valid = mag_n > 1e-30
+        mag_ref = float(np.percentile(mag_n[valid], 95)) if valid.any() else 1.0
+        mag_ref = max(mag_ref, 1e-30)
+        rel_mag = np.clip(mag_n / mag_ref, 0.05, 1.0)  # 保留最小5%可见长度
+
+        # 归一化方向单位向量（归一化坐标系）
+        mag_safe = np.where(valid, mag_n, 1.0)
+        dX_dir = dX_n / mag_safe
+        dY_dir = dY_n / mag_safe
+
+        # 换算回数据坐标：箭头长度 = 相对幅值 × 格点间距 × 比例因子
+        # angles='xy' 保证 (U, V) 在数据坐标系中正确渲染角度
+        arrow_factor = 0.45
+        U_arrow = dX_dir * rel_mag * grid_spacing_x * arrow_factor
+        V_arrow = dY_dir * rel_mag * grid_spacing_y * arrow_factor
+        Q.set_UVC(U_arrow, V_arrow)
+
+        # 轨迹（映射到全帧索引）
+        traj_end = fi * subsample + 1
+        traj_line.set_data(traj_x_full[:traj_end], traj_y_full[:traj_end])
+        curr_point.set_data([traj_x_full[min(fi * subsample, len(traj_x_full) - 1)]],
+                            [traj_y_full[min(fi * subsample, len(traj_y_full) - 1)]])
+
+        # 清理旧零倾线
+        if nullcline_x_artist[0] is not None:
+            for coll in nullcline_x_artist[0].collections:
+                coll.remove()
+        if nullcline_y_artist[0] is not None:
+            for coll in nullcline_y_artist[0].collections:
+                coll.remove()
+        if eq_scatter[0] is not None:
+            eq_scatter[0].remove()
+            eq_scatter[0] = None
+        for t in eq_text_artists[0]:
+            t.remove()
+        eq_text_artists[0] = []
+
+        # 绘制零倾线 (d{x_var}/dt = 0 和 d{y_var}/dt = 0)
+        try:
+            cs_x = ax.contour(X_grid, Y_grid, dX, levels=[0], colors=['#66bb6a'], linewidths=1.5, linestyles='--')
+            nullcline_x_artist[0] = cs_x
+        except Exception:
+            nullcline_x_artist[0] = None
+        try:
+            cs_y = ax.contour(X_grid, Y_grid, dY, levels=[0], colors=['#ef5350'], linewidths=1.5, linestyles='--')
+            nullcline_y_artist[0] = cs_y
+        except Exception:
+            nullcline_y_artist[0] = None
+
+        # 计算平衡点及其稳定性 (李雅普诺夫第一方法)
+        step = frame_steps[fi]
+        eqs = find_equilibria(segment_id, step, x_var, y_var, Nx=30, Ny=30)
+        eq_stability = []
+        if eqs:
+            for x_eq, y_eq in eqs:
+                try:
+                    J, eigvals, classif, color = compute_jacobian_at_equilibrium(
+                        segment_id, step, x_var, y_var, x_eq, y_eq)
+                    eq_stability.append((x_eq, y_eq, J, eigvals, classif, color))
+                except Exception:
+                    eq_stability.append((x_eq, y_eq, None, None, "Unknown", "#9e9e9e"))
+            for x_eq, y_eq, J, eigvals, classif, color in eq_stability:
+                sc = ax.scatter([x_eq], [y_eq], marker='*', s=220,
+                                c=color, edgecolors='black',
+                                linewidths=0.8, zorder=10)
+                eq_text_artists[0].append(sc)
+
+        # 信息文本
+        bio = get_biophysical_info(segment_id, step)
+        t_ms = bio['t_ms']
+        lines = [f"t = {t_ms:.1f} ms  |  Frame {fi+1}/{N_display}"]
+        lines.append(f"V={bio['V']:.2f} mV  m={bio['m']:.4f}  h={bio['h']:.4f}  n={bio['n']:.4f}")
+        lines.append(f"Ca={bio['Ca']:.6f} mM  mT={bio['mT']:.4f}  hT={bio['hT']:.4f}")
+        lines.append(f"g_Na={bio['g_Na']:.4e}  g_K={bio['g_K']:.4e}  g_L={bio['g_L']:.4e}  I_T={bio['I_T']:.4e}")
+        eq_info_lines = []
+        if eq_stability:
+            for i_eq, (x_eq, y_eq, J, eigvals, classif, color) in enumerate(eq_stability):
+                if eigvals is not None:
+                    lam_str = ", ".join(
+                        f"{ev.real:+.4f}{ev.imag:+.4f}j" if abs(ev.imag) > 1e-10
+                        else f"{ev.real:+.6f}" for ev in eigvals)
+                    eq_info_lines.append(
+                        f"Eq#{i_eq} ({x_var}={x_eq:.4f}, {y_var}={y_eq:.4f}): "
+                        f"\u03bb=[{lam_str}] \u2192 {classif}")
+                else:
+                    eq_info_lines.append(
+                        f"Eq#{i_eq} ({x_var}={x_eq:.4f}, {y_var}={y_eq:.4f}): 计算失败")
+                # 在图上标注稳定性类型
+                ann_text = f"({x_eq:.3f}, {y_eq:.3f})\n{classif}" if eigvals is not None \
+                    else f"({x_eq:.3f}, {y_eq:.3f})"
+                eq_text_artists[0].append(
+                    ax.annotate(ann_text, (x_eq, y_eq),
+                                textcoords="offset points", xytext=(8, -16),
+                                fontsize=7, color=color, zorder=11))
+        else:
+            eq_info_lines.append("No equilibrium found in visible range.")
+        info_line1 = "  |  ".join(lines[:2])
+        info_line2 = "  |  ".join(lines[2:])
+        info_text = info_line1 + "\n" + info_line2
+        if eq_info_lines:
+            info_text += "\n" + "\n".join(eq_info_lines)
+        info_var.set(info_text)
+
+        canvas.draw_idle()
+
+    # 按钮与进度条
+    def on_play_pause():
+        is_playing[0] = not is_playing[0]
+        btn_play.config(text="⏸" if is_playing[0] else "▶")
+        if is_playing[0]:
+            play_next()
+
+    def play_next():
+        if not is_playing[0]:
+            return
+        fi = current_frame[0] + 1
+        if fi >= N_display:
+            is_playing[0] = False
+            btn_play.config(text="▶")
+            return
+        slider.set(fi)
+        root.after(play_speed[0], play_next)
+
+    def on_reset():
+        is_playing[0] = False
+        btn_play.config(text="▶")
+        slider.set(0)
+
+    def on_slider(val):
+        fi = int(float(val))
+        update_display(fi)
+
+    btn_reset = tk.Button(ctrl_frame, text="⏮", command=on_reset, width=3,
+                          bg='#3c3c3c', fg='white', relief=tk.FLAT, font=('Arial', 12))
+    btn_reset.pack(side=tk.LEFT, padx=2)
+
+    btn_play = tk.Button(ctrl_frame, text="▶", command=on_play_pause, width=3,
+                         bg='#3c3c3c', fg='white', relief=tk.FLAT, font=('Arial', 12))
+    btn_play.pack(side=tk.LEFT, padx=2)
+
+    # 图例说明
+    legend_lbl = tk.Label(ctrl_frame, text=f"  ── {x_var}-nullcline (green)  ── {y_var}-nullcline (red)  ★ equilibrium",
+                          bg='#2d2d30', fg='#aaaaaa', font=('Arial', 9))
+    legend_lbl.pack(side=tk.LEFT, padx=8)
+
+    slider = tk.Scale(ctrl_frame, from_=0, to=max(0, N_display - 1), orient=tk.HORIZONTAL,
+                      command=on_slider, bg='#2d2d30', fg='white', troughcolor='#555555',
+                      highlightthickness=0, length=450, sliderlength=20)
+    slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
+
+    frame_lbl_var = tk.StringVar(value=f"0/{N_display}")
+    frame_lbl = tk.Label(ctrl_frame, textvariable=frame_lbl_var, bg='#2d2d30', fg='white', font=('Arial', 10))
+    frame_lbl.pack(side=tk.LEFT, padx=4)
+
+    # 更新帧标签
+    orig_update = update_display
+    def update_display_wrapped(fi):
+        orig_update(fi)
+        frame_lbl_var.set(f"{fi+1}/{N_display}")
+    # patch
+    update_display = update_display_wrapped
+
+    # 重新绑定 slider 回调
+    slider.config(command=lambda val: update_display(int(float(val))))
+
+    # 显示第一帧
+    update_display(0)
+
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    root.mainloop()
+    plt.close(fig)
 
 
 def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: float, end_time_ms: float):

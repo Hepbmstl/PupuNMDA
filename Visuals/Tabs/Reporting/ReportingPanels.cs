@@ -156,7 +156,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
-            foreach (var v in new[] { "V", "m", "h", "n" }) varCombo.Items.Add(v);
+            foreach (var v in new[] { "V", "m", "h", "n", "Ca", "mT", "hT" }) varCombo.Items.Add(v);
             varCombo.SelectedIndex = 0;
             stack.Children.Add(varCombo);
             _entityVarCombos[entity.Id] = varCombo;
@@ -302,7 +302,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
-            foreach (var v in new[] { "V", "m", "h", "n" }) xCombo.Items.Add(v);
+            foreach (var v in new[] { "V", "m", "h", "n", "Ca", "mT", "hT" }) xCombo.Items.Add(v);
             xCombo.SelectedIndex = 0;
             stack.Children.Add(xCombo);
 
@@ -315,7 +315,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
-            foreach (var v in new[] { "V", "m", "h", "n" }) yCombo.Items.Add(v);
+            foreach (var v in new[] { "V", "m", "h", "n", "Ca", "mT", "hT" }) yCombo.Items.Add(v);
             yCombo.SelectedIndex = 3;
             stack.Children.Add(yCombo);
 
