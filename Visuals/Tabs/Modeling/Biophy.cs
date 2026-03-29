@@ -5,40 +5,40 @@ using System.Windows.Media;
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
     /// <summary>
-    /// 离子通道属性数据类，描述单个离子通道的名称、颜色和电导密度。
-    /// 被 IVisualEntity.Channels 字典持有，由 PropertiesPanelController 的通道选择器创建引用。
-    /// 全局实例在 GlobalBiophysics.GlobalChannels 中定义。
+    /// Ion channel property data class describing a single ion channel's name, color, and conductance/permeability.
+    /// Instances are held by an IVisualEntity.Channels dictionary and referenced by the channel selector in PropertiesPanelController.
+    /// Global predefined channel instances are defined in GlobalBiophysics.GlobalChannels.
     /// </summary>
     public class ChannelProperty
     {
-        /// <summary>通道唯一标识符 (GUID)，在构造时自动生成。</summary>
+        /// <summary>Unique channel identifier (GUID), generated automatically in the constructor.</summary>
         public string Id { get; private set; }
 
-        /// <summary>通道显示名称（如 "Na+ (Sodium)"），也作为 GlobalChannels 字典的 Key。</summary>
+        /// <summary>Display name for the channel (e.g., "Na (Sodium)"), also used as the key in the GlobalChannels dictionary.</summary>
         public string Name { get; set; }
 
-        /// <summary>通道可视化颜色，用于三维表面散点渲染。</summary>
+        /// <summary>Visualization color for rendering on 3D surfaces or scatter plots.</summary>
         public Color Color { get; set; }
 
         /// <summary>
-        /// 离子通道电导密度（单位：mS/cm²）或膜渗透率（单位：cm/s，当 IsPermeability 为 true 时）。
-        /// 在仿真中直接传入 Hines_method.py 的 add_channel_to_segment 接口。
+        /// Ion channel conductance density (units: mS/cm²) or membrane permeability (units: cm/s when IsPermeability is true).
+        /// Passed directly to Hines_method.py's add_channel_to_segment interface in the simulation.
         /// </summary>
         public float G_ion_channel { get; set; }
 
         /// <summary>
-        /// 为 true 时表示 G_ion_channel 字段存储的是膜渗透率 P (cm/s) 而非电导密度 g (mS/cm²)。
-        /// 用于 CaT 等通过 GHK 方程计算电流的通道。
+        /// When true, indicates that G_ion_channel stores membrane permeability P (cm/s) rather than conductance density g (mS/cm²).
+        /// Used for channels (e.g., CaT) whose currents are computed via the GHK equation.
         /// </summary>
         public bool IsPermeability { get; set; }
 
         /// <summary>
-        /// 构造函数。
+        /// Constructor.
         /// </summary>
-        /// <param name="name">通道名称</param>
-        /// <param name="color">渲染颜色</param>
-        /// <param name="G">电导密度 (mS/cm²) 或渗透率 (cm/s)</param>
-        /// <param name="isPermeability">是否为渗透率通道</param>
+        /// <param name="name">Channel name</param>
+        /// <param name="color">Rendering color</param>
+        /// <param name="G">Conductance density (mS/cm²) or permeability (cm/s)</param>
+        /// <param name="isPermeability">Whether this channel represents permeability</param>
         public ChannelProperty(string name, Color color, float G, bool isPermeability = false)
         {
             Name = name;
@@ -49,7 +49,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 创建当前实例的深拷贝（新 Id），用于为每个实体维护独立的通道参数。
+        /// Create a deep copy of this instance (new Id), used to maintain independent channel parameters per entity.
         /// </summary>
         public ChannelProperty Clone()
         {
@@ -58,36 +58,36 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 全局生物物理参数静态类，持有所有可用离子通道的定义。
-    /// 所有实体引用的 ChannelProperty 均来源于此字典。
-    /// 被 PropertiesPanelController.InitializeChannelSelector 读取以填充通道选择器弹窗按钮。
+    /// Static class holding global biophysical parameters and definitions for available ion channels.
+    /// ChannelProperty instances referenced by entities come from this dictionary.
+    /// Read by PropertiesPanelController.InitializeChannelSelector to populate the channel selector UI.
     /// </summary>
     public static class GlobalBiophysics
     {
         /// <summary>
-        /// 全局离子通道字典，Key 为通道名称（与 Hines_method 中使用的键对齐："Na","K","L"）。
-        /// 在静态构造函数中预置 Na、K、L 三种通道。
+        /// Global ion channel dictionary, with keys aligned to Hines_method ("Na","K","L").
+        /// Pre-populated with Na, K, and L channels in the static constructor.
         /// </summary>
         public static Dictionary<string, ChannelProperty> GlobalChannels { get; } = new Dictionary<string, ChannelProperty>();
 
         /// <summary>
-        /// 静态构造函数，初始化预置的三种标准离子通道。
+        /// Static constructor initializing the default standard ion channels.
         /// </summary>
         static GlobalBiophysics()
         {
             ResetToDefaults();
         }
 
-        /// <summary>重置全局通道为初始默认值。</summary>
+        /// <summary>Reset global channels to their default initial values.</summary>
         public static void ResetToDefaults()
         {
             GlobalChannels.Clear();
-            // 名称使用短键以与 Hines_method 的键名一致
-            // 默认值对齐 Biophy.json (tcD model): gnabar=0.003 S/cm²=3 mS/cm², gkbar=0.005=5, g_pas=3.79e-5=0.0379
+            // Use short keys to match the key names used by Hines_method
+            // Default values aligned with Biophy.json (tcD model): gnabar=0.003 S/cm² = 3 mS/cm², gkbar=0.005 = 5, g_pas=3.79e-5 = 0.0379
             var naChannel = new ChannelProperty("Na", Colors.Red, 3.0f);
             var kChannel = new ChannelProperty("K", Colors.Blue, 5.0f);
             var leakChannel = new ChannelProperty("L", Colors.LightGreen, 0.0379f);
-            // CaT: pcabar=1.7e-5 cm/s (Biophy.json)
+            // CaT: pcabar=1.7e-5 cm/s (from Biophy.json)
             var catChannel = new ChannelProperty("CaT", Colors.Orange, 1.7e-5f, isPermeability: true);
 
             GlobalChannels.Add(naChannel.Name, naChannel);

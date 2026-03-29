@@ -11,11 +11,12 @@ using NeuronCAD.Visuals.Windows;
 namespace NeuronCAD.Backward
 {
     /// <summary>
-    /// 仿真运行器，通过 pythonnet 调用 Hines_method.py 执行完整仿真流程。
-    /// 负责按正确顺序调用 Python 接口：
+    /// Simulation runner that calls Hines_method.py via pythonnet to perform the
+    /// full simulation workflow.
+    /// Responsible for invoking Python interfaces in the correct order:
     ///   clear_environment → set_env → set_E → init_segment (+ add_channel_to_segment)
     ///   → add_connection → insert_stimulation → insert_probe → start_simulation
-    /// 提供实时步数回调和结果导出。
+    /// Provides real-time step callbacks and result export.
     /// </summary>
     public class SimulationRunner
     {
@@ -24,23 +25,24 @@ namespace NeuronCAD.Backward
         private int _totalSteps;
         private volatile bool _abortRequested;
 
-        /// <summary>当前仿真步数（通过 progress_callback 更新），可在 UI 线程安全读取。</summary>
+        /// <summary>Current simulation step (updated via progress_callback), safe to read from the UI thread.</summary>
         public int CurrentStep => Volatile.Read(ref _currentStep);
 
-        /// <summary>仿真是否正在运行。</summary>
+        /// <summary>Whether the simulation is currently running.</summary>
         public bool IsRunning => _isRunning;
 
-        /// <summary>总步数。</summary>
+        /// <summary>Total number of steps.</summary>
         public int TotalSteps => _totalSteps;
 
-        /// <summary>仿真完成后的探针 JSON 数据。</summary>
+        /// <summary>Probe JSON data after the simulation completes.</summary>
         public string? ProbeResultJson { get; private set; }
 
-        /// <summary>是否已请求终止仿真（供外部可靠检测 abort 状态）。</summary>
+        /// <summary>Whether an abort of the simulation has been requested (for external abort checks).</summary>
         public bool WasAborted => _abortRequested;
 
         /// <summary>
-        /// 请求终止正在运行的仿真。下一次 Python 回调时会抛出异常中断执行。
+        /// Request termination of the running simulation. An exception will be thrown
+        /// on the next Python callback to interrupt execution.
         /// </summary>
         public void Abort()
         {
@@ -50,20 +52,21 @@ namespace NeuronCAD.Backward
 
 
         /// <summary>
-        /// 异步执行完整仿真流程。
-        /// 在后台线程中持有 GIL 调用 Python，通过 progress_callback 回写步数到 _currentStep。
+        /// Run the full simulation asynchronously.
+        /// Acquires the GIL on a background thread to call Python and writes step
+        /// updates back to _currentStep via progress_callback.
         /// </summary>
-        /// <param name="simData">已由 SimulationRegistry.BuildSimulationData 构建的仿真数据包。</param>
-        /// <param name="vInit">初始膜电位 (mV)。</param>
-        /// <param name="dt">时间步长 (ms)。</param>
-        /// <param name="steps">总仿真步数。</param>
-        /// <param name="eNa">钠离子平衡电位 (mV)。</param>
-        /// <param name="eK">钾离子平衡电位 (mV)。</param>
-        /// <param name="eLeak">漏电流平衡电位 (mV)。</param>
-        /// <param name="celsius">仿真温度 (°C)，默认 24.0。</param>
-        /// <param name="caOut">胞外钙浓度 (mM)，默认 2.0。</param>
-        /// <param name="caInf">胞内稳态钙浓度 (mM)，默认 2.4e-4。</param>
-        /// <param name="tauCa">钙离子衰减时间常数 (ms)，默认 5.0。</param>
+        /// <param name="simData">Simulation data package built by SimulationRegistry.BuildSimulationData.</param>
+        /// <param name="vInit">Initial membrane potential (mV).</param>
+        /// <param name="dt">Time step (ms).</param>
+        /// <param name="steps">Total number of simulation steps.</param>
+        /// <param name="eNa">Sodium reversal potential (mV).</param>
+        /// <param name="eK">Potassium reversal potential (mV).</param>
+        /// <param name="eLeak">Leak reversal potential (mV).</param>
+        /// <param name="celsius">Simulation temperature (°C), default 24.0.</param>
+        /// <param name="caOut">Extracellular calcium concentration (mM), default 2.0.</param>
+        /// <param name="caInf">Intracellular steady-state calcium concentration (mM), default 2.4e-4.</param>
+        /// <param name="tauCa">Calcium decay time constant (ms), default 5.0.</param>
         public async Task RunAsync(
             SimulationData simData,
             double vInit, double dt, int steps,
@@ -90,7 +93,7 @@ namespace NeuronCAD.Backward
 
                     dynamic sim = Py.Import("Hines_method");
 
-                    // ── 1. 清除上一次仿真状态 ──
+                    // ── 1. Clear previous simulation state ──
                     sim.clear_environment();
 
                     // ── 2. set_env ──
@@ -104,7 +107,7 @@ namespace NeuronCAD.Backward
                         ca_inf: caInf,
                         tau_ca: tauCa);
 
-                    // ── 3. set_E（通过 JSON 传递字典） ──
+                    // ── 3. set_E (pass dictionary via JSON) ──
                     dynamic json = Py.Import("json");
                     string eJson = string.Format(
                         CultureInfo.InvariantCulture,
@@ -117,7 +120,7 @@ namespace NeuronCAD.Backward
                     sim.set_hh_params(json2.loads(IonChannelParams.GetHHParamsJson()));
                     sim.set_ca_params(json2.loads(IonChannelParams.GetCaParamsJson()));
 
-                    // ── 4. init_segment + add_channel_to_segment（按 GlobalId 顺序） ──
+                    // ── 4. init_segment + add_channel_to_segment (in GlobalId order) ──
                     foreach (var comp in simData.Compartments)
                     {
                         sim.init_segment(
@@ -137,7 +140,7 @@ namespace NeuronCAD.Backward
                         }
                     }
 
-                    // ── 5. add_connection（按 GlobalId 顺序） ──
+                    // ── 5. add_connection (in GlobalId order) ──
                     foreach (var comp in simData.Compartments)
                     {
                         foreach (int connId in comp.ConnectedIds)
@@ -146,7 +149,7 @@ namespace NeuronCAD.Backward
                         }
                     }
 
-                    // ── 6. insert_stimulation (电流钳) ──
+                    // ── 6. insert_stimulation (current clamp) ──
                     foreach (var stim in simData.Stimulations)
                     {
                         sim.insert_stimulation(
@@ -157,10 +160,10 @@ namespace NeuronCAD.Backward
                             stim.StimDuration);
                     }
 
-                    // ── 6b. insert_voltage_clamp (电压钳) ──
+                    // ── 6b. insert_voltage_clamp (voltage clamp) ──
                     foreach (var vc in simData.VoltageClamps)
                     {
-                        // 构建 Python 端需要的 protocol 列表: [[dur, amp], ...]
+                        // Build protocol list required by Python: [[dur, amp], ...]
                         dynamic builtins = Py.Import("builtins");
                         using var pyProtocol = new PyList();
                         foreach (var step in vc.Protocol)
@@ -188,16 +191,16 @@ namespace NeuronCAD.Backward
                             probe.DurationMs);
                     }
 
-                    // ── 8. start_simulation（带步数回调） ──
+                    // ── 8. start_simulation (with step callback) ──
                     Action<int> callback = step =>
                     {
                         Volatile.Write(ref _currentStep, step);
                         if (_abortRequested)
-                            throw new OperationCanceledException("仿真已被用户终止。");
+                            throw new OperationCanceledException("Simulation aborted by user.");
                     };
                     sim.start_simulation(callback);
 
-                    // ── 9. 导出探针数据 ──
+                    // ── 9. Export probe data ──
                     ProbeResultJson = (string)sim.export_probe_data_json();
                 });
             }
@@ -211,7 +214,7 @@ namespace NeuronCAD.Backward
         #region Static Plotting API
 
         /// <summary>
-        /// 定位 Hines_method.py 所在的脚本目录。
+        /// Locate the script directory containing Hines_method.py.
         /// </summary>
         private static string FindScriptDir()
         {
@@ -226,8 +229,8 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 异步调用 Hines_method.plot_variable_over_time，在 matplotlib 窗口中显示结果。
-        /// 必须在 start_simulation 成功执行后调用（依赖 HISTORY_* 全局状态）。
+        /// Asynchronously call Hines_method.plot_variable_over_time and show the result in a matplotlib window.
+        /// Must be called after start_simulation has completed successfully (depends on HISTORY_* global state).
         /// </summary>
         public static async Task CallPlotVariableOverTime(int segmentId, string varLabel, double startMs, double endMs)
         {
@@ -245,8 +248,8 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 异步调用 Hines_method.show_dynamic_phase_portrait，在 matplotlib 窗口中显示动态相图。
-        /// 必须在 start_simulation 成功执行后调用（依赖 HISTORY_* 和 PROBE_LIST 全局状态）。
+        /// Asynchronously call Hines_method.show_dynamic_phase_portrait and display the dynamic phase portrait in a matplotlib window.
+        /// Must be called after start_simulation has completed successfully (depends on HISTORY_* and PROBE_LIST global state).
         /// </summary>
         public static async Task CallShowPhasePortrait(int probeId, string xVar, string yVar)
         {

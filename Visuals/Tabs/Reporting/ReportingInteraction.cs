@@ -12,7 +12,7 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Reporting
 {
     /// <summary>
-    /// 区室覆盖层数据，持有一个区室对应的 3D 可视化模型和元数据。
+    /// Compartment overlay data, holding a 3D visual model and metadata for a compartment.
     /// </summary>
     public class CompartmentOverlay
     {
@@ -26,9 +26,9 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
     }
 
     /// <summary>
-    /// Reporting 模式专属交互控制器。
-    /// 职责：禁止一般操作；支持点击实体选中并展开面板条目；
-    /// 鼠标靠近选中实体时按需显示区室覆盖层；点击覆盖层选择区室。
+    /// Interaction controller specific to Reporting mode.
+    /// Responsibilities: disable general editing operations; support clicking entities to select and expand panel entries;
+    /// show compartment overlays on demand when the mouse is near a selected entity; select compartments by clicking an overlay.
     /// </summary>
     public class ReportingInteractionController : IViewportInteractionHandler
     {
@@ -39,19 +39,19 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         private CompartmentOverlay? _hoveredOverlay;
         private bool _isActive;
 
-        /// <summary>当前选中的实体（由面板展开或视口点击设置）。</summary>
+        /// <summary>Externally (panel expansion) set the selected entity.</summary>
         private IVisualEntity? _selectedEntity;
 
-        /// <summary>覆盖层是否正在显示。</summary>
+        /// <summary>Whether overlays are currently visible.</summary>
         private bool _overlaysVisible;
 
-        /// <summary>鼠标按下位置，用于区分点击和视口拖拽。</summary>
+        /// <summary>Mouse down position used to distinguish clicks from viewport dragging.</summary>
         private Point _mouseDownPos;
 
-        /// <summary>实体选中事件，面板订阅以展开对应条目。</summary>
+        /// <summary>Entity selected event; panel subscribes to expand the corresponding entry.</summary>
         public event Action<IVisualEntity?>? OnEntitySelected;
 
-        /// <summary>区室选中事件 (globalId, parentEntityId)，面板订阅以更新选中标签。</summary>
+        /// <summary>Compartment selected event (globalId, parentEntityId); panel subscribes to update selection labels.</summary>
         public event Action<int, string>? OnCompartmentSelected;
 
         private static readonly Color[] CompartmentColors = new[]
@@ -72,7 +72,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             _updateCursorInfo = updateCursorInfo;
         }
 
-        /// <summary>外部（面板展开）设置选中实体。</summary>
+        /// <summary>Set selected entity externally (e.g., from panel expansion).</summary>
         public void SelectEntity(IVisualEntity? entity)
         {
             if (_selectedEntity == entity) return;
@@ -124,7 +124,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 return;
             }
 
-            // 检查鼠标是否命中选中实体或其覆盖层
+            // Check whether the mouse hits the selected entity or its overlays
             var hits = Viewport3DHelper.FindHits(viewport.Viewport, mousePos);
             bool nearSelectedEntity = false;
             CompartmentOverlay? hitOverlay = null;
@@ -133,7 +133,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 if (hit.Visual == null) continue;
 
-                // 检查覆盖层命中
+                // Check overlay hit
                 if (_overlaysVisible)
                 {
                     foreach (var overlay in _overlays)
@@ -148,7 +148,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                     if (hitOverlay != null) break;
                 }
 
-                // 检查选中实体命中
+                // Check hit on selected entity
                 if (VisualTreeUtils.IsSelfOrChild(hit.Visual, _selectedEntity.Visual3D))
                 {
                     nearSelectedEntity = true;
@@ -158,13 +158,13 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 }
             }
 
-            // 按需显示/隐藏覆盖层
+            // Show/hide overlays as needed
             if (nearSelectedEntity && !_overlaysVisible)
                 ShowOverlaysForEntity(_selectedEntity);
             else if (!nearSelectedEntity && _overlaysVisible)
                 HideOverlays();
 
-            // 更新高亮
+            // Update highlight
             if (hitOverlay != _hoveredOverlay)
             {
                 if (_hoveredOverlay != null)
@@ -185,7 +185,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             if (e.ChangedButton != MouseButton.Left) return;
             var pos = e.GetPosition(_scene.HelixViewport);
-            if ((pos - _mouseDownPos).Length > 5) return; // 视口拖拽，不处理
+            if ((pos - _mouseDownPos).Length > 5) return; // viewport drag, ignore
 
             var hits = Viewport3DHelper.FindHits(_scene.HelixViewport.Viewport, pos);
 
@@ -193,7 +193,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 if (hit.Visual == null) continue;
 
-                // 优先检查覆盖层点击 → 选择区室
+                // Check overlay clicks first → select compartment
                 if (_overlaysVisible)
                 {
                     foreach (var overlay in _overlays)
@@ -206,7 +206,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                     }
                 }
 
-                // 检查实体点击 → 选中实体
+                // Check entity clicks → select entity
                 foreach (var entity in _scene.Entities)
                 {
                     if (VisualTreeUtils.IsSelfOrChild(hit.Visual, entity.Visual3D))
@@ -220,7 +220,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
 
         public void OnMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            // 允许滚轮缩放
+            // Allow wheel zoom
         }
 
         #endregion

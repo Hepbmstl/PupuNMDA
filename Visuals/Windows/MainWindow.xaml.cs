@@ -16,56 +16,57 @@ using NeuronCAD.Visuals.Tabs.Reporting;
 namespace NeuronCAD.Visuals.Windows
 {
     /// <summary>
-    /// 应用程序主窗口，承载所有 UI 组件的顶层容器。
-    /// 职责：顶部标签页切换 (Modeling/Simulating/Reporting)、视口鼠标事件路由、
-    /// HUD 叠加层管理、工具栏按钮响应、编辑弹窗控制。
-    /// 由 App.xaml 的 StartupUri 启动。
+    /// Application main window serving as the top-level container for all UI components.
+    /// Responsibilities: top-level tab switching (Modeling/Simulating/Reporting),
+    /// viewport mouse event routing, HUD overlay management, toolbar handling, and
+    /// edit popup control.
+    /// Launched by App.xaml's StartupUri.
     /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>跨模式共享的场景状态，持有实体列表、连接控制器和设备列表。由 InitializeControllers 创建。</summary>
+        /// <summary>Scene state shared across modes, holding entity lists, connection controller and device lists. Created by InitializeControllers.</summary>
         private SharedSceneState _scene = null!;
 
-        /// <summary>建模模式交互控制器，处理实体的放置、选择、移动、连接等操作。由 InitializeControllers 创建。</summary>
+        /// <summary>Modeling-mode interaction controller handling placement, selection, movement, and connection of entities. Created by InitializeControllers.</summary>
         private InteractionController _modelingInteraction = null!;
-        /// <summary>仿真模式交互控制器，处理刺激/探针设备的放置与拖拽。由 InitializeControllers 创建。</summary>
+        /// <summary>Simulation-mode interaction controller handling insertion and dragging of stimulation/probe devices. Created by InitializeControllers.</summary>
         private SimulationInteractionController _simulationInteraction = null!;
 
-        /// <summary>建模模式左侧属性面板控制器，管理实体属性编辑卡片与离子通道选择器。由 InitializeControllers 创建。</summary>
+        /// <summary>Left-side properties panel controller for modeling mode; manages entity property edit cards and ion channel selector. Created by InitializeControllers.</summary>
         private PropertiesPanelController _propertiesPanelController = null!;
-        /// <summary>仿真模式左侧面板控制器，管理刺激/探针设备的参数配置卡片。由 InitializeControllers 创建。</summary>
+        /// <summary>Left-side panel controller for simulation mode; manages parameter configuration cards for stimulation/probe devices. Created by InitializeControllers.</summary>
         private SimulationPanelController _simulationPanelController = null!;
 
-        /// <summary>Reporting 模式交互控制器，处理区室分块显示与悬停高亮。由 InitializeControllers 创建。</summary>
+        /// <summary>Reporting-mode interaction controller handling compartment chunk display and hover highlighting. Created by InitializeControllers.</summary>
         private ReportingInteractionController _reportingInteraction = null!;
-        /// <summary>Reporting 模式左侧面板控制器，按实体分组展示区室列表。由 InitializeControllers 创建。</summary>
+        /// <summary>Reporting-mode left-side panel controller; displays compartment lists grouped by entity. Created by InitializeControllers.</summary>
         private ReportingPanelController _reportingPanelController = null!;
 
-        /// <summary>当前活跃的视口交互处理器，根据标签页切换在 _modelingInteraction 和 _simulationInteraction 之间切换。</summary>
+        /// <summary>Currently active viewport interaction handler, switches between _modelingInteraction and _simulationInteraction based on the active tab.</summary>
         private IViewportInteractionHandler _activeHandler = null!;
 
-        /// <summary>顶层标签页枚举，用于追踪当前激活的功能模式。</summary>
+        /// <summary>Top-level tab enum used to track the current active functional mode.</summary>
         private enum ActiveTab { Modeling, Simulating, Reporting }
-        /// <summary>当前激活的标签页，默认为建模模式。</summary>
+        /// <summary>Currently active tab, defaulting to Modeling mode.</summary>
         private ActiveTab _activeTab = ActiveTab.Modeling;
 
-        /// <summary>当前正在编辑尺寸的实体引用，用于 EditPopup 弹窗。由 ShowEditPopup 设置，OnApplyEdit/OnCancelEdit 清除。</summary>
+        /// <summary>Reference to the entity currently editing dimensions for the EditPopup. Set by ShowEditPopup and cleared by OnApplyEdit/OnCancelEdit.</summary>
         private IVisualEntity? _editingEntity;
 
-        /// <summary>仿真运行器实例，管理 Python 互操作和仿真执行。</summary>
+        /// <summary>Simulation runner instance managing Python interop and simulation execution.</summary>
         private SimulationRunner? _simulationRunner;
 
-        /// <summary>仿真进度轮询定时器，每 100ms 从 SimulationRunner 读取当前步数并更新 UI。</summary>
+        /// <summary>Simulation progress polling timer; reads the current step from SimulationRunner every 100ms and updates the UI.</summary>
         private DispatcherTimer? _simProgressTimer;
 
-        /// <summary>是否正在仿真中。为 true 时禁止所有建模/仿真交互操作。</summary>
+        /// <summary>Indicates whether a simulation is in progress. When true, all modeling/simulation interactions are disabled.</summary>
         private bool _isSimulating;
 
-        /// <summary>当前项目文件路径。Save 时直接覆盖，为 null 时走 Save As 流程。</summary>
+        /// <summary>Current project file path. Overwritten on Save; when null triggers Save As flow.</summary>
         private string? _currentProjectPath;
 
         /// <summary>
-        /// 构造函数，初始化 XAML 组件并在窗口 Loaded 后初始化控制器。
+        /// Constructor: initializes XAML components and initializes controllers after the window is loaded.
         /// </summary>
         public MainWindow()
         {
@@ -74,9 +75,9 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 初始化所有控制器实例和事件关联。在窗口 Loaded 事件中调用。
-        /// 创建 SharedSceneState、双模式交互控制器、双模式面板控制器，
-        /// 并注册 CompositionTarget.Rendering 事件以实时更新连接线。
+        /// Initialize all controller instances and event bindings. Called on the window's Loaded event.
+        /// Creates SharedSceneState, interaction controllers and panel controllers for both modes,
+        /// and registers CompositionTarget.Rendering to update connection lines in real time.
         /// </summary>
         private void InitializeControllers()
         {
@@ -118,33 +119,33 @@ namespace NeuronCAD.Visuals.Windows
                 _scene,
                 NavigateToPoint);
 
-            // 将建模实体的创建/删除同步登记到仿真注册表
+            // Register modeling entity creation/removal with the simulation registry
             _modelingInteraction.OnEntityAdded += entity => _scene.SimulationRegistry.Register(entity);
             _modelingInteraction.OnEntityRemoved += entity => _scene.SimulationRegistry.Unregister(entity.Id);
 
             _activeHandler = _modelingInteraction;
 
-            // 每帧更新所有连接线位置，确保实体移动后连接线跟随
+            // Update all connection line positions each frame to ensure connections follow entities after movement
             CompositionTarget.Rendering += (s, e) => _scene.ConnectionController.UpdateAll();
         }
 
         #region Top-level Tab Switching
 
-        /// <summary>点击 "Modeling" 标签页按钮时触发，切换至建模模式。由 XAML 按钮 Click 绑定。</summary>
+        /// <summary>Triggered when the "Modeling" tab button is clicked; switch to Modeling mode. Bound to the XAML button Click event.</summary>
         private void OnTabModelingClick(object sender, RoutedEventArgs e)
         {
             if (_activeTab != ActiveTab.Modeling) SwitchTab(ActiveTab.Modeling);
             SyncTabButtons();
         }
 
-        /// <summary>点击 "Simulating" 标签页按钮时触发，切换至仿真模式。由 XAML 按钮 Click 绑定。</summary>
+        /// <summary>Triggered when the "Simulating" tab button is clicked; switch to Simulation mode. Bound to the XAML button Click event.</summary>
         private void OnTabSimulationClick(object sender, RoutedEventArgs e)
         {
             if (_activeTab != ActiveTab.Simulating) SwitchTab(ActiveTab.Simulating);
             SyncTabButtons();
         }
 
-        /// <summary>点击 "Reporting" 标签页按钮时触发，切换至报告模式。由 XAML 按钮 Click 绑定。</summary>
+        /// <summary>Triggered when the "Reporting" tab button is clicked; switch to Reporting mode. Bound to the XAML button Click event.</summary>
         private void OnTabReportingClick(object sender, RoutedEventArgs e)
         {
             if (_activeTab != ActiveTab.Reporting) SwitchTab(ActiveTab.Reporting);
@@ -152,8 +153,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 同步三个顶层标签页 ToggleButton 的 IsChecked 状态，使之与 _activeTab 一致。
-        /// 被所有 OnTab*Click 方法调用。
+        /// Synchronize the IsChecked state of the three top-level tab ToggleButtons to match _activeTab.
+        /// Called by all OnTab*Click handlers.
         /// </summary>
         private void SyncTabButtons()
         {
@@ -163,14 +164,14 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 执行标签页切换的核心逻辑：停用旧模式处理器、隐藏所有面板/工具栏、
-        /// 显示目标模式的面板并切换 _activeHandler。
-        /// 被 OnTab*Click 方法调用。
+        /// Perform the core tab-switching logic: deactivate the previous mode handler, hide all panels/toolbars,
+        /// show the target mode's panels, and switch _activeHandler.
+        /// Called by the OnTab*Click handlers.
         /// </summary>
-        /// <param name="target">目标标签页</param>
+        /// <param name="target">Target tab</param>
         private void SwitchTab(ActiveTab target)
         {
-            // 停用当前模式的交互处理器
+            // Deactivate the interaction handler for the current mode
             if (_activeTab == ActiveTab.Modeling)
                 _modelingInteraction.Deactivate();
             else if (_activeTab == ActiveTab.Simulating)
@@ -180,7 +181,7 @@ namespace NeuronCAD.Visuals.Windows
 
             _activeTab = target;
 
-            // 隐藏所有面板和工具栏
+            // Hide all panels and toolbars
             ModelingPanelScroll.Visibility = Visibility.Collapsed;
             SimulatingPanelRoot.Visibility = Visibility.Collapsed;
             ReportingPanelRoot.Visibility = Visibility.Collapsed;
@@ -189,7 +190,7 @@ namespace NeuronCAD.Visuals.Windows
             EditPopup.Visibility = Visibility.Collapsed;
             ChannelSelectorPopup.IsOpen = false;
 
-            // 根据目标模式显示对应面板并切换交互处理器
+            // Display panels for the target mode and switch the interaction handler
             switch (target)
             {
                 case ActiveTab.Modeling:
@@ -216,8 +217,9 @@ namespace NeuronCAD.Visuals.Windows
         #region Simulating Sub-tab Switching
 
         /// <summary>
-        /// 点击仿真模式下 "Insert" 子标签时触发，显示设备插入面板。
-        /// 由 XAML 按钮 Click 绑定。
+        /// <summary>
+        /// Triggered when the "Insert" sub-tab under Simulation is selected; show the device insertion panel.
+        /// Called by the XAML button Click event.
         /// </summary>
         private void OnSubTabInsertClick(object sender, RoutedEventArgs e)
         {
@@ -228,8 +230,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击仿真模式下 "Simulate" 子标签时触发，显示仿真参数配置面板。
-        /// 由 XAML 按钮 Click 绑定。
+        /// Triggered when the "Simulate" sub-tab under Simulation is selected; show the simulation parameter panel.
+        /// Called by the XAML button Click event.
         /// </summary>
         private void OnSubTabSimulateClick(object sender, RoutedEventArgs e)
         {
@@ -244,10 +246,10 @@ namespace NeuronCAD.Visuals.Windows
         #region Simulation Begin
 
         /// <summary>
-        /// 点击 "Begin" 按钮时触发仿真运行。
-        /// 读取 UI 参数 → 构建仿真数据 → 通过 SimulationRunner 调用 Hines_method.py。
-        /// 仿真期间禁止所有修改操作，显示实时进度。
-        /// 由 XAML 按钮 Click 绑定。
+        /// Triggered by the "Begin" button to start the simulation.
+        /// Reads UI parameters → builds simulation data → invokes Hines_method.py via SimulationRunner.
+        /// Disables modification during simulation and displays live progress.
+        /// Bound to the XAML button Click event.
         /// </summary>
         private async void OnBeginSimulationClick(object sender, RoutedEventArgs e)
         {
@@ -255,7 +257,7 @@ namespace NeuronCAD.Visuals.Windows
 
             var registry = _scene.SimulationRegistry;
 
-            // 读取区室化模式和参数
+            // Read compartmentalization mode and parameters
             if (RbNSeg.IsChecked == true)
             {
                 registry.Mode = SegmentationMode.NSeg;
@@ -269,19 +271,19 @@ namespace NeuronCAD.Visuals.Windows
                     registry.LSeg = l;
             }
 
-            // 一次性构建完整仿真数据：区室化 + 设备绑定
+            // Build full simulation data once: compartmentalization + device bindings
             var simData = registry.BuildSimulationData(
                 _scene.ConnectionController.ConnectionsById,
                 _scene.Devices);
 
             if (simData.Compartments.Count == 0)
             {
-                MessageBox.Show("没有可仿真的区室，请先添加建模实体。", "Simulation",
+                MessageBox.Show("No compartments to simulate. Please add modeling entities first.", "Simulation",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // 读取仿真参数
+            // Read simulation parameters
             if (!double.TryParse(TbVInit.Text, out double vInit)) vInit = -70.0;
             if (!double.TryParse(TbDt.Text, out double dt) || dt <= 0) dt = 0.1;
             if (!int.TryParse(TbSteps.Text, out int steps) || steps <= 0) steps = 10000;
@@ -293,7 +295,7 @@ namespace NeuronCAD.Visuals.Windows
             if (!double.TryParse(TbCaInf.Text, out double caInf)) caInf = 2.4e-4;
             if (!double.TryParse(TbTauCa.Text, out double tauCa)) tauCa = 5.0;
 
-            // ── 进入仿真状态：禁用交互，显示进度面板 ──
+            // ── Enter simulation state: disable interactions, show progress panel ──
             _isSimulating = true;
             SetSimulationLockUI(true);
 
@@ -303,10 +305,10 @@ namespace NeuronCAD.Visuals.Windows
             SimProgressBar.Maximum = steps;
             SimProgressBar.Value = 0;
 
-            // 创建运行器
+            // Create the runner
             _simulationRunner = new SimulationRunner();
 
-            // 启动进度轮询定时器
+            // Start progress polling timer
             _simProgressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _simProgressTimer.Tick += (s2, e2) =>
             {
@@ -322,30 +324,30 @@ namespace NeuronCAD.Visuals.Windows
             {
                 await _simulationRunner.RunAsync(simData, vInit, dt, steps, eNa, eK, eLeak, celsius, caOut, caInf, tauCa);
 
-                // ── 仿真完成 ──
+                // ── Simulation complete ──
                 SimStatusText.Text = "Simulation Complete";
                 SimStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
                 SimStepText.Text = $"Step: {steps} / {steps}";
                 SimProgressBar.Value = steps;
 
-                // 存储仿真数据供 Reporting 面板使用
+                // Store simulation data for use by the Reporting panel
                 _scene.LastSimulationData = simData;
 
                 MessageBox.Show(
-                    $"仿真完成：\n" +
-                    $"  区室数: {simData.Compartments.Count}\n" +
-                    $"  电流钳数: {simData.Stimulations.Count}\n" +
-                    $"  电压钳数: {simData.VoltageClamps.Count}\n" +
-                    $"  探针数: {simData.Probes.Count}\n" +
-                    $"  总步数: {steps}",
+                    $"Simulation complete:\n" +
+                    $"  Compartments: {simData.Compartments.Count}\n" +
+                    $"  Current clamps: {simData.Stimulations.Count}\n" +
+                    $"  Voltage clamps: {simData.VoltageClamps.Count}\n" +
+                    $"  Probes: {simData.Probes.Count}\n" +
+                    $"  Total steps: {steps}",
                     "Simulation",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                // pythonnet 将回调中抛出的 OperationCanceledException 包装为 PythonException，
-                // 所以直接检查 WasAborted 标志更可靠。
+                // pythonnet wraps OperationCanceledException thrown in callbacks as PythonException,
+                // so checking the WasAborted flag is more reliable.
                 bool aborted = _simulationRunner?.WasAborted == true
                             || ex.InnerException is OperationCanceledException
                             || ex is OperationCanceledException;
@@ -353,14 +355,14 @@ namespace NeuronCAD.Visuals.Windows
                 {
                     SimStatusText.Text = "Simulation Aborted";
                     SimStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
-                    MessageBox.Show("仿真已被用户终止。", "Simulation Aborted",
+                    MessageBox.Show("Simulation aborted by user.", "Simulation Aborted",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
                     SimStatusText.Text = "Simulation Failed";
                     SimStatusText.Foreground = new SolidColorBrush(Colors.Red);
-                    MessageBox.Show($"仿真失败：\n{ex.Message}", "Simulation Error",
+                    MessageBox.Show($"Simulation failed:\n{ex.Message}", "Simulation Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -376,7 +378,7 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 切换仿真锁定状态：禁用/启用工具栏、标签页切换和 Begin 按钮。
+        /// Toggle simulation lock UI: disable/enable toolbars, tab switching and the Begin button.
         /// </summary>
         private void SetSimulationLockUI(bool locked)
         {
@@ -389,8 +391,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击 "Abort" 按钮时强制终止仿真。
-        /// 通过 SimulationRunner.Abort() 在下一次 Python 回调时中断执行。
+        /// Forcefully abort the simulation when the "Abort" button is clicked.
+        /// Calls SimulationRunner.Abort() to interrupt execution on the next Python callback.
         /// </summary>
         private void OnAbortSimulationClick(object sender, RoutedEventArgs e)
         {
@@ -406,29 +408,25 @@ namespace NeuronCAD.Visuals.Windows
         #endregion
 
         #region Viewport Mouse Event Routing
-
-        /// <summary>将视口 MouseDown 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseDown 绑定。</summary>
+        /// <summary>Route the viewport MouseDown event to the currently active interaction handler. Bound to HelixViewport3D.MouseDown in XAML.</summary>
         private void OnViewportMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (_isSimulating) return;
             _activeHandler?.OnMouseDown(sender, e);
         }
-
-        /// <summary>将视口 MouseMove 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseMove 绑定。</summary>
+        /// <summary>Route the viewport MouseMove event to the currently active interaction handler. Bound to HelixViewport3D.MouseMove in XAML.</summary>
         private void OnViewportMouseMove(object sender, MouseEventArgs e)
         {
             if (_isSimulating) return;
             _activeHandler?.OnMouseMove(sender, e);
         }
-
-        /// <summary>将视口 MouseUp 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseUp 绑定。</summary>
+        /// <summary>Route the viewport MouseUp event to the currently active interaction handler. Bound to HelixViewport3D.MouseUp in XAML.</summary>
         private void OnViewportMouseUp(object sender, MouseButtonEventArgs e)
         {
             if (_isSimulating) return;
             _activeHandler?.OnMouseUp(sender, e);
         }
-
-        /// <summary>将视口 MouseWheel 路由到当前活跃交互处理器。由 XAML 的 HelixViewport3D.MouseWheel 绑定。</summary>
+        /// <summary>Route the viewport MouseWheel event to the currently active interaction handler. Bound to HelixViewport3D.MouseWheel in XAML.</summary>
         private void OnViewportMouseWheel(object sender, MouseWheelEventArgs e)
         {
             if (_isSimulating) return;
@@ -438,23 +436,20 @@ namespace NeuronCAD.Visuals.Windows
         #endregion
 
         #region HUD and Overlay
-
         /// <summary>
-        /// 平滑将相机视角对准指定世界坐标点（500ms 动画过渡）。
-        /// 被 PropertiesPanelController 和 SimulationPanelController 的面板展开事件调用。
+        /// Smoothly align the camera view to a specified world coordinate point (500ms animated transition).
+        /// Called by panel expand events of PropertiesPanelController and SimulationPanelController.
         /// </summary>
         private void NavigateToPoint(Point3D target)
         {
             MainViewport.LookAt(target, 500);
         }
-
         /// <summary>
-        /// 更新准星位置和世界坐标 HUD 显示。
-        /// 被 InteractionController 和 SimulationInteractionController 通过委托回调调用，
-        /// 在每次鼠标移动时触发。
+        /// Update the crosshair position and world-coordinate HUD display.
+        /// Invoked via delegate callbacks from InteractionController and SimulationInteractionController on every mouse move.
         /// </summary>
-        /// <param name="mousePos">鼠标在视口控件中的屏幕坐标</param>
-        /// <param name="worldPos">鼠标对应的三维世界坐标，若无有效命中则为 null</param>
+        /// <param name="mousePos">Mouse position in the viewport control's screen coordinates</param>
+        /// <param name="worldPos">The corresponding 3D world coordinate for the mouse; null if no valid hit</param>
         public void UpdateCursorInfo(Point mousePos, Point3D? worldPos)
         {
             Canvas.SetLeft(CrosshairPath, mousePos.X);
@@ -475,11 +470,11 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 显示实体尺寸编辑弹窗（EditPopup），根据实体类型显示不同的编辑字段。
-        /// 被 InteractionController 的 _onResizeRequested 委托在用户右键选择 "Resize..." 时调用。
+        /// Display the entity size edit popup (EditPopup), showing different edit fields depending on the entity type.
+        /// Called by InteractionController's _onResizeRequested delegate when the user selects "Resize..." from the context menu.
         /// </summary>
-        /// <param name="entity">要编辑的可视化实体</param>
-        /// <param name="mousePos">弹窗显示位置（鼠标在 ViewportGrid 中的坐标）</param>
+        /// <param name="entity">The visual entity to edit</param>
+        /// <param name="mousePos">Popup display position (mouse coordinates within the ViewportGrid)</param>
         public void ShowEditPopup(IVisualEntity entity, Point mousePos)
         {
             _editingEntity = entity;
@@ -500,8 +495,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 应用编辑弹窗中的尺寸修改。将文本框值解析后写入实体属性。
-        /// 由 EditPopup 中 "Apply" 按钮的 Click 事件绑定。
+        /// Apply size changes from the edit popup. Parse textbox values and write them to the entity's properties.
+        /// Bound to the 'Apply' button's Click event in the EditPopup.
         /// </summary>
         private void OnApplyEdit(object sender, RoutedEventArgs e)
         {
@@ -524,8 +519,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 取消编辑弹窗，不应用任何修改。
-        /// 由 EditPopup 中 "Cancel" 按钮的 Click 事件绑定。
+        /// Cancel the edit popup without applying changes.
+        /// Bound to the 'Cancel' button's Click event in the EditPopup.
         /// </summary>
         private void OnCancelEdit(object sender, RoutedEventArgs e)
         {
@@ -536,10 +531,9 @@ namespace NeuronCAD.Visuals.Windows
         #endregion
 
         #region Toolbar Actions (Modeling)
-
         /// <summary>
-        /// 点击 "Add Soma" 按钮，创建细胞体实体并进入放置模式。
-        /// 由建模模式底部工具栏按钮 Click 绑定。
+        /// Handle the 'Add Soma' button click: create a soma entity and enter placement mode.
+        /// Bound to the modeling toolbar button's Click event.
         /// </summary>
         private void OnAddSomaClick(object sender, RoutedEventArgs e)
         {
@@ -550,8 +544,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击 "Add Axon" 按钮，创建轴突实体并进入放置模式。
-        /// 由建模模式底部工具栏按钮 Click 绑定。
+        /// Handle the 'Add Axon' button click: create an axon entity and enter placement mode.
+        /// Bound to the modeling toolbar button's Click event.
         /// </summary>
         private void OnAddAxonClick(object sender, RoutedEventArgs e)
         {
@@ -562,8 +556,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击 "Add Dend" 按钮，创建树突实体并进入放置模式。
-        /// 由建模模式底部工具栏按钮 Click 绑定。
+        /// Handle the 'Add Dend' button click: create a dendrite entity and enter placement mode.
+        /// Bound to the modeling toolbar button's Click event.
         /// </summary>
         private void OnAddDendClick(object sender, RoutedEventArgs e)
         {
@@ -576,10 +570,9 @@ namespace NeuronCAD.Visuals.Windows
         #endregion
 
         #region Toolbar Actions (Simulation)
-
         /// <summary>
-        /// 点击 "Add Stimulation" 按钮，在仿真模式下启动刺激设备放置流程。
-        /// 由仿真模式底部工具栏按钮 Click 绑定。
+        /// Handle the 'Add Stimulation' button click: start placing a stimulation device in simulation mode.
+        /// Bound to the simulation toolbar button's Click event.
         /// </summary>
         private void OnAddStimulationClick(object sender, RoutedEventArgs e)
         {
@@ -587,8 +580,8 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击 "Add Probe" 按钮，在仿真模式下启动探针设备放置流程。
-        /// 由仿真模式底部工具栏按钮 Click 绑定。
+        /// Handle the 'Add Probe' button click: start placing a probe device in simulation mode.
+        /// Bound to the simulation toolbar button's Click event.
         /// </summary>
         private void OnAddProbeClick(object sender, RoutedEventArgs e)
         {
@@ -596,7 +589,7 @@ namespace NeuronCAD.Visuals.Windows
         }
 
         /// <summary>
-        /// 点击 "Add VoltageClamp" 按钮，在仿真模式下启动电压钳设备放置流程。
+        /// Handle the 'Add VoltageClamp' button click: start placing a voltage clamp device in simulation mode.
         /// </summary>
         private void OnAddVoltageClampClick(object sender, RoutedEventArgs e)
         {
@@ -640,7 +633,7 @@ namespace NeuronCAD.Visuals.Windows
         private void OnNewProjectClick(object sender, RoutedEventArgs e)
         {
             if (_isSimulating) return;
-            var result = MessageBox.Show("是否创建新项目？当前未保存的更改将丢失。",
+            var result = MessageBox.Show("Create a new project? Unsaved changes will be lost.",
                 "New Project", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (result != MessageBoxResult.OK) return;
 
@@ -685,13 +678,12 @@ namespace NeuronCAD.Visuals.Windows
                 _currentProjectPath = dlg.FileName;
                 Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
 
-                // 显示加载参数概要
+                // Show loaded parameters summary
                 var summary = SaveLoadManager.GetLoadedParamsSummary(project);
                 MessageBox.Show(
-                    $"项目加载成功：{System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
+                    $"Project loaded: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
                     "Project Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                // 切换到建模模式查看加载结果
+                // Switch to Modeling tab to view the loaded results
                 if (_activeTab != ActiveTab.Modeling)
                 {
                     SwitchTab(ActiveTab.Modeling);
@@ -700,7 +692,7 @@ namespace NeuronCAD.Visuals.Windows
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载失败：\n{ex.Message}", "Error",
+                MessageBox.Show($"Load failed:\n{ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -763,7 +755,7 @@ namespace NeuronCAD.Visuals.Windows
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存失败：\n{ex.Message}", "Error",
+                MessageBox.Show($"Save failed:\n{ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

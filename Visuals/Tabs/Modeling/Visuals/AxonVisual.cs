@@ -6,34 +6,32 @@ using System;
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
     /// <summary>
-    /// 轴突 (Axon) 可视化实体，以圆台/圆柱形式渲染。
-    /// 继承 VisualEntityBase 并实现 IAnchoredEntity 接口。
-    /// 局部坐标系：底面在 Z=0，顶面在 Z=Length，轴向沿局部 Z 轴。
-    /// 由 MainWindow.OnAddAxonClick 创建，也被 DendVisual 子类复用。
+    /// Axon visual entity rendered as a frustum/cylinder.
+    /// Inherits VisualEntityBase and implements IAnchoredEntity.
+    /// Local coordinate system: base at Z=0, top at Z=Length, axial direction along local Z axis.
+    /// Created by MainWindow.OnAddAxonClick and reused by DendVisual subclasses.
     /// </summary>
     public class AxonVisual : VisualEntityBase, IAnchoredEntity
     {
         /// <summary>
-        /// 可视化类型标识字符串（"Axon" 或 "Dend"），用于面板中区分显示名称。
-        /// 在构造时注入，被 PropertiesPanelController.BuildEntityNode 读取。
+        /// Visual type identifier string ("Axon" or "Dend"), used to distinguish display names in the properties panel.
+        /// Injected in the constructor and read by PropertiesPanelController.BuildEntityNode.
         /// </summary>
         public string VisualType { get; private set; }
 
-        /// <summary>圆台长度（局部 Z 轴方向），修改时自动重建网格。</summary>
+        /// <summary>Frustum length (local Z axis). Changing this triggers a geometry rebuild.</summary>
         private double _length;
-
-        /// <summary>底面半径，修改时自动重建网格。</summary>
+        /// <summary>Base radius. Changing this triggers a geometry rebuild.</summary>
         private double _baseRadius;
-
-        /// <summary>顶面半径，修改时自动重建网格。当与 _baseRadius 相同时为圆柱。</summary>
+        /// <summary>Top radius. Changing this triggers a geometry rebuild. When equal to _baseRadius the shape is a cylinder.</summary>
         private double _topRadius;
 
-        /// <summary>上一次有效的锚点角度缓存。当命中点过于靠近轴心时使用此缓存值避免角度突变。</summary>
+        /// <summary>Cached last valid anchor angle. Used to avoid angle jump when hit points are too close to the axis.</summary>
         private double _lastAnchorAngle = 0.0;
 
         /// <summary>
-        /// 圆台长度属性。设置时自动调用 UpdateGeometry 重建网格。
-        /// 被 MainWindow.OnApplyEdit 和 PropertiesPanelController 面板修改。
+        /// Length property for the frustum. Setting it automatically calls UpdateGeometry to rebuild the mesh.
+        /// Modified by MainWindow.OnApplyEdit and the PropertiesPanelController panel.
         /// </summary>
         public double Length
         {
@@ -42,8 +40,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 底面半径属性。设置时自动调用 UpdateGeometry 重建网格。
-        /// 被 MainWindow.OnApplyEdit 和 PropertiesPanelController 面板修改。
+        /// Base radius property. Setting it automatically calls UpdateGeometry to rebuild the mesh.
+        /// Modified by MainWindow.OnApplyEdit and the PropertiesPanelController panel.
         /// </summary>
         public double BaseRadius
         {
@@ -52,8 +50,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 顶面半径属性。设置时自动调用 UpdateGeometry 重建网格。
-        /// 被 MainWindow.OnApplyEdit 和 PropertiesPanelController 面板修改。
+        /// Top radius property. Setting it automatically calls UpdateGeometry to rebuild the mesh.
+        /// Modified by MainWindow.OnApplyEdit and the PropertiesPanelController panel.
         /// </summary>
         public double TopRadius
         {
@@ -62,8 +60,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 世界坐标系中的中心位置，为局部中心点 (0, 0, Length/2) 经变换矩阵映射后的结果。
-        /// 被 Connection 端点回退和设备法线计算引用。
+        /// Center position in world coordinates, which is the local center point (0,0,Length/2) transformed by Visual3D.Transform.
+        /// Referenced by Connection endpoint fallback and device normal calculations.
         /// </summary>
         public override Point3D CenterPosition
         {
@@ -75,14 +73,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 构造函数，根据起止点、半径和颜色创建圆台/圆柱可视化实体。
-        /// 长度由 start→end 距离决定，方向由 start→end 向量决定。
+        /// Constructor: create a frustum/cylinder visual from start/end points, radius and color.
+        /// Length is determined by the distance from start to end, and direction by the start->end vector.
         /// </summary>
-        /// <param name="start">圆台底面世界坐标</param>
-        /// <param name="end">圆台顶面世界坐标</param>
-        /// <param name="radius">初始半径（底面和顶面相同）</param>
-        /// <param name="color">实体颜色</param>
-        /// <param name="visualType">可视化类型标识，默认为 "Axon"，DendVisual 传入 "Dend"</param>
+        /// <param name="start">World coordinate of the frustum base</param>
+        /// <param name="end">World coordinate of the frustum top</param>
+        /// <param name="radius">Initial radius (both base and top)</param>
+        /// <param name="color">Entity color</param>
+        /// <param name="visualType">Visual type identifier, default "Axon"; DendVisual passes "Dend"</param>
         public AxonVisual(Point3D start, Point3D end, double radius, Color color, string visualType = "Axon") : base()
         {
             VisualType = visualType;
@@ -99,9 +97,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 将圆台对齐到指定位置和方向。通过四元数旋转使局部 Z 轴对齐到 normal 方向，
-        /// 然后平移到 position 位置。
-        /// 被 InteractionController.UpdateObjectPosition 在放置/移动时调用。
+        /// Align the frustum to a given position and direction. Rotate via quaternion so the local Z axis aligns with the normal,
+        /// then translate to the specified position.
+        /// Called by InteractionController.UpdateObjectPosition during placement/movement.
         /// </summary>
         public override void AlignTo(Point3D position, Vector3D normal)
         {
@@ -109,7 +107,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             var localZ = new Vector3D(0, 0, 1);
 
             var matrix = Matrix3D.Identity;
-            // 计算从局部 Z 轴到目标法线的旋转
+            // Compute rotation from local Z axis to the target normal
             var axis = Vector3D.CrossProduct(localZ, normal);
             if (axis.LengthSquared > 1e-10)
             {
@@ -119,7 +117,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             }
             else if (Vector3D.DotProduct(localZ, normal) < 0)
             {
-                // 局部 Z 与目标法线反向时，绕 X 轴旋转 180°
+                // If local Z and target normal are opposite, rotate 180° around the X axis
                 matrix.Rotate(new Quaternion(new Vector3D(1, 0, 0), 180));
             }
 
@@ -127,16 +125,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             Visual3D.Transform = new MatrixTransform3D(matrix);
         }
 
-        /// <summary>返回圆台尺寸信息字符串。预留用于状态栏或提示信息。</summary>
+        /// <summary>Return a frustum dimension info string. Reserved for status bar or tooltips.</summary>
         public override string GetDimensionInfo()
         {
             return $"L: {_length:F2}, BaseR: {_baseRadius:F2}, TopR: {_topRadius:F2}";
         }
 
         /// <summary>
-        /// 重建圆台/圆柱三维网格，包含侧面和两个端盖。
-        /// 局部坐标系：底面在 Z=0，顶面在 Z=_length。
-        /// 在 Length/BaseRadius/TopRadius 属性 setter 和构造函数中调用。
+        /// Rebuild the frustum/cylinder 3D mesh including side surface and two end caps.
+        /// Local coordinates: base at Z=0, top at Z=_length.
+        /// Called from the Length/BaseRadius/TopRadius property setters and the constructor.
         /// </summary>
         protected override void UpdateGeometry()
         {
@@ -144,18 +142,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             bool hasNormals = true;
             int segments = 18;
 
-            // ---- 侧面顶点和法线 ----
+            // ---- Side vertices and normals ----
             for (int i = 0; i < segments; i++)
             {
                 double angle = 2 * Math.PI * i / segments;
                 double cos = Math.Cos(angle);
                 double sin = Math.Sin(angle);
 
-                // 底面顶点和顶面顶点交替排列
+                // Base and top vertices are interleaved
                 mesh.Positions.Add(new Point3D(_baseRadius * cos, _baseRadius * sin, 0));
                 mesh.Positions.Add(new Point3D(_topRadius * cos, _topRadius * sin, _length));
 
-                // 计算圆台侧面法线（考虑半径变化导致的倾斜）
+                // Compute side normals for the frustum (account for slope caused by radius change)
                 double dz = _baseRadius - _topRadius;
                 double slopeLen = Math.Sqrt(dz * dz + _length * _length);
                 double nz = slopeLen > 0 ? dz / slopeLen : 0;
@@ -165,14 +163,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 mesh.Normals.Add(new Vector3D(cos * nxy, sin * nxy, nz));
             }
 
-            // ---- 侧面三角面索引 ----
+            // ---- Side triangle indices ----
             for (int i = 0; i < segments; i++)
             {
                 int next_i = (i + 1) % segments;
-                int b0 = i * 2;       // 当前底面顶点
-                int t0 = i * 2 + 1;   // 当前顶面顶点
-                int b1 = next_i * 2;   // 下一底面顶点
-                int t1 = next_i * 2 + 1; // 下一顶面顶点
+                int b0 = i * 2;       // current base vertex
+                int t0 = i * 2 + 1;   // current top vertex
+                int b1 = next_i * 2;   // next base vertex
+                int t1 = next_i * 2 + 1; // next top vertex
 
                 mesh.TriangleIndices.Add(b0);
                 mesh.TriangleIndices.Add(b1);
@@ -183,18 +181,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 mesh.TriangleIndices.Add(t1);
             }
 
-            // ---- 端盖中心点和边缘顶点 ----
+            // ---- End cap centers and rim vertices ----
             int startIndex = mesh.Positions.Count;
 
-            // 底面中心点
+            // Bottom cap center point
             mesh.Positions.Add(new Point3D(0, 0, 0));
             if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
 
-            // 顶面中心点
+            // Top cap center point
             mesh.Positions.Add(new Point3D(0, 0, _length));
             if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
 
-            // 底面端盖边缘顶点
+            // Bottom cap rim vertices
             int capVertsStart = startIndex + 2;
             for (int i = 0; i < segments; i++)
             {
@@ -205,7 +203,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, -1));
             }
 
-            // 顶面端盖边缘顶点
+            // Top cap rim vertices
             int capVertsEnd = mesh.Positions.Count;
             for (int i = 0; i < segments; i++)
             {
@@ -216,10 +214,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 if (hasNormals) mesh.Normals.Add(new Vector3D(0, 0, 1));
             }
 
-            int centerStartIdx = startIndex;      // 底面中心索引
-            int centerEndIdx = startIndex + 1;     // 顶面中心索引
+            int centerStartIdx = startIndex;      // bottom cap center index
+            int centerEndIdx = startIndex + 1;     // top cap center index
 
-            // ---- 端盖三角面索引 ----
+            // ---- Cap triangle indices ----
             for (int i = 0; i < segments; i++)
             {
                 int next = (i + 1) % segments;
@@ -232,16 +230,16 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 mesh.TriangleIndices.Add(capVertsEnd + next);
             }
 
-            // 重复端盖面片（双面渲染保证）
+            // Duplicate cap faces (ensure double-sided rendering)
             for (int i = 0; i < segments; i++)
             {
                 int next = (i + 1) % segments;
-                // 底面 (Z=0)
+                // Bottom cap (Z=0)
                 mesh.TriangleIndices.Add(centerStartIdx);
                 mesh.TriangleIndices.Add(capVertsStart + next);
                 mesh.TriangleIndices.Add(capVertsStart + i);
 
-                // 顶面 (Z=Length)
+                // Top cap (Z=Length)
                 mesh.TriangleIndices.Add(centerEndIdx);
                 mesh.TriangleIndices.Add(capVertsEnd + i);
                 mesh.TriangleIndices.Add(capVertsEnd + next);
@@ -252,10 +250,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 将世界坐标点转换为圆台表面锚点引用。
-        /// 通过逆变换矩阵将世界坐标转为局部坐标，然后根据 Z 值判断端盖或侧面，
-        /// 侧面锚点用 (AxialT, Angle) 参数化表示。
-        /// 被 InteractionController.ConfirmAction（创建连接）和 SimulationInteractionController 调用。
+        /// Convert a world-space point to a frustum surface anchor reference.
+        /// Transforms the world point into local space via the inverse transform, then determines cap vs side by the Z value.
+        /// Side anchors are parameterized by (AxialT, Angle).
+        /// Called by InteractionController.ConfirmAction (when creating connections) and SimulationInteractionController.
         /// </summary>
         public bool TryWorldPointToAnchor(Point3D worldPoint, out AnchorRef anchor)
         {
@@ -268,7 +266,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             var local = inv.Transform(worldPoint);
 
-            // 底端盖判定
+            // Bottom cap test
             if (local.Z <= 1e-3)
             {
                 anchor.Mode = AnchorMode.AxonCapStart;
@@ -276,7 +274,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 anchor.Angle = 0.0;
                 return true;
             }
-            // 顶端盖判定
+            // Top cap test
             if (local.Z >= _length - 1e-3)
             {
                 anchor.Mode = AnchorMode.AxonCapEnd;
@@ -285,7 +283,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 return true;
             }
 
-            // 侧面：计算轴向比例和周向角度
+            // Side: compute axial fraction and polar angle
             var t = _length <= 1e-9 ? 0.5 : local.Z / _length;
             t = Math.Clamp(t, 0.0, 1.0);
 
@@ -294,7 +292,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             if (r2 < 1e-6)
             {
-                // 命中点过于靠近轴心，使用缓存角度避免突变
+                // Hit point too close to the axis; use cached angle to avoid discontinuity
                 angle = _lastAnchorAngle;
             }
             else
@@ -310,9 +308,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 将锚点引用转换回世界坐标。根据锚点模式在局部坐标系中计算点位，
-        /// 然后通过变换矩阵映射到世界坐标系。
-        /// 被 ConnectionController.Update（刷新连接线）和 AttachedDeviceBase.UpdatePosition 调用。
+        /// Convert an anchor reference back to world coordinates. Computes the point in local space based on the anchor mode,
+        /// then maps it to world coordinates via the transform matrix.
+        /// Called by ConnectionController.Update (refresh connection visuals) and AttachedDeviceBase.UpdatePosition.
         /// </summary>
         public bool TryAnchorToWorldPoint(AnchorRef anchor, out Point3D worldPoint)
         {
@@ -323,20 +321,20 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             if (anchor.Mode == AnchorMode.AxonCapStart)
             {
-                // 底面中心
+                // bottom cap center
                 local = new Point3D(0, 0, 0);
             }
             else if (anchor.Mode == AnchorMode.AxonCapEnd)
             {
-                // 顶面中心
+                // top cap center
                 local = new Point3D(0, 0, _length);
             }
             else
             {
-                // 侧面：使用 AxialT 和 Angle 参数化定位
+                // Side: use AxialT and Angle parameterization to locate the point
                 double t = Math.Clamp(anchor.AxialT, 0.0, 1.0);
                 double z = t * _length;
-                double r = _baseRadius + (_topRadius - _baseRadius) * t; // 沿轴向线性插值半径
+                double r = _baseRadius + (_topRadius - _baseRadius) * t; // linearly interpolate radius along axial direction
 
                 double x = r * Math.Cos(anchor.Angle);
                 double y = r * Math.Sin(anchor.Angle);
@@ -349,15 +347,15 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
     }
 
     /// <summary>
-    /// 树突 (Dend) 可视化实体，直接继承自 AxonVisual 并在构造时注入 "Dend" 类型标识。
-    /// 几何形状和行为与 AxonVisual 完全一致，仅在面板中以不同名称显示。
-    /// 由 MainWindow.OnAddDendClick 创建。
+    /// Dend visual entity that directly inherits from AxonVisual and injects "Dend" as visual type.
+    /// Geometry and behavior are identical to AxonVisual; displayed under a different name in the panel.
+    /// Created by MainWindow.OnAddDendClick.
     /// </summary>
     public class DendVisual : AxonVisual
     {
         /// <summary>
-        /// 构造函数，创建树突可视化实体。
-        /// 自动将 VisualType 设为 "Dend"。
+        /// Constructor: create a dend visual entity.
+        /// Automatically sets VisualType to "Dend".
         /// </summary>
         public DendVisual(Point3D start, Point3D end, double radius, Color color)
             : base(start, end, radius, color, "Dend")

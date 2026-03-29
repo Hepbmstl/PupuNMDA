@@ -9,8 +9,10 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Windows
 {
     /// <summary>
-    /// 全局离子通道参数静态容器，在应用生命周期内持久化 HH / Ca T-type 通道参数。
-    /// 值由 IonChannelSettingWindow 修改，由 SimulationRunner 在每次仿真前推送到 Python。
+    /// Global static container for ion channel parameters, persisting HH and
+    /// Ca T-type channel parameters for the application lifetime.
+    /// Values are modified by IonChannelSettingWindow and pushed to Python by
+    /// SimulationRunner before each simulation.
     /// </summary>
     public static class IonChannelParams
     {
@@ -34,7 +36,7 @@ namespace NeuronCAD.Visuals.Windows
         public static double TauHT_base = 28.0, TauHT_V2 = 22.0, TauHT_k2 = 10.5;
         public static double TauHT_Q10 = 2.5, TauHT_Tref = 24.0;
 
-        /// <summary>生成 HH 参数 JSON 字符串，用于传递给 Python set_hh_params。</summary>
+        /// <summary>Generate HH parameters JSON string for passing to Python set_hh_params.</summary>
         public static string GetHHParamsJson()
         {
             return string.Format(CultureInfo.InvariantCulture,
@@ -56,7 +58,7 @@ namespace NeuronCAD.Visuals.Windows
                 BetaN_A, BetaN_V, BetaN_k);
         }
 
-        /// <summary>生成 Ca T-type 参数 JSON 字符串，用于传递给 Python set_ca_params。</summary>
+        /// <summary>Generate Ca T-type parameters JSON string for passing to Python set_ca_params.</summary>
         public static string GetCaParamsJson()
         {
             return string.Format(CultureInfo.InvariantCulture,
@@ -82,7 +84,7 @@ namespace NeuronCAD.Visuals.Windows
                 TauHT_Q10, TauHT_Tref);
         }
 
-        /// <summary>重置所有参数为默认值。</summary>
+        /// <summary>Reset all parameters to their default values.</summary>
         public static void ResetToDefault()
         {
             Vtraub = -63.0;
@@ -106,9 +108,10 @@ namespace NeuronCAD.Visuals.Windows
     }
 
     /// <summary>
-    /// 离子通道参数设置窗口，包含 HH 门控参数和 Ca²⁺ T-type 通道参数两个标签页。
-    /// 渲染经典 HH 方程并提供可编辑的玻尔兹曼分布常数。
-    /// 由 MainWindow Edit 菜单的 "Ion Channel Setting" 菜单项打开。
+    /// Ion channel parameter settings window, containing tabs for HH gating
+    /// parameters and Ca²⁺ T-type channel parameters.
+    /// Renders classical HH equations and provides editable Boltzmann constants.
+    /// Opened from the MainWindow Edit menu's "Ion Channel Setting" item.
     /// </summary>
     public partial class IonChannelSettingWindow : Window
     {

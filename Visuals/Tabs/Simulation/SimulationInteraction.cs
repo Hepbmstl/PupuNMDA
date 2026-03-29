@@ -11,67 +11,67 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Simulation
 {
     /// <summary>
-    /// 仿真交互状态枚举，追踪 SimulationInteractionController 当前所处的操作阶段。
+    /// Simulation interaction state enum, tracking the current operation stage of SimulationInteractionController.
     /// </summary>
     public enum SimulationState
     {
-        /// <summary>空闲状态，可点击拖拽或右键删除设备</summary>
+        /// <summary>Idle state: devices can be clicked, dragged, or right-click deleted</summary>
         Idle,
-        /// <summary>放置电流钳设备中（跟随鼠标吸附到实体表面）</summary>
+        /// <summary>Placing a stimulation device (snaps to entity surface under mouse)</summary>
         PlacingStimulation,
-        /// <summary>放置探针设备中（跟随鼠标吸附到实体表面）</summary>
+        /// <summary>Placing a probe device (snaps to entity surface under mouse)</summary>
         PlacingProbe,
-        /// <summary>放置电压钳设备中（跟随鼠标吸附到实体表面）</summary>
+        /// <summary>Placing a voltage clamp device (snaps to entity surface under mouse)</summary>
         PlacingVoltageClamp,
-        /// <summary>拖拽已放置设备中（沿目标实体表面滑动）</summary>
+        /// <summary>Dragging a placed device (slide along target entity surface)</summary>
         DraggingDevice
     }
 
     /// <summary>
-    /// 仿真模式专属交互控制器，实现 IViewportInteractionHandler 接口。
-    /// 职责：刺激/探针设备的放置、拖拽、删除。
-    /// 由 MainWindow.InitializeControllers 创建，注入 SharedSceneState 和回调。
+    /// Interaction controller specific to Simulation mode, implementing IViewportInteractionHandler.
+    /// Responsibilities: placing, dragging, and removing stimulation/probe devices.
+    /// Created by MainWindow.InitializeControllers and injected with SharedSceneState and callbacks.
     /// </summary>
     public class SimulationInteractionController : IViewportInteractionHandler
     {
-        /// <summary>共享场景状态引用。由构造函数注入。</summary>
+        /// <summary>Reference to the shared scene state. Injected via constructor.</summary>
         private readonly SharedSceneState _scene;
 
-        /// <summary>准星和坐标 HUD 更新回调，指向 MainWindow.UpdateCursorInfo。</summary>
+        /// <summary>Crosshair and coordinate HUD update callback, points to MainWindow.UpdateCursorInfo.</summary>
         private readonly Action<Point, Point3D?> _updateCursorInfo;
 
-        /// <summary>当前仿真交互状态。</summary>
+        /// <summary>Current simulation interaction state.</summary>
         private SimulationState _currentState = SimulationState.Idle;
 
-        /// <summary>正在放置的设备引用（尚未确认提交）。</summary>
+        /// <summary>Reference to the device currently being placed (not yet committed).</summary>
         private IAttachedDevice? _placingDevice;
 
-        /// <summary>正在拖拽的设备引用。</summary>
+        /// <summary>Reference to the device currently being dragged.</summary>
         private IAttachedDevice? _dragDevice;
 
-        /// <summary>鼠标按下时的屏幕位置，用于判断视口拖拽。</summary>
+        /// <summary>Screen position when mouse was pressed, used to detect viewport dragging.</summary>
         private Point _mouseDownPos;
 
-        /// <summary>标记鼠标是否正在拖拽视口。</summary>
+        /// <summary>Flag indicating whether the mouse is currently dragging the viewport.</summary>
         private bool _isDraggingViewport = false;
 
-        /// <summary>设备添加事件，被 SimulationPanelController.HandleDeviceAdded 订阅。</summary>
+        /// <summary>Device added event, subscribed by SimulationPanelController.HandleDeviceAdded.</summary>
         public event Action<IAttachedDevice>? OnDeviceAdded;
 
-        /// <summary>设备删除事件，被 SimulationPanelController.HandleDeviceRemoved 订阅。</summary>
+        /// <summary>Device removed event, subscribed by SimulationPanelController.HandleDeviceRemoved.</summary>
         public event Action<IAttachedDevice>? OnDeviceRemoved;
 
-        /// <summary>设备选中变更事件，被 SimulationPanelController.HandleDeviceSelectionChanged 订阅。</summary>
+        /// <summary>Device selection changed event, subscribed by SimulationPanelController.HandleDeviceSelectionChanged.</summary>
         public event Action<IAttachedDevice?>? OnDeviceSelectionChanged;
 
-        /// <summary>当前选中的设备。</summary>
+        /// <summary>Currently selected device.</summary>
         private IAttachedDevice? _selectedDevice;
 
         /// <summary>
-        /// 构造函数。由 MainWindow.InitializeControllers 调用。
+        /// Constructor. Called by MainWindow.InitializeControllers.
         /// </summary>
-        /// <param name="scene">共享场景状态</param>
-        /// <param name="updateCursorInfo">准星/HUD 更新回调</param>
+        /// <param name="scene">Shared scene state</param>
+        /// <param name="updateCursorInfo">Crosshair/HUD update callback</param>
         public SimulationInteractionController(
             SharedSceneState scene,
             Action<Point, Point3D?> updateCursorInfo)
@@ -83,10 +83,10 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         #region Public API
 
         /// <summary>
-        /// 启动放置设备操作，进入 PlacingStimulation 或 PlacingProbe 状态。
-        /// 被 MainWindow 工具栏按钮 "Add Stimulation"/"Add Probe" 调用。
+        /// Begin placing a device, entering PlacingStimulation or PlacingProbe state.
+        /// Invoked by main window toolbar buttons "Add Stimulation"/"Add Probe".
         /// </summary>
-        /// <param name="type">设备类型（刺激或探针）</param>
+        /// <param name="type">Device type (stimulation, probe, or voltage clamp)</param>
         public void StartPlacingDevice(DeviceType type)
         {
             if (_currentState != SimulationState.Idle) return;
@@ -106,8 +106,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 通知外部（面板等）有设备被加载（从文件恢复），触发 OnDeviceAdded 事件。
-        /// 被 SaveLoadManager.ApplyToScene 调用。
+        /// Notify external listeners (panels etc.) that a device was loaded (restored from file) and trigger OnDeviceAdded.
+        /// Called by SaveLoadManager.ApplyToScene.
         /// </summary>
         public void NotifyDeviceLoaded(IAttachedDevice device)
         {
@@ -115,8 +115,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 停用仿真交互：取消当前操作，移除未提交的设备可视化对象。
-        /// 被 MainWindow.SwitchTab 在切换标签页时调用。
+        /// Deactivate simulation interaction: cancel current operation and remove any uncommitted device visuals.
+        /// Called by MainWindow.SwitchTab when switching tabs.
         /// </summary>
         public void Deactivate()
         {
@@ -131,8 +131,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 强制选中指定设备（或取消选中），触发 OnDeviceSelectionChanged 事件。
-        /// 被面板展开和视口点击调用。
+        /// Force-select the specified device (or deselect), triggering OnDeviceSelectionChanged.
+        /// Called by panel expand and viewport clicks.
         /// </summary>
         public void SelectDevice(IAttachedDevice? device)
         {
@@ -146,15 +146,15 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         #region Input Handlers (IViewportInteractionHandler)
 
         /// <summary>
-        /// 鼠标按下事件处理。空闲状态：左键拖拽设备，右键删除设备；放置状态：左键确认，右键取消。
-        /// 由 MainWindow.OnViewportMouseDown 路由调用。
+        /// Mouse down event handler. Idle: left-drag device, right-delete device; Placing: left-confirm, right-cancel.
+        /// Routed by MainWindow.OnViewportMouseDown.
         /// </summary>
         public void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
             _mouseDownPos = e.GetPosition(_scene.HelixViewport);
             _isDraggingViewport = false;
 
-            // ===== 空闲模式：点击设备 =====
+            // ===== Idle mode: device click handling =====
             if (_currentState == SimulationState.Idle)
             {
                 var hitDevice = HitTestDevice(_mouseDownPos);
@@ -175,7 +175,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 return;
             }
 
-            // ===== 放置模式：确认/取消 =====
+            // ===== Placing mode: confirm/cancel =====
             if (_currentState == SimulationState.PlacingStimulation || _currentState == SimulationState.PlacingProbe || _currentState == SimulationState.PlacingVoltageClamp)
             {
                 e.Handled = true;
@@ -203,8 +203,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 鼠标移动事件处理。更新准星 HUD；拖拽状态更新设备位置；放置状态更新待放置设备的吸附点。
-        /// 由 MainWindow.OnViewportMouseMove 路由调用。
+        /// Mouse move handler. Updates crosshair HUD; updates device position while dragging; updates snap point while placing.
+        /// Routed by MainWindow.OnViewportMouseMove.
         /// </summary>
         public void OnMouseMove(object sender, MouseEventArgs e)
         {
@@ -233,9 +233,9 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 鼠标释放事件处理。DraggingDevice 状态下释放拖拽，回到 Idle。
-        /// Idle 状态左键点击（非拖拽）选中设备。
-        /// 由 MainWindow.OnViewportMouseUp 路由调用。
+        /// Mouse up handler. Releases dragging in DraggingDevice state and returns to Idle.
+        /// In Idle state, a left click (non-drag) selects a device.
+        /// Routed by MainWindow.OnViewportMouseUp.
         /// </summary>
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
@@ -255,7 +255,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             }
         }
 
-        /// <summary>鼠标滚轮事件处理（当前无自定义逻辑）。</summary>
+        /// <summary>Mouse wheel handler (no custom logic currently).</summary>
         public void OnMouseWheel(object sender, MouseWheelEventArgs e) { }
 
         #endregion
@@ -263,11 +263,11 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         #region Hit Testing
 
         /// <summary>
-        /// 命中测试：查找鼠标位置下的仿真设备。
-        /// 被 OnMouseDown 在 Idle 状态调用，用于判断拖拽或删除目标。
+        /// Hit test: find the simulation device under the mouse position.
+        /// Called from OnMouseDown in Idle state to determine drag or delete targets.
         /// </summary>
-        /// <param name="mousePos">鼠标屏幕坐标</param>
-        /// <returns>命中的设备，或 null</returns>
+        /// <param name="mousePos">Mouse screen coordinates</param>
+        /// <returns>The hit device, or null</returns>
         private IAttachedDevice? HitTestDevice(Point mousePos)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -286,11 +286,11 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 命中测试：查找鼠标位置下的场景实体（用于设备放置时确定吸附目标）。
-        /// 被 UpdatePlacingDevice 和 UpdateDraggingDevice 间接使用。
+        /// Hit test: find the scene entity under the mouse position (used to determine snap targets when placing devices).
+        /// Indirectly used by UpdatePlacingDevice and UpdateDraggingDevice.
         /// </summary>
-        /// <param name="mousePos">鼠标屏幕坐标</param>
-        /// <returns>命中的实体，或 null</returns>
+        /// <param name="mousePos">Mouse screen coordinates</param>
+        /// <returns>The hit entity, or null</returns>
         private IVisualEntity? HitTestEntity(Point mousePos)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -306,12 +306,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 在指定实体上执行射线命中测试，返回命中点的世界坐标。
-        /// 被 UpdatePlacingDevice 调用，用于获取精确的表面吸附点。
+        /// Perform a ray hit test on the given entity and return the world coordinate of the hit point.
+        /// Called by UpdatePlacingDevice to obtain an accurate surface snap point.
         /// </summary>
-        /// <param name="mousePos">鼠标屏幕坐标</param>
-        /// <param name="entity">目标实体</param>
-        /// <returns>命中点世界坐标，或 null</returns>
+        /// <param name="mousePos">Mouse screen coordinates</param>
+        /// <param name="entity">Target entity</param>
+        /// <returns>Hit point world coordinate, or null</returns>
         private Point3D? HitTestPointOnEntity(Point mousePos, IVisualEntity entity)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -327,7 +327,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         #region Position Updates
 
         /// <summary>
-        /// 更新准星和 HUD 显示。在 OnMouseMove 中每次鼠标移动时调用。
+        /// Update crosshair and HUD display. Called on every mouse move in OnMouseMove.
         /// </summary>
         private void UpdateCrosshair(Point mousePos)
         {
@@ -338,9 +338,9 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 更新放置中设备的位置：将设备吸附到鼠标悬停的实体表面锚点。
-        /// 若目标实体变更，会重新创建设备实例。
-        /// 在 PlacingStimulation/PlacingProbe 状态下由 OnMouseMove 调用。
+        /// Update the position of the device being placed: snap the device to the surface anchor under the mouse.
+        /// If the target entity changes, a new device instance is created.
+        /// Called from OnMouseMove when in PlacingStimulation/PlacingProbe/PlacingVoltageClamp state.
         /// </summary>
         private void UpdatePlacingDevice(Point mousePos)
         {
@@ -375,8 +375,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 更新拖拽中设备的位置：沿目标实体表面滑动锚点。
-        /// 在 DraggingDevice 状态下由 OnMouseMove 调用。
+        /// Update the position of the device being dragged: slide the anchor point along the target entity surface.
+        /// Called from OnMouseMove when in DraggingDevice state.
         /// </summary>
         private void UpdateDraggingDevice(Point mousePos)
         {

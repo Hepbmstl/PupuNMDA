@@ -19,7 +19,7 @@ namespace NeuronCAD.Backward
     #region JSON Data Models
 
     /// <summary>
-    /// 项目文件根节点。包含驱动 Hines_method.py 完整仿真所需的全部数据。
+    /// Root node of the project file. Contains all data required to drive a full simulation in Hines_method.py.
     /// </summary>
     public class ProjectData
     {
@@ -120,9 +120,9 @@ namespace NeuronCAD.Backward
     #endregion
 
     /// <summary>
-    /// 项目保存/加载管理器。
-    /// 序列化：从 SharedSceneState + UI 参数构建 ProjectData → JSON。
-    /// 反序列化：从 JSON → ProjectData → 重建场景实体、连接、设备及全局参数。
+    /// Project save/load manager.
+    /// Serialization: build ProjectData from SharedSceneState + UI parameters → JSON.
+    /// Deserialization: JSON → ProjectData → rebuild scene entities, connections, devices, and global parameters.
     /// </summary>
     public static class SaveLoadManager
     {
@@ -130,13 +130,13 @@ namespace NeuronCAD.Backward
         {
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = null, // 保持原始属性名
+            PropertyNamingPolicy = null, // keep original property names
         };
 
         #region Save
 
         /// <summary>
-        /// 将当前场景状态序列化为 ProjectData 并写入 JSON 文件。
+        /// Serialize the current scene state into ProjectData and write to a JSON file.
         /// </summary>
         public static void Save(
             string filePath,
@@ -311,17 +311,17 @@ namespace NeuronCAD.Backward
         #region Load
 
         /// <summary>
-        /// 从 JSON 文件加载 ProjectData。
+        /// Load ProjectData from a JSON file.
         /// </summary>
         public static ProjectData Load(string filePath)
         {
             string json = File.ReadAllText(filePath);
             return JsonSerializer.Deserialize<ProjectData>(json, JsonOpts)
-                ?? throw new InvalidOperationException("无法解析项目文件。");
+                ?? throw new InvalidOperationException("Failed to parse project file.");
         }
 
         /// <summary>
-        /// 将 ProjectData 应用到场景：清空当前状态 → 重建实体 → 重建连接 → 重建设备 → 恢复全局参数。
+        /// Apply ProjectData to the scene: clear current state → rebuild entities → rebuild connections → rebuild devices → restore global parameters.
         /// </summary>
         public static void ApplyToScene(
             ProjectData project,
@@ -342,24 +342,24 @@ namespace NeuronCAD.Backward
             Action<string> setTbLSeg,
             Action<bool> setRbNSeg)
         {
-            // ── 1. 清空当前场景 ──
+            // ── 1. Clear current scene ──
             modelingInteraction.Deactivate();
             simulationInteraction.Deactivate();
 
-            // 移除所有设备
+            // Remove all devices
             foreach (var device in scene.Devices.ToList())
             {
                 scene.HelixViewport.Children.Remove(device.Visual3D);
             }
             scene.Devices.Clear();
 
-            // 移除所有连接
+            // Remove all connections
             foreach (var connId in scene.ConnectionController.ConnectionsById.Keys.ToList())
             {
                 scene.ConnectionController.Remove(connId);
             }
 
-            // 移除所有实体
+            // Remove all entities
             foreach (var entity in scene.Entities.ToList())
             {
                 scene.HelixViewport.Children.Remove(entity.Visual3D);
@@ -367,7 +367,7 @@ namespace NeuronCAD.Backward
             }
             scene.Entities.Clear();
 
-            // ── 2. 恢复全局环境参数到 UI ──
+            // ── 2. Restore global environment parameters to UI ──
             var env = project.GlobalEnvironment;
             setTbVInit(env.V_init.ToString(CultureInfo.InvariantCulture));
             setTbDt(env.dt.ToString(CultureInfo.InvariantCulture));
@@ -385,7 +385,7 @@ namespace NeuronCAD.Backward
             setTbCaInf(env.CA_INF.ToString(CultureInfo.InvariantCulture));
             setTbTauCa(env.TAU_CA.ToString(CultureInfo.InvariantCulture));
 
-            // ── 3. 恢复区室化参数 ──
+            // ── 3. Restore segmentation parameters ──
             var seg = project.Segmentation;
             bool isNSeg = seg.Mode == "NSeg";
             setRbNSeg(isNSeg);
@@ -398,14 +398,14 @@ namespace NeuronCAD.Backward
             scene.SimulationRegistry.NSeg = seg.NSeg;
             scene.SimulationRegistry.LSeg = seg.LSeg;
 
-            // ── 4. 恢复 HH / CA 参数 ──
+            // ── 4. Restore HH / CA parameters ──
             ApplyHHParams(project.HH_PARAMS);
             ApplyCaParams(project.CA_PARAMS);
 
-            // ── 4b. 诊断输出：显示所有加载的全局参数 ──
+            // ── 4b. Diagnostic output: display all loaded global parameters ──
             TraceLoadedParams(project);
 
-            // ── 5. 重建实体 ──
+            // ── 5. Rebuild entities ──
             var entityMap = new Dictionary<string, IVisualEntity>();
 
             foreach (var ed in project.Entities)
@@ -430,30 +430,30 @@ namespace NeuronCAD.Backward
                         break;
                 }
 
-                // 通过反射设置 Id（保持与保存时一致）
+                // Set Id via reflection (preserve saved value)
                 SetEntityId(entity, ed.Id);
 
-                // 设置几何参数（会触发 UpdateGeometry）
+                // Set geometry parameters (triggers UpdateGeometry)
                 entity.BaseRadius = ed.BaseRadius;
                 entity.TopRadius = ed.TopRadius;
                 entity.Length = ed.Length;
 
-                // 设置生物物理参数
+                // Set biophysical parameters
                 entity.Ra = ed.Ra;
                 entity.Cm = ed.Cm;
 
-                // 恢复变换矩阵（包含空间位置和旋转信息）
+                // Restore transformation matrix (includes position and rotation)
                 if (ed.Transform.Length == 16)
                 {
                     var m = ArrayToMatrix3D(ed.Transform);
                     entity.Visual3D.Transform = new MatrixTransform3D(m);
                 }
 
-                // 恢复离子通道
+                // Restore ion channels
                 entity.Channels.Clear();
                 foreach (var chEntry in ed.Channels)
                 {
-                    // 从 GlobalBiophysics 获取基础颜色信息，如不存在则用默认灰色
+                    // Retrieve base color from GlobalBiophysics; use default gray if missing
                     Color chColor = Colors.Gray;
                     if (GlobalBiophysics.GlobalChannels.TryGetValue(chEntry.Key, out var globalCh))
                         chColor = globalCh.Color;
@@ -463,18 +463,18 @@ namespace NeuronCAD.Backward
                 }
                 entity.UpdateChannelVisuals();
 
-                // 添加到场景
+                // Add to scene
                 scene.HelixViewport.Children.Add(entity.Visual3D);
                 scene.Entities.Add(entity);
                 scene.SimulationRegistry.Register(entity);
 
-                // 触发面板更新
+                // Trigger panel update
                 modelingInteraction.NotifyEntityLoaded(entity);
 
                 entityMap[ed.Id] = entity;
             }
 
-            // ── 6. 重建连接 ──
+            // ── 6. Rebuild connections ──
             foreach (var cd in project.Connections)
             {
                 if (!entityMap.TryGetValue(cd.EntityA_Id, out var entityA)) continue;
@@ -487,7 +487,7 @@ namespace NeuronCAD.Backward
                 scene.ConnectionController.Add(conn);
             }
 
-            // ── 7. 重建设备 ──
+            // ── 7. Rebuild devices ──
             foreach (var dd in project.Devices)
             {
                 if (!entityMap.TryGetValue(dd.TargetEntityId, out var targetEntity)) continue;
@@ -587,7 +587,7 @@ namespace NeuronCAD.Backward
 
         private static void SetConnectionId(Connection conn, string id)
         {
-            // Connection.Id 只有 get 访问器，通过反射设置私有后备字段
+            // Connection.Id has only a get accessor; set the private backing field via reflection
             var field = typeof(Connection).GetField("<Id>k__BackingField",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             field?.SetValue(conn, id);
@@ -644,8 +644,8 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 诊断输出：将加载的项目全局参数打印到 Debug Output 窗口，
-        /// 供开发者确认 JSON → IonChannelParams 覆写是否正确。
+        /// Diagnostic output: print loaded global project parameters to the Debug Output window,
+        /// allowing developers to verify that JSON → IonChannelParams overrides were applied correctly.
         /// </summary>
         private static void TraceLoadedParams(ProjectData project)
         {
@@ -689,7 +689,7 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 供外部 UI 调用：生成加载参数的可读摘要字符串。
+        /// For external UI calls: generate a human-readable summary string of loaded parameters.
         /// </summary>
         public static string GetLoadedParamsSummary(ProjectData project)
         {

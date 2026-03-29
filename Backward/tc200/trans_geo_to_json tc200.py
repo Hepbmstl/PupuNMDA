@@ -4,14 +4,14 @@ import math
 import re
 
 # ==========================================
-# 1. 基础数学与几何工具 (与 tcD 版本相同)
+# 1. Basic math and geometry utilities (same as tcD version)
 # ==========================================
 def rescale_diam(d):
     """
-    应用 NEURON geo 文件中的树突直径缩放公式 (仅用于 dend 节)
-    对应 .geo 底部 rescale_diameters()：
-      newdiam = diam / (1 + exp(-(diam - diam_hlf) / diam_stp))
-      diam_min = 0.8, diam_hlf = 1.5, diam_stp = 1.5
+        Apply NEURON .geo dendrite diameter rescaling formula (dendrite-only).
+        Corresponds to .geo's rescale_diameters():
+            newdiam = diam / (1 + exp(-(diam - diam_hlf) / diam_stp))
+            diam_min = 0.8, diam_hlf = 1.5, diam_stp = 1.5
     """
     d_new = d / (1.0 + math.exp(-(d - 1.5) / 1.5))
     return max(0.8, d_new)
@@ -33,14 +33,14 @@ def cross_product(v1, v2):
 
 def get_transform_matrix(p1, p2):
     """
-    生成 4x4 齐次变换矩阵，匹配 NeuronCAD AxonVisual.AlignTo() 的行为：
-      1) 将局部 Z 轴 (0,0,1) 旋转对齐到 p1→p2 方向
-      2) 平移至 p1
-    WPF Matrix3D row-major 布局：
-      [M11 M12 M13 M14]   ← Row1 = 变换后的 X 轴
-      [M21 M22 M23 M24]   ← Row2 = 变换后的 Y 轴
-      [M31 M32 M33 M34]   ← Row3 = 变换后的 Z 轴 (圆台轴向)
-      [OffX OffY OffZ M44] ← 平移 + 齐次
+        Produce a 4x4 homogeneous transform matrix matching NeuronCAD AxonVisual.AlignTo():
+            1) rotate local Z axis (0,0,1) to align with direction p1→p2
+            2) translate to p1
+        WPF Matrix3D row-major layout:
+            [M11 M12 M13 M14]   ← Row1 = transformed X axis
+            [M21 M22 M23 M24]   ← Row2 = transformed Y axis
+            [M31 M32 M33 M34]   ← Row3 = transformed Z axis (cylinder axis)
+            [OffX OffY OffZ M44] ← translation + homogeneous
     """
     v = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]]
     length = math.sqrt(sum(x**2 for x in v))
@@ -89,7 +89,7 @@ def get_transform_matrix(p1, p2):
     ]
 
 # ==========================================
-# 2. 生成 NeuronCAD 对象
+# 2. Generate NeuronCAD objects
 # ==========================================
 def create_entity(p1, p2, type_name, color, channels, Ra, Cm):
     length = distance(p1[:3], p2[:3])
@@ -110,7 +110,7 @@ def create_entity(p1, p2, type_name, color, channels, Ra, Cm):
     }
 
 def create_connection(ent_a_id, ent_b_id, axial_a, axial_b=0.0):
-    """NSeg=1 模式下 AxialT 只取 0 或 1"""
+    """For NSeg=1 mode, AxialT takes values 0 or 1 only."""
     mode_a = "AxonCapEnd" if axial_a == 1.0 else "AxonCapStart"
     mode_b = "AxonCapEnd" if axial_b == 1.0 else "AxonCapStart"
 
@@ -124,18 +124,18 @@ def create_connection(ent_a_id, ent_b_id, axial_a, axial_b=0.0):
     }
 
 # ==========================================
-# 3. 主解析逻辑
+# 3. Main parsing logic
 # ==========================================
 def load_biophy(biophy_filepath):
-    """加载 Biophy.json，返回解析后的字典。"""
+    """Load Biophy.json and return the parsed dictionary."""
     with open(biophy_filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def build_channels_from_biophy(region_params):
     """
-    从 Biophy.json 的 biophysical_assignments 区域参数构建 NeuronCAD channels 字典。
-    单位转换：g_pas / gnabar / gkbar: S/cm² → mS/cm² (×1000)
-              pcabar: cm/s → cm/s (不变, IsPermeability=True)
+    Build NeuronCAD channels dict from biophysical_assignments in Biophy.json.
+    Unit conversions: g_pas / gnabar / gkbar: S/cm² → mS/cm² (×1000)
+                      pcabar: cm/s → cm/s (unchanged, IsPermeability=True)
     """
     channels = {}
     passive = region_params.get("passive", {})
@@ -151,7 +151,7 @@ def build_channels_from_biophy(region_params):
     # L (passive g_pas S/cm² → mS/cm²)
     if "g_pas" in passive:
         channels["L"] = {"G": passive["g_pas"] * 1000.0, "IsPermeability": False}
-    # CaT (itGHK pcabar cm/s, 保持原值)
+    # CaT (itGHK pcabar cm/s — keep original value)
     if "pcabar" in it:
         channels["CaT"] = {"G": it["pcabar"], "IsPermeability": True}
 
@@ -160,9 +160,9 @@ def build_channels_from_biophy(region_params):
 
 def build_region_lookup(biophy):
     """
-    从 Biophy.json 的 spatial_regions 构建 segment_name → region_name 的查找表。
-    如果某个 region 的 segments 为 "_remainder"，则标记为默认区域。
-    返回 (lookup_dict, default_region_name)。
+    Build a lookup mapping segment_name → region_name from Biophy.json's spatial_regions.
+    If a region's segments is "_remainder", mark it as the default region.
+    Returns (lookup_dict, default_region_name).
     """
     lookup = {}
     default_region = None
@@ -177,15 +177,15 @@ def build_region_lookup(biophy):
 
 
 def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.json"):
-    # ---- 加载 Biophy.json ----
+    # ---- Load Biophy.json ----
     biophy = load_biophy(biophy_filepath)
     bio_env = biophy["global_environment"]
     bio_assign = biophy["biophysical_assignments"]
 
-    # 构建 segment_name → region_name 查找表
+    # Build segment_name → region_name lookup
     region_lookup, default_region = build_region_lookup(biophy)
 
-    # 预构建每个区域的 channels / Ra / Cm
+    # Prebuild channels / Ra / Cm per region
     region_channels = {}
     region_Ra = {}
     region_Cm = {}
@@ -201,13 +201,13 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
     with open(geo_filepath, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
-    # ---- 3.1 从 create 语句自动识别树突结构 ----
-    # 例: "create soma,\  dend1[1],\  dend2[3], ..."  (可能跨多行)
-    # 同时记录 dend 编号以便后续构建 segment name
+    # ---- 3.1 Auto-detect dendrite groups from create statements ----
+    # Example: "create soma,\  dend1[1],\  dend2[3], ..." (may span multiple lines)
+    # Also record dend numbers to build segment names later
     dend_group_sizes = []
-    dend_group_numbers = []  # 实际的编号 (1, 2, 3, ...)
+    dend_group_numbers = []  # actual numbers (1, 2, 3, ...)
 
-    # 先将多行 create 语句拼接为一行
+    # Concatenate multi-line create statements into a single line
     create_stmt = ""
     capturing = False
     for line in lines:
@@ -215,11 +215,11 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
         if not capturing and ls.startswith("create "):
             capturing = True
         if capturing:
-            # 去掉行尾续行符 '\'
+            # Strip trailing continuation '\\'
             stripped = ls.rstrip("\\").strip()
             create_stmt += " " + stripped
             if not ls.endswith("\\"):
-                break  # 最后一行（无续行符）
+                break  # last line (no continuation char)
 
     for part in create_stmt.split(","):
         part = part.strip()
@@ -228,7 +228,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
             dend_group_numbers.append(int(m.group(1)))
             dend_group_sizes.append(int(m.group(2)))
 
-    # ---- 3.2 逐段解析数据 ----
+    # ---- 3.2 Parse segment data ----
     soma_points = []
     dend_blocks = []
     topo_connections = []
@@ -241,7 +241,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
         if not line:
             continue
 
-        # -- Soma 数据 --
+        # -- Soma data --
         if "SOMA COORDINATES AND DIAMETERS:" in line:
             while idx < len(lines) and not lines[idx].strip():
                 idx += 1
@@ -252,7 +252,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                 soma_points.append(parts)
                 idx += 1
 
-        # -- 树突数据 --
+        # -- Dendrite data --
         elif "NEURITE COORDINATES AND DIAMETERS:" in line:
             state = "READ_DEND"
 
@@ -275,7 +275,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                     idx += 1
                 dend_blocks.append(block)
 
-        # -- 拓扑连接 --
+        # -- Topology connections --
         elif state == "READ_CONN":
             if "/*" in line or "proc " in line or "//" in line:
                 state = "DONE"
@@ -287,7 +287,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                 except ValueError:
                     pass
 
-    # ---- 3.3 按 create 声明分组树突 blocks ----
+    # ---- 3.3 Group dendrite blocks according to create declarations ----
     dend_groups = []
     blk_idx = 0
     for size in dend_group_sizes:
@@ -301,12 +301,12 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
     entities = []
     connections_list = []
 
-    # ---- 3.4 根据 segment name 查找区域 ----
+    # ---- 3.4 Lookup region by segment name ----
     def get_region_for_segment(seg_name):
-        """查找 segment_name 对应的区域，未命中则返回 default_region。"""
+        """Lookup region for a segment_name; return default_region if not found."""
         return region_lookup.get(seg_name, default_region)
 
-    # ---- 3.5 Soma 实体 ----
+    # ---- 3.5 Soma entities ----
     soma_region = get_region_for_segment("soma")
     soma_channels = region_channels[soma_region]
     soma_Ra = region_Ra[soma_region]
@@ -327,14 +327,14 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
 
     total_soma_length = sum(soma_lengths)
 
-    # ---- 3.6 树突实体 ----
+    # ---- 3.6 Dendrite entities ----
     # dend_entities_map[g_local_idx][sec_idx] = [entity_list]
-    # 通过 segment name "dendN[sec_idx]" 查找 Biophy 区域
+    # Lookup Biophy region by segment name "dendN[sec_idx]"
     dend_entities_map = {}
     for g_local_idx, (dend_num, group) in enumerate(zip(dend_group_numbers, dend_groups)):
         dend_entities_map[g_local_idx] = []
         for sec_idx, pts in enumerate(group):
-            # 构建 NEURON 风格的 segment name
+            # Build NEURON-style segment name
             seg_name = f"dend{dend_num}[{sec_idx}]"
             region = get_region_for_segment(seg_name)
 
@@ -353,7 +353,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                         create_connection(section_ents[i-1]["Id"], ent["Id"], 1.0, 0.0))
             dend_entities_map[g_local_idx].append(section_ents)
 
-    # ---- 3.7 Soma ↔ Dendrite 主干连接 ----
+    # ---- 3.7 Soma ↔ Dendrite main trunk connections ----
     # .geo: "soma connect dendN[0] (0), 0.5"
     soma_mid_ent_idx = 0
     accumulated = 0.0
@@ -371,7 +371,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                                   dend_entities_map[g_local_idx][0][0]["Id"],
                                   1.0, 0.0))
 
-    # ---- 3.8 组内 section 间拓扑 ----
+    # ---- 3.8 In-group section topology ----
     conn_idx = 0
     for g_local_idx, size in enumerate(dend_group_sizes):
         for child_sec_idx in range(1, size):
@@ -395,7 +395,7 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
                     create_connection(parent_ents[0]["Id"],
                                       child_ents[0]["Id"], 0.0, 0.0))
 
-    # ---- 3.9 构建 JSON (从 Biophy.json 填充全局参数) ----
+    # ---- 3.9 Build JSON (fill global params from Biophy.json) ----
     e_tbl = biophy["e_table"]
     hh2_kin = biophy["hh2_kinetics"]
     ca_kin = biophy["ca_kinetics"]
@@ -452,8 +452,8 @@ def parse_geo_to_json(geo_filepath, out_filepath, biophy_filepath="Biophy_tc200.
     with open(out_filepath, 'w', encoding='utf-8') as f:
         json.dump(neuron_cad_data, f, indent=2)
 
-    print(f"解析完成！生成了 {len(entities)} 个 Entities 和 {len(connections_list)} 条 Connections。")
-    print(f"文件已保存至: {out_filepath}")
+    print(f"Parsing complete! Generated {len(entities)} entities and {len(connections_list)} connections.")
+    print(f"File saved to: {out_filepath}")
 
 if __name__ == "__main__":
     parse_geo_to_json("tc200.geo", "tc200_NeuronCAD.json", "Biophy_tc200.json")

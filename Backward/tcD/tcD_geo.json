@@ -2,7 +2,7 @@
   "GlobalEnvironment": {
     "V_init": -70,
     "dt": 0.1,
-    "STEPS": 4000,
+    "STEPS": 10000,
     "celsius": 24,
     "CA_OUT": 2,
     "CA_INF": 0.00024,
@@ -3034,7 +3034,7 @@
   ],
   "Devices": [
     {
-      "Id": "7644ca6d-9874-4426-9ecc-37917cafcdec",
+      "Id": "7ad47c46-180a-4af3-9850-3a1bc995fdaa",
       "Type": "Stimulation",
       "TargetEntityId": "c76caeca-bb20-4af9-9e06-7e748132d3f8",
       "Anchor": {
@@ -3042,9 +3042,34 @@
         "AxialT": 0.9566472118302677,
         "Angle": 2.8584804437988014
       },
-      "Stimulation_uA": 0.0002,
+      "Stimulation_uA": 0,
       "StimStart": 20,
-      "StimDuration": 10
+      "StimDuration": 300
+    },
+    {
+      "Id": "26432154-fe28-43a1-b303-462c856995ab",
+      "Type": "Stimulation",
+      "TargetEntityId": "14def939-69bb-4d3c-85ea-6872ffc7c582",
+      "Anchor": {
+        "Mode": "AxonCylinder",
+        "AxialT": 0.7336668937759262,
+        "Angle": 2.856285577343718
+      },
+      "Stimulation_uA": 7.5E-05,
+      "StimStart": 20,
+      "StimDuration": 100
+    },
+    {
+      "Id": "5225a158-c6a5-432b-a341-748da6f5acc8",
+      "Type": "Probe",
+      "TargetEntityId": "4ab36b63-3b45-44df-a408-100095574585",
+      "Anchor": {
+        "Mode": "AxonCylinder",
+        "AxialT": 0.6900591741646315,
+        "Angle": -0.05726522589237442
+      },
+      "StartMs": 0,
+      "DurationMs": 10000
     }
   ]
 }

@@ -12,43 +12,43 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     /// <summary>
-    /// 建模模式下的属性面板控制器。
-    /// 职责：管理左侧属性面板中实体卡片的创建/删除/选中高亮，以及离子通道选择弹窗。
-    /// 由 MainWindow.InitializeControllers 创建，订阅 InteractionController 的事件总线。
+    /// Properties panel controller for Modeling mode.
+    /// Responsibilities: manage creation/removal/highlight of entity cards in the left properties panel, and the ion channel selector popup.
+    /// Created by MainWindow.InitializeControllers and subscribes to the InteractionController event bus.
     /// </summary>
     public class PropertiesPanelController
     {
-        /// <summary>属性面板容器（左侧栏 StackPanel），由构造函数注入。</summary>
+        /// <summary>Properties panel container (left sidebar StackPanel), injected via constructor.</summary>
         private readonly StackPanel _container;
 
-        /// <summary>建模交互控制器引用，用于订阅实体增删/选中事件及调用 ForceSelect。</summary>
+        /// <summary>Reference to the modeling interaction controller, used to subscribe to entity add/remove/selection events and call ForceSelect.</summary>
         private readonly InteractionController _interaction;
 
-        /// <summary>离子通道选择弹窗引用（MainWindow.xaml 中定义）。</summary>
+        /// <summary>Reference to the ion channel selector popup (defined in MainWindow.xaml).</summary>
         private readonly Popup _channelPopup;
 
-        /// <summary>离子通道弹窗内部按钮列表容器。</summary>
+        /// <summary>Container for the list of buttons inside the ion channel popup.</summary>
         private readonly StackPanel _channelSelectorList;
 
-        /// <summary>实体 ID 到属性卡片 Expander 的映射字典，用于快速查找和移除 UI 节点。</summary>
+        /// <summary>Mapping from entity ID to property card Expander for quick UI node lookup and removal.</summary>
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
 
-        /// <summary>当前正在操作“添加通道”的目标实体，由 btnAddChannel.Click 设置。</summary>
+        /// <summary>The entity currently targeted for adding a channel, set by btnAddChannel.Click.</summary>
         private IVisualEntity _currentOperatingEntity;
 
-        /// <summary>相机跳转回调，由 MainWindow 注入。</summary>
+        /// <summary>Camera navigation callback, injected by MainWindow.</summary>
         private readonly Action<Point3D>? _navigateToPoint;
 
-        /// <summary>标记是否正在通过代码设置展开状态（防止递归触发选中）。</summary>
+        /// <summary>Flag indicating whether expansion state is being set programmatically (prevents recursive selection triggers).</summary>
         private bool _suppressExpandEvent;
 
         /// <summary>
-        /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器和交互控制器，并订阅事件。
+        /// Constructor. Called by MainWindow.InitializeControllers; injects UI container and interaction controller, and subscribes to events.
         /// </summary>
-        /// <param name="container">左侧属性面板 StackPanel</param>
-        /// <param name="popup">离子通道选择弹窗</param>
-        /// <param name="popupList">弹窗内按钮列表容器</param>
-        /// <param name="interaction">建模交互控制器（用于订阅事件）</param>
+        /// <param name="container">Left properties panel StackPanel</param>
+        /// <param name="popup">Ion channel selector popup</param>
+        /// <param name="popupList">Container for buttons inside the popup</param>
+        /// <param name="interaction">Modeling interaction controller (used to subscribe to events)</param>
         public PropertiesPanelController(StackPanel container, Popup popup, StackPanel popupList, InteractionController interaction, Action<Point3D>? navigateToPoint = null)
         {
             _container = container;
@@ -65,9 +65,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 初始化离子通道选择器：为 GlobalBiophysics.GlobalChannels 中每个通道创建按钮，
-        /// 点击后为当前操作实体添加该通道并刷新可视化。
-        /// 由构造函数调用。
+        /// Initialize the ion channel selector: create a button for each channel in GlobalBiophysics.GlobalChannels.
+        /// Clicking a button adds the channel to the current operating entity and refreshes visuals.
+        /// Called by the constructor.
         /// </summary>
         private void InitializeChannelSelector()
         {
@@ -103,8 +103,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 处理实体添加事件：为新实体创建属性卡片并添加到面板。
-        /// 被 InteractionController.OnEntityAdded 事件触发调用。
+        /// Handle entity added event: create a property card for the new entity and add it to the panel.
+        /// Triggered by InteractionController.OnEntityAdded.
         /// </summary>
         private void HandleEntityAdded(IVisualEntity entity)
         {
@@ -114,8 +114,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 处理实体删除事件：移除对应的属性卡片。
-        /// 被 InteractionController.OnEntityRemoved 事件触发调用。
+        /// Handle entity removed event: remove the corresponding property card.
+        /// Triggered by InteractionController.OnEntityRemoved.
         /// </summary>
         private void HandleEntityRemoved(IVisualEntity entity)
         {
@@ -127,8 +127,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 处理选中实体变更事件：展开对应卡片并橙色高亮边框，折叠其他卡片。
-        /// 被 InteractionController.OnSelectionChanged 事件触发调用。
+        /// Handle selection change events: expand the corresponding card and highlight the border orange; collapse others.
+        /// Triggered by InteractionController.OnSelectionChanged.
         /// </summary>
         private void HandleSelectionChanged(IVisualEntity? selectedEntity)
         {
@@ -160,11 +160,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 构建实体属性卡片 Expander，包含颜色、尺寸参数输入框和离子通道列表。
-        /// 由 HandleEntityAdded 调用。展开时会调用 InteractionController.ForceSelect 同步选中。
+        /// Build the entity property card Expander, including color and size input fields and the ion channel list.
+        /// Called by HandleEntityAdded. On expand, calls InteractionController.ForceSelect to synchronize selection.
         /// </summary>
-        /// <param name="entity">目标实体</param>
-        /// <returns>构建完成的 Expander 控件</returns>
+        /// <param name="entity">The target entity</param>
+        /// <returns>The constructed Expander control</returns>
         private Expander BuildEntityNode(IVisualEntity entity)
         {
             string entityType = "Unknown";
@@ -256,11 +256,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 刷新实体卡片中的离子通道列表，显示当前已添加的通道名称和删除按钮。
-        /// 由 BuildEntityNode（初始构建）和通道增删操作后调用。
+        /// Refresh the ion channel list in the entity card, showing currently added channel names and delete buttons.
+        /// Called by BuildEntityNode (initial construction) and after channel add/remove operations.
         /// </summary>
-        /// <param name="entity">目标实体</param>
-        /// <param name="listPanel">通道列表容器（可选，null 时从 _uiNodes 查找）</param>
+        /// <param name="entity">The target entity</param>
+        /// <param name="listPanel">Channel list container (optional, if null, looks up from _uiNodes)</param>
         private void RefreshChannelList(IVisualEntity entity, StackPanel listPanel = null)
         {
             if (listPanel == null && _uiNodes.TryGetValue(entity.Id, out var expander))
