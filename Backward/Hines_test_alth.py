@@ -1,3 +1,30 @@
+# Copyright 2026 [Hepbmstl Hepupu]
+#
+# Pupu NMDA / NeuronCAD
+# A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Scientific and Algorithmic Foundations:
+# This software's biophysical organization and core numerical methods are 
+# fundamentally informed by the following works:
+# * 1. Destexhe, A., Neubig, M., Ulrich, D., & Huguenard, J. (1998). 
+# Dendritic Low-Threshold Calcium Currents in Thalamic Relay Cells. 
+# The Journal of Neuroscience, 18(10), 3574-3588.
+# * 2. Hines, M. (1984). Efficient computation of branched nerve equations. 
+# International Journal of Bio-Medical Computing, 15(1), 69-76.
+#
+
 from Hines_method import (
     set_env, init_segment, add_connection, add_channel_to_segment,
     insert_stimulation, start_simulation, plot_variable_over_time, clear_environment,
