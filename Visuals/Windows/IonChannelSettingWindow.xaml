@@ -1,7 +1,7 @@
 <Window x:Class="NeuronCAD.Visuals.Windows.IonChannelSettingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Ion Channel Setting"
+        Title="离子通道设置"
         Height="720"
         Width="680"
         WindowStartupLocation="CenterOwner"
@@ -18,7 +18,7 @@
                             BorderBrush="#3F3F46"
                             Margin="8">
                         <!-- Tab 1: HH Gating -->
-                        <TabItem Header="HH Gating"
+                        <TabItem Header="HH 门控"
                                  Foreground="#F1F1F1">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Background="#1E1E1E">
@@ -28,7 +28,7 @@
                         </TabItem>
 
                         <!-- Tab 2: Ca²⁺ T-type -->
-                        <TabItem Header="Ca²⁺ T-type"
+                        <TabItem Header="Ca²⁺ T 型"
                                  Foreground="#F1F1F1">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Background="#1E1E1E">
@@ -38,7 +38,7 @@
                         </TabItem>
 
                         <!-- Tab 3: Channels -->
-                        <TabItem Header="Channels"
+                        <TabItem Header="通道"
                                  Foreground="#F1F1F1">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Background="#1E1E1E">
@@ -53,7 +53,7 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             Margin="15,5,15,15">
-                        <Button Content="Reset to Default"
+                        <Button Content="恢复默认"
                                 Click="OnResetClick"
                                 Padding="12,6"
                                 Margin="0,0,8,0"
@@ -61,7 +61,7 @@
                                 Foreground="White"
                                 BorderThickness="0"
                                 Cursor="Hand"/>
-                        <Button Content="Apply"
+                        <Button Content="应用"
                                 Click="OnApplyClick"
                                 Padding="12,6"
                                 Margin="0,0,8,0"
@@ -69,7 +69,7 @@
                                 Foreground="White"
                                 BorderThickness="0"
                                 Cursor="Hand"/>
-                        <Button Content="Cancel"
+                        <Button Content="取消"
                                 Click="OnCancelClick"
                                 Padding="12,6"
                                 Background="#444444"

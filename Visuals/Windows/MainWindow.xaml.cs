@@ -278,7 +278,7 @@ namespace NeuronCAD.Visuals.Windows
 
             if (simData.Compartments.Count == 0)
             {
-                MessageBox.Show("No compartments to simulate. Please add modeling entities first.", "Simulation",
+                MessageBox.Show("没有可模拟的区室。请先添加建模实体。", "模拟",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -300,8 +300,8 @@ namespace NeuronCAD.Visuals.Windows
             SetSimulationLockUI(true);
 
             SimProgressPanel.Visibility = Visibility.Visible;
-            SimStatusText.Text = "Simulating...";
-            SimStepText.Text = $"Step: 0 / {steps}";
+            SimStatusText.Text = "模拟中...";
+            SimStepText.Text = $"步骤：0 / {steps}";
             SimProgressBar.Maximum = steps;
             SimProgressBar.Value = 0;
 
@@ -315,7 +315,7 @@ namespace NeuronCAD.Visuals.Windows
                 if (_simulationRunner == null) return;
                 int cur = _simulationRunner.CurrentStep;
                 int total = _simulationRunner.TotalSteps;
-                SimStepText.Text = $"Step: {cur} / {total}";
+                SimStepText.Text = $"步骤：{cur} / {total}";
                 SimProgressBar.Value = cur;
             };
             _simProgressTimer.Start();
@@ -325,22 +325,22 @@ namespace NeuronCAD.Visuals.Windows
                 await _simulationRunner.RunAsync(simData, vInit, dt, steps, eNa, eK, eLeak, celsius, caOut, caInf, tauCa);
 
                 // ── Simulation complete ──
-                SimStatusText.Text = "Simulation Complete";
+                SimStatusText.Text = "模拟完成";
                 SimStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x88));
-                SimStepText.Text = $"Step: {steps} / {steps}";
+                SimStepText.Text = $"步骤：{steps} / {steps}";
                 SimProgressBar.Value = steps;
 
                 // Store simulation data for use by the Reporting panel
                 _scene.LastSimulationData = simData;
 
                 MessageBox.Show(
-                    $"Simulation complete:\n" +
-                    $"  Compartments: {simData.Compartments.Count}\n" +
-                    $"  Current clamps: {simData.Stimulations.Count}\n" +
-                    $"  Voltage clamps: {simData.VoltageClamps.Count}\n" +
-                    $"  Probes: {simData.Probes.Count}\n" +
-                    $"  Total steps: {steps}",
-                    "Simulation",
+                    $"模拟完成：\n" +
+                    $"  区室数: {simData.Compartments.Count}\n" +
+                    $"  电流钳: {simData.Stimulations.Count}\n" +
+                    $"  电压钳: {simData.VoltageClamps.Count}\n" +
+                    $"  探针: {simData.Probes.Count}\n" +
+                    $"  总步数: {steps}",
+                    "模拟",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -353,16 +353,16 @@ namespace NeuronCAD.Visuals.Windows
                             || ex is OperationCanceledException;
                 if (aborted)
                 {
-                    SimStatusText.Text = "Simulation Aborted";
+                    SimStatusText.Text = "模拟已中止";
                     SimStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
-                    MessageBox.Show("Simulation aborted by user.", "Simulation Aborted",
+                    MessageBox.Show("用户已中止模拟。", "模拟已中止",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
-                    SimStatusText.Text = "Simulation Failed";
+                    SimStatusText.Text = "模拟失败";
                     SimStatusText.Foreground = new SolidColorBrush(Colors.Red);
-                    MessageBox.Show($"Simulation failed:\n{ex.Message}", "Simulation Error",
+                    MessageBox.Show($"模拟失败：\n{ex.Message}", "模拟错误",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -400,7 +400,7 @@ namespace NeuronCAD.Visuals.Windows
             {
                 _simulationRunner.Abort();
                 BtnAbortSimulation.IsEnabled = false;
-                SimStatusText.Text = "Aborting...";
+                SimStatusText.Text = "正在中止...";
                 SimStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
             }
         }
@@ -633,13 +633,13 @@ namespace NeuronCAD.Visuals.Windows
         private void OnNewProjectClick(object sender, RoutedEventArgs e)
         {
             if (_isSimulating) return;
-            var result = MessageBox.Show("Create a new project? Unsaved changes will be lost.",
-                "New Project", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+            var result = MessageBox.Show("创建新项目？未保存的更改将会丢失。",
+                "新建项目", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (result != MessageBoxResult.OK) return;
 
             ClearScene();
             _currentProjectPath = null;
-            Title = "NeuronCAD 2026";
+            Title = "神经元 CAD 2026";
         }
 
         private void OnOpenProjectClick(object sender, RoutedEventArgs e)
@@ -648,8 +648,8 @@ namespace NeuronCAD.Visuals.Windows
 
             var dlg = new OpenFileDialog
             {
-                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
-                Title = "Open Project"
+                Filter = "NeuronCAD 项目 (*.json)|*.json|所有文件 (*.*)|*.*",
+                Title = "打开项目"
             };
             if (dlg.ShowDialog() != true) return;
 
@@ -676,13 +676,13 @@ namespace NeuronCAD.Visuals.Windows
                     isNSeg => { RbNSeg.IsChecked = isNSeg; RbLSeg.IsChecked = !isNSeg; });
 
                 _currentProjectPath = dlg.FileName;
-                Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+                Title = $"神经元 CAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
 
                 // Show loaded parameters summary
                 var summary = SaveLoadManager.GetLoadedParamsSummary(project);
                 MessageBox.Show(
-                    $"Project loaded: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
-                    "Project Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                    $"项目已加载： {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
+                    "项目已加载", MessageBoxButton.OK, MessageBoxImage.Information);
                 // Switch to Modeling tab to view the loaded results
                 if (_activeTab != ActiveTab.Modeling)
                 {
@@ -692,7 +692,7 @@ namespace NeuronCAD.Visuals.Windows
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Load failed:\n{ex.Message}", "Error",
+                MessageBox.Show($"加载失败：\n{ex.Message}", "错误",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -714,14 +714,14 @@ namespace NeuronCAD.Visuals.Windows
 
             var dlg = new SaveFileDialog
             {
-                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
-                Title = "Save Project As"
+                Filter = "NeuronCAD 项目 (*.json)|*.json|所有文件 (*.*)|*.*",
+                Title = "另存为项目"
             };
             if (dlg.ShowDialog() != true) return;
 
             SaveToFile(dlg.FileName);
             _currentProjectPath = dlg.FileName;
-            Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+            Title = $"神经元 CAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
         }
 
         private void OnExitClick(object sender, RoutedEventArgs e)
@@ -755,7 +755,7 @@ namespace NeuronCAD.Visuals.Windows
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Save failed:\n{ex.Message}", "Error",
+                MessageBox.Show($"保存失败：\n{ex.Message}", "错误",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

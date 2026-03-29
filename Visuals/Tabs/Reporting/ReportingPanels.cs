@@ -93,7 +93,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 _componentsContainer.Children.Add(new TextBlock
                 {
-                    Text = "No modeling components.\nAdd entities in Modeling mode.",
+                    Text = "没有建模组件。\n请在建模模式中添加实体。",
                     Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
                     FontSize = 13,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -107,9 +107,9 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             string typeName = entity switch
             {
-                DendVisual => "Dend",
+                DendVisual => "树突",
                 AxonVisual a => a.VisualType,
-                _ => "Entity"
+                _ => "实体"
             };
 
             var expander = new Expander
@@ -126,29 +126,29 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             var stack = new StackPanel { Margin = new Thickness(4) };
 
             // --- Properties ---
-            AddLabel(stack, $"Type: {typeName}");
-            AddLabel(stack, $"Cm: {entity.Cm} µF/cm²");
-            AddLabel(stack, $"Ra: {entity.Ra} Ω·cm");
+            AddLabel(stack, $"类型： {typeName}");
+            AddLabel(stack, $"膜电容 (Cm)： {entity.Cm} µF/cm²");
+            AddLabel(stack, $"电阻 (Ra)： {entity.Ra} Ω·cm");
 
             if (entity is AxonVisual axon)
             {
-                AddLabel(stack, $"Length: {axon.Length:F2} µm");
-                AddLabel(stack, $"Base R: {axon.BaseRadius:F2} µm");
-                AddLabel(stack, $"Top R: {axon.TopRadius:F2} µm");
+                AddLabel(stack, $"长度： {axon.Length:F2} µm");
+                AddLabel(stack, $"基底半径： {axon.BaseRadius:F2} µm");
+                AddLabel(stack, $"顶端半径： {axon.TopRadius:F2} µm");
             }
 
             if (entity.Channels.Count > 0)
             {
-                AddLabel(stack, "Channels:");
+                AddLabel(stack, "通道：");
                 foreach (var ch in entity.Channels)
-                    AddLabel(stack, $"  {ch.Key}: g={ch.Value.G_ion_channel} µS/cm²");
+                    AddLabel(stack, $"  {ch.Key}： g={ch.Value.G_ion_channel} µS/cm²");
             }
 
             int compCount = entity.CompartmentCount;
-            AddLabel(stack, $"Compartments: {compCount}", FontWeights.Bold);
+            AddLabel(stack, $"区室数： {compCount}", FontWeights.Bold);
 
             // --- Variable selection ---
-            AddLabel(stack, "Variable:", topMargin: 8);
+            AddLabel(stack, "变量：", topMargin: 8);
             var varCombo = new ComboBox
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
@@ -162,12 +162,12 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             _entityVarCombos[entity.Id] = varCombo;
 
             // --- Time range ---
-            AddLabel(stack, "Start (ms):");
+            AddLabel(stack, "开始 (ms)：");
             var tbStart = MakeTextBox("0");
             stack.Children.Add(tbStart);
             _entityStartTimeBoxes[entity.Id] = tbStart;
 
-            AddLabel(stack, "End (ms):");
+            AddLabel(stack, "结束 (ms)：");
             var tbEnd = MakeTextBox("20");
             stack.Children.Add(tbEnd);
             _entityEndTimeBoxes[entity.Id] = tbEnd;
@@ -176,8 +176,8 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             var compartmentLabel = new TextBlock
             {
                 Text = compCount > 0
-                    ? "Selected Compartment: (click in viewport)"
-                    : "No compartments (run simulation first)",
+                ? "已选择区室：（在视口中点击）"
+                : "无区室（请先运行模拟）",
                 Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xD7, 0x00)),
                 FontSize = 11,
                 Margin = new Thickness(0, 4, 0, 4),
@@ -187,7 +187,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             _entityCompartmentLabels[entity.Id] = compartmentLabel;
 
             // --- Plot button ---
-            var btnPlot = MakeButton("Plot Variable", Color.FromRgb(0x00, 0x7A, 0xCC), compCount > 0);
+            var btnPlot = MakeButton("绘制变量", Color.FromRgb(0x00, 0x7A, 0xCC), compCount > 0);
             string eid = entity.Id;
             btnPlot.Click += async (s, e) => await OnPlotVariableClick(eid, btnPlot);
             stack.Children.Add(btnPlot);
@@ -208,7 +208,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             if (!_entitySelectedCompartment.TryGetValue(entityId, out int segId))
             {
-                MessageBox.Show("Please click to select a compartment in the viewport first.", "Reporting",
+                MessageBox.Show("请先在视口中点击选择一个区室。", "报告",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -223,7 +223,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Plot failed:\n{ex.Message}", "Plot Error",
+                MessageBox.Show($"绘图失败：\n{ex.Message}", "绘图错误",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -246,7 +246,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 _probesContainer.Children.Add(new TextBlock
                 {
-                    Text = "No probe data.\nRun simulation with probes first.",
+                    Text = "无探针数据。\n请先运行包含探针的模拟。",
                     Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
                     FontSize = 13,
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -272,12 +272,12 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         private Expander BuildProbeExpander(SimProbe simProbe, IAttachedDevice? device)
         {
             string targetInfo = device != null
-                ? $"Target: {(device.TargetEntity is DendVisual ? "Dend" : device.TargetEntity is SomaVisual ? "Soma" : "Axon")}"
-                : "Target: unknown";
+                ? $"目标：{(device.TargetEntity is DendVisual ? "树突" : device.TargetEntity is SomaVisual ? "胞体" : "轴突")}"
+                : "目标：未知";
 
             var expander = new Expander
             {
-                Header = $"Probe #{simProbe.ProbeId}  [Seg {simProbe.SegmentId}]",
+                Header = $"探针 #{simProbe.ProbeId}  [段 {simProbe.SegmentId}]",
                 Foreground = Brushes.White,
                 Background = ItemBg,
                 BorderBrush = DefaultBorder,
@@ -289,12 +289,12 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             var stack = new StackPanel { Margin = new Thickness(4) };
 
             AddLabel(stack, targetInfo);
-            AddLabel(stack, $"Segment ID: {simProbe.SegmentId}");
-            AddLabel(stack, $"Start: {simProbe.StartMs} ms");
-            AddLabel(stack, $"Duration: {simProbe.DurationMs} ms");
+            AddLabel(stack, $"区段 ID： {simProbe.SegmentId}");
+            AddLabel(stack, $"开始： {simProbe.StartMs} ms");
+            AddLabel(stack, $"持续时间： {simProbe.DurationMs} ms");
 
             // X-axis variable
-            AddLabel(stack, "X-axis variable:", topMargin: 8);
+            AddLabel(stack, "X 轴变量：", topMargin: 8);
             var xCombo = new ComboBox
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
@@ -307,7 +307,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(xCombo);
 
             // Y-axis variable
-            AddLabel(stack, "Y-axis variable:");
+            AddLabel(stack, "Y 轴变量：");
             var yCombo = new ComboBox
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
@@ -320,7 +320,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(yCombo);
 
             // Plot button
-            var btnPlot = MakeButton("Plot Phase Portrait", Color.FromRgb(0x00, 0x80, 0x80), true);
+            var btnPlot = MakeButton("绘制相位图", Color.FromRgb(0x00, 0x80, 0x80), true);
             int probeId = simProbe.ProbeId;
             btnPlot.Click += async (s, e) =>
             {
@@ -328,7 +328,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 string yVar = yCombo.SelectedItem?.ToString() ?? "n";
                 if (xVar == yVar)
                 {
-                    MessageBox.Show("X-axis and Y-axis variables cannot be the same.", "Reporting",
+                    MessageBox.Show("X 轴和 Y 轴变量不能相同。", "报告",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -339,7 +339,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Plot failed:\n{ex.Message}", "Plot Error",
+                    MessageBox.Show($"绘图失败：\n{ex.Message}", "绘图错误",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally
@@ -385,7 +385,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             _entitySelectedCompartment[parentEntityId] = globalId;
             if (_entityCompartmentLabels.TryGetValue(parentEntityId, out var lbl))
-                lbl.Text = $"Selected Compartment: ID {globalId}";
+                lbl.Text = $"已选择区室：ID {globalId}";
         }
 
         #endregion

@@ -121,9 +121,9 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             string devType;
             switch (device.Type)
             {
-                case DeviceType.Stimulation: devType = "CurrentClamp"; break;
-                case DeviceType.VoltageClamp: devType = "VoltageClamp"; break;
-                default: devType = "Probe"; break;
+                case DeviceType.Stimulation: devType = "电流钳"; break;
+                case DeviceType.VoltageClamp: devType = "电压钳"; break;
+                default: devType = "探针"; break;
             }
 
             var expander = new Expander
@@ -145,7 +145,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
             panel.Children.Add(new TextBlock
             {
-                Text = $"Target: {device.TargetEntity.Id.Substring(0, 4)}",
+                Text = $"目标：{device.TargetEntity.Id.Substring(0, 4)}",
                 Foreground = Brushes.DarkGray,
                 Margin = new Thickness(0, 0, 0, 5)
             });
@@ -153,7 +153,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             if (device is StimulationDevice stim)
             {
                 // Stimulation_uA
-                panel.Children.Add(new TextBlock { Text = "Current (µA):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "电流 (µA)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbCurrent = new TextBox { Text = stim.Stimulation_uA.ToString("F4"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbCurrent.LostFocus += (s, e) =>
                 {
@@ -163,7 +163,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 panel.Children.Add(tbCurrent);
 
                 // StimStart
-                panel.Children.Add(new TextBlock { Text = "Start Time (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "开始时间 (ms)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbStart = new TextBox { Text = stim.StimStart.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbStart.LostFocus += (s, e) =>
                 {
@@ -173,7 +173,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 panel.Children.Add(tbStart);
 
                 // StimDuration
-                panel.Children.Add(new TextBlock { Text = "Duration (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "持续时间 (ms)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbDuration = new TextBox { Text = stim.StimDuration.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbDuration.LostFocus += (s, e) =>
                 {
@@ -185,7 +185,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             else if (device is ProbeDevice probe)
             {
                 // Start time (ms)
-                panel.Children.Add(new TextBlock { Text = "Start Time (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "开始时间 (ms)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbStart = new TextBox { Text = probe.StartMs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbStart.LostFocus += (s, e) =>
                 {
@@ -195,7 +195,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 panel.Children.Add(tbStart);
 
                 // Duration (ms)
-                panel.Children.Add(new TextBlock { Text = "Duration (ms):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "持续时间 (ms)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbDur = new TextBox { Text = probe.DurationMs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbDur.LostFocus += (s, e) =>
                 {
@@ -207,7 +207,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             else if (device is VoltageClampDevice vc)
             {
                 // Rs (MΩ)
-                panel.Children.Add(new TextBlock { Text = "Rs (MΩ):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "串联电阻 (Rs, MΩ)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbRs = new TextBox { Text = vc.Rs.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbRs.LostFocus += (s, e) =>
                 {
@@ -217,12 +217,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 panel.Children.Add(tbRs);
 
                 // Protocol steps
-                panel.Children.Add(new TextBlock { Text = "Protocol Steps:", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "协议步骤：", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) });
                 for (int si = 0; si < vc.Protocol.Count; si++)
                 {
                     var step = vc.Protocol[si];
                     var stepPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 0) };
-                    stepPanel.Children.Add(new TextBlock { Text = $"Step {si + 1}: ", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center, Width = 50 });
+                    stepPanel.Children.Add(new TextBlock { Text = $"步骤 {si + 1}：", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center, Width = 50 });
 
                     var tbAmp = new TextBox { Text = step.Amplitude.ToString("F1"), Background = Brushes.DarkGray, Foreground = Brushes.White, Width = 60 };
                     stepPanel.Children.Add(new TextBlock { Text = "mV ", Foreground = Brushes.Gray, VerticalAlignment = System.Windows.VerticalAlignment.Center });

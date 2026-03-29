@@ -137,14 +137,14 @@ namespace NeuronCAD.Visuals.Windows
         private void BuildHHPanel()
         {
             // ── Traub shift ──
-            AddSection(HHPanel, "Traub Voltage Shift (hh2.mod: v2 = V − vtraub)");
+            AddSection(HHPanel, "Traub 电压偏移 (hh2.mod: v2 = V − vtraub)");
 
             AddEquation(HHPanel,
                 "v₂ = V − vtraub",
                 ("vtraub", "vtraub", IonChannelParams.Vtraub));
 
             // ── Na⁺ m gate ──
-            AddSection(HHPanel, "Na⁺ Activation — m gate");
+            AddSection(HHPanel, "Na⁺ 激活 — m 门");
 
             AddEquation(HHPanel,
                 "αm(V) = A · (V₀ − v₂) / (exp((V₀ − v₂) / k) − 1)",
@@ -159,7 +159,7 @@ namespace NeuronCAD.Visuals.Windows
                 ("k", "beta_m_k", IonChannelParams.BetaM_k));
 
             // ── Na⁺ h gate ──
-            AddSection(HHPanel, "Na⁺ Inactivation — h gate");
+            AddSection(HHPanel, "Na⁺ 失活 — h 门");
 
             AddEquation(HHPanel,
                 "αh(V) = A · exp((V₀ − v₂) / k)",
@@ -174,7 +174,7 @@ namespace NeuronCAD.Visuals.Windows
                 ("k", "beta_h_k", IonChannelParams.BetaH_k));
 
             // ── K⁺ n gate ──
-            AddSection(HHPanel, "K⁺ Activation — n gate");
+            AddSection(HHPanel, "K⁺ 激活 — n 门");
 
             AddEquation(HHPanel,
                 "αn(V) = A · (V₀ − v₂) / (exp((V₀ − v₂) / k) − 1)",
@@ -196,7 +196,7 @@ namespace NeuronCAD.Visuals.Windows
         private void BuildCaPanel()
         {
             // ── Shift parameters ──
-            AddSection(CaPanel, "T-type Ca²⁺ Voltage Shifts (ITGHK.mod)");
+            AddSection(CaPanel, "T 型 Ca²⁺ 电压偏移 (ITGHK.mod)");
 
             AddEquation(CaPanel,
                 "shift: global voltage shift applied to all Ca kinetics\n" +
@@ -205,7 +205,7 @@ namespace NeuronCAD.Visuals.Windows
                 ("actshift", "actshift", IonChannelParams.ActShift));
 
             // ── Steady-state ──
-            AddSection(CaPanel, "T-type Ca²⁺ Steady-state Activation / Inactivation");
+            AddSection(CaPanel, "T 型 Ca²⁺ 稳态激活/失活");
 
             AddEquation(CaPanel,
                 "m\u221E(V) = 1 / (1 + exp(\u2212(V + V\u00BD) / k))",
@@ -218,7 +218,7 @@ namespace NeuronCAD.Visuals.Windows
                 ("k", "inf_hT_k", IonChannelParams.InfHT_k));
 
             // ── Time constants ──
-            AddSection(CaPanel, "T-type Ca²⁺ Time Constants");
+            AddSection(CaPanel, "T 型 Ca²⁺ 时间常数");
 
             AddEquation(CaPanel,
                 "\u03C4m(V) = (base + 1 / (exp(\u2212(V+V\u2081)/k\u2081) + exp((V+V\u2082)/k\u2082))) / \u03C6\n" +
@@ -255,7 +255,7 @@ namespace NeuronCAD.Visuals.Windows
             ChannelsPanel.Children.Clear();
             _channelRows.Clear();
 
-            AddSection(ChannelsPanel, "Global Ion Channel Defaults");
+            AddSection(ChannelsPanel, "全局离子通道默认值");
 
             foreach (var kvp in GlobalBiophysics.GlobalChannels)
             {
@@ -266,7 +266,7 @@ namespace NeuronCAD.Visuals.Windows
                 // Name
                 row.Children.Add(new TextBlock
                 {
-                    Text = "Name:",
+                    Text = "名称：",
                     Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
                     VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 12,
@@ -285,7 +285,7 @@ namespace NeuronCAD.Visuals.Windows
                 row.Children.Add(tbName);
 
                 // Value
-                string unitLabel = ch.IsPermeability ? "P (cm/s):" : "g (mS/cm\u00b2):";
+                string unitLabel = ch.IsPermeability ? "P（cm/s）：" : "g（mS/cm\u00b2）：";
                 row.Children.Add(new TextBlock
                 {
                     Text = unitLabel,
@@ -311,7 +311,7 @@ namespace NeuronCAD.Visuals.Windows
                 {
                     row.Children.Add(new TextBlock
                     {
-                        Text = "  \u26a0 Permeability (GHK), not conductance",
+                        Text = "  \u26a0 这是渗透率（GHK），非电导",
                         Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA5, 0x00)),
                         VerticalAlignment = VerticalAlignment.Center,
                         FontSize = 11,
@@ -333,22 +333,22 @@ namespace NeuronCAD.Visuals.Windows
                 string newName = nameTb.Text.Trim();
                 if (string.IsNullOrEmpty(newName))
                 {
-                    MessageBox.Show($"Channel name cannot be empty (original: '{origKey}').",
-                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"通道名称不能为空（原始键：'{origKey}'）。",
+                        "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                     nameTb.Focus();
                     return false;
                 }
                 if (!float.TryParse(valTb.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float val))
                 {
-                    MessageBox.Show($"Invalid value for channel '{newName}': {valTb.Text}",
-                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"通道 '{newName}' 的值无效：{valTb.Text}",
+                        "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                     valTb.Focus();
                     return false;
                 }
                 if (newChannels.ContainsKey(newName))
                 {
-                    MessageBox.Show($"Duplicate channel name: '{newName}'.",
-                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"重复的通道名称：'{newName}'。",
+                        "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                     nameTb.Focus();
                     return false;
                 }
@@ -482,8 +482,8 @@ namespace NeuronCAD.Visuals.Windows
             {
                 if (!double.TryParse(kv.Value.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double val))
                 {
-                    MessageBox.Show($"Invalid value for parameter '{kv.Key}': {kv.Value.Text}",
-                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"参数 '{kv.Key}' 的值无效：{kv.Value.Text}",
+                        "验证错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                     kv.Value.Focus();
                     return false;
                 }

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:helix="http://helix-toolkit.org/wpf"
         mc:Ignorable="d"
-        Title="NeuronCAD 2026"
+        Title="Neuron CAD 2026"
         Height="768"
         Width="1280"
         WindowStartupLocation="CenterScreen"
@@ -36,25 +36,25 @@
                                                         Value="10,5"/>
                                         </Style>
                                 </Menu.Resources>
-                                <MenuItem Header="File">
-                                        <MenuItem Header="New Project"
+                                <MenuItem Header="文件">
+                                        <MenuItem Header="新建项目"
                                                   Click="OnNewProjectClick"/>
-                                        <MenuItem Header="Open..."
+                                        <MenuItem Header="打开..."
                                                   Click="OnOpenProjectClick"/>
-                                        <MenuItem Header="Save"
+                                        <MenuItem Header="保存"
                                                   Click="OnSaveProjectClick"/>
-                                        <MenuItem Header="Save As..."
+                                        <MenuItem Header="另存为..."
                                                   Click="OnSaveAsProjectClick"/>
                                         <Separator/>
-                                        <MenuItem Header="Exit"
+                                        <MenuItem Header="退出"
                                                   Click="OnExitClick"/>
                                 </MenuItem>
-                                <MenuItem Header="Edit">
-                                        <MenuItem Header="Ion Channel Setting"
+                                <MenuItem Header="编辑">
+                                        <MenuItem Header="离子通道设置"
                                                   Click="OnIonChannelSettingClick"/>
                                 </MenuItem>
-                                <MenuItem Header="View"/>
-                                <MenuItem Header="Help"/>
+                                <MenuItem Header="视图"/>
+                                <MenuItem Header="帮助"/>
                         </Menu>
                 </Border>
 
@@ -66,7 +66,7 @@
                         <StackPanel Orientation="Horizontal"
                                     Margin="5,0,0,0">
                                 <ToggleButton x:Name="TabModeling"
-                                              Content="Modeling"
+                                              Content="建模"
                                               IsChecked="True"
                                               Click="OnTabModelingClick"
                                               Padding="18,7"
@@ -76,7 +76,7 @@
                                               BorderThickness="0"
                                               Margin="0,0,2,0"/>
                                 <ToggleButton x:Name="TabSimulation"
-                                              Content="Simulating"
+                                              Content="模拟"
                                               Click="OnTabSimulationClick"
                                               Padding="18,7"
                                               MinWidth="90"
@@ -85,7 +85,7 @@
                                               BorderThickness="0"
                                               Margin="0,0,2,0"/>
                                 <ToggleButton x:Name="TabReporting"
-                                              Content="Reporting"
+                                              Content="报告"
                                               Click="OnTabReportingClick"
                                               Padding="18,7"
                                               MinWidth="90"
@@ -131,7 +131,7 @@
                                                             Background="#1E1E1E"
                                                             Margin="0,0,0,1">
                                                         <ToggleButton x:Name="SubTabInsert"
-                                                                      Content="Insert"
+                                                                      Content="插入"
                                                                       IsChecked="True"
                                                                       Click="OnSubTabInsertClick"
                                                                       Padding="14,5"
@@ -141,7 +141,7 @@
                                                                       BorderThickness="0"
                                                                       Margin="4,4,2,4"/>
                                                         <ToggleButton x:Name="SubTabSimulate"
-                                                                      Content="Simulate"
+                                                                      Content="运行"
                                                                       Click="OnSubTabSimulateClick"
                                                                       Padding="14,5"
                                                                       MinWidth="70"
@@ -166,13 +166,13 @@
                                                               VerticalScrollBarVisibility="Auto"
                                                               Visibility="Collapsed">
                                                         <StackPanel Margin="10">
-                                                                <TextBlock Text="Simulation Parameters"
+                                                                <TextBlock Text="模拟参数"
                                                                            Foreground="White"
                                                                            FontWeight="Bold"
                                                                            FontSize="14"
                                                                            Margin="0,0,0,12"/>
 
-                                                                <TextBlock Text="V_init (mV):"
+                                                                <TextBlock Text="初始电位 (mV):"
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -184,7 +184,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="dt (ms):"
+                                                                <TextBlock Text="时间步长 (ms):"
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -196,7 +196,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="Steps:"
+                                                                <TextBlock Text="步数："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -208,7 +208,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="E_Na (mV):"
+                                                                <TextBlock Text="E_Na（mV）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -220,7 +220,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="E_K (mV):"
+                                                                <TextBlock Text="E_K（mV）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -232,7 +232,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="E_Leak (mV):"
+                                                                <TextBlock Text="E_Leak（mV）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -244,7 +244,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="Celsius (°C):"
+                                                                <TextBlock Text="温度 (°C):"
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -256,7 +256,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="Ca_out (mM):"
+                                                                <TextBlock Text="Ca_out（mM）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -268,7 +268,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="Ca_inf (mM):"
+                                                                <TextBlock Text="Ca_inf（mM）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -280,7 +280,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="Tau_Ca (ms):"
+                                                                <TextBlock Text="Tau_Ca（ms）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -292,7 +292,7 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,16"/>
 
-                                                                <TextBlock Text="Segmentation"
+                                                                <TextBlock Text="分段"
                                                                            Foreground="White"
                                                                            FontWeight="Bold"
                                                                            FontSize="14"
@@ -301,18 +301,18 @@
                                                                 <StackPanel Orientation="Horizontal"
                                                                             Margin="0,0,0,8">
                                                                         <RadioButton x:Name="RbNSeg"
-                                                                                     Content="NSeg"
+                                                                                     Content="NSeg（按区室数）"
                                                                                      IsChecked="True"
                                                                                      Foreground="#CCC"
                                                                                      GroupName="SegMode"
                                                                                      Margin="0,0,15,0"/>
                                                                         <RadioButton x:Name="RbLSeg"
-                                                                                     Content="LSeg"
+                                                                                     Content="LSeg（按区室间距）"
                                                                                      Foreground="#CCC"
                                                                                      GroupName="SegMode"/>
                                                                 </StackPanel>
 
-                                                                <TextBlock Text="NSeg (compartments per segment):"
+                                                                <TextBlock Text="NSeg（每段区室数）："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -324,8 +324,8 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="LSeg (µm, compartment spacing):"
-                                                                                Foreground="#CCC"
+                                                                <TextBlock Text="LSeg（µm，区室间距）："
+                                                                           Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
                                                                 <TextBox x:Name="TbLSeg"
@@ -337,7 +337,7 @@
                                                                          Margin="0,0,0,16"/>
 
                                                                 <Button x:Name="BtnBeginSimulation"
-                                                                        Content="Begin"
+                                                                        Content="开始"
                                                                         Click="OnBeginSimulationClick"
                                                                         Background="#C42B1C"
                                                                         Foreground="White"
@@ -367,12 +367,12 @@
                                                                                 Padding="8">
                                                                                 <StackPanel>
                                                                                         <TextBlock x:Name="SimStatusText"
-                                                                                                   Text="Initializing..."
+                                                                                                   Text="初始化中..."
                                                                                                    Foreground="#FFD700"
                                                                                                    FontWeight="Bold"
                                                                                                    Margin="0,0,0,4"/>
                                                                                         <TextBlock x:Name="SimStepText"
-                                                                                                   Text="Step: 0 / 0"
+                                                                                                   Text="步骤：0 / 0"
                                                                                                    Foreground="#AAAAAA"
                                                                                                    FontSize="11"
                                                                                                    Margin="0,0,0,6"/>
@@ -384,7 +384,7 @@
                                                                                                      Foreground="#007ACC"
                                                                                                      Background="#333333"/>
                                                                                         <Button x:Name="BtnAbortSimulation"
-                                                                                                Content="Abort"
+                                                                                                Content="中止"
                                                                                                 Click="OnAbortSimulationClick"
                                                                                                 Background="#C42B1C"
                                                                                                 Foreground="White"
@@ -414,7 +414,7 @@
                                                             Background="#1E1E1E"
                                                             Margin="0,0,0,1">
                                                         <ToggleButton x:Name="ReportSubTabComponents"
-                                                                      Content="Components"
+                                                                      Content="组件"
                                                                       IsChecked="True"
                                                                       Click="OnReportSubTabComponentsClick"
                                                                       Padding="14,5"
@@ -424,7 +424,7 @@
                                                                       BorderThickness="0"
                                                                       Margin="4,4,2,4"/>
                                                         <ToggleButton x:Name="ReportSubTabProbes"
-                                                                      Content="Probes"
+                                                                      Content="探针"
                                                                       Click="OnReportSubTabProbesClick"
                                                                       Padding="14,5"
                                                                       MinWidth="70"
@@ -518,7 +518,7 @@
                                                                           Opacity="0.5"/>
                                                 </Border.Effect>
                                                 <StackPanel>
-                                                        <TextBlock Text="Edit Dimensions"
+                                                        <TextBlock Text="编辑尺寸"
                                                                    Foreground="White"
                                                                    FontWeight="Bold"
                                                                    Margin="0,0,0,10"/>
@@ -526,7 +526,7 @@
                                                         <StackPanel x:Name="PanelAxonLength"
                                                                     Visibility="Collapsed"
                                                                     Margin="0,0,0,5">
-                                                                <TextBlock Text="Length:"
+                                                                <TextBlock Text="长度："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"/>
                                                                 <TextBox x:Name="TbLength"
@@ -538,7 +538,7 @@
                                                         <StackPanel x:Name="PanelRadius"
                                                                     Visibility="Collapsed"
                                                                     Margin="0,0,0,5">
-                                                                <TextBlock Text="Base / Soma Radius:"
+                                                                <TextBlock Text="基底/胞体半径："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"/>
                                                                 <TextBox x:Name="TbRadius"
@@ -550,7 +550,7 @@
                                                         <StackPanel x:Name="PanelTopRadius"
                                                                     Visibility="Collapsed"
                                                                     Margin="0,0,0,10">
-                                                                <TextBlock Text="Top Radius:"
+                                                                <TextBlock Text="顶端半径："
                                                                            Foreground="#CCC"
                                                                            FontSize="11"/>
                                                                 <TextBox x:Name="TbTopRadius"
@@ -561,12 +561,12 @@
 
                                                         <StackPanel Orientation="Horizontal"
                                                                     HorizontalAlignment="Right">
-                                                                <Button Content="Cancel"
+                                                                <Button Content="取消"
                                                                         Click="OnCancelEdit"
                                                                         Width="60"
                                                                         Margin="0,0,5,0"
                                                                         Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
-                                                                <Button Content="Apply"
+                                                                <Button Content="应用"
                                                                         Click="OnApplyEdit"
                                                                         Width="60"
                                                                         Background="#007ACC"
@@ -586,15 +586,15 @@
                                         Padding="10"
                                         Margin="0,0,0,20">
                                         <StackPanel Orientation="Horizontal">
-                                                <Button Content="Add Soma"
+                                                <Button Content="添加胞体"
                                                         Click="OnAddSomaClick"
                                                         Padding="10,5"
                                                         Margin="5"/>
-                                                <Button Content="Add Axon"
+                                                <Button Content="添加轴突"
                                                         Click="OnAddAxonClick"
                                                         Padding="10,5"
                                                         Margin="5"/>
-                                                <Button Content="Add Dend"
+                                                <Button Content="添加树突"
                                                         Click="OnAddDendClick"
                                                         Padding="10,5"
                                                         Margin="5"/>
@@ -611,19 +611,19 @@
                                         Padding="10"
                                         Margin="0,0,0,20">
                                         <StackPanel Orientation="Horizontal">
-                                                <Button Content="Add CurrentClamp"
+                                                <Button Content="添加电流钳"
                                                         Click="OnAddStimulationClick"
                                                         Background="DarkGoldenrod"
                                                         Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
-                                                <Button Content="Add VoltageClamp"
+                                                <Button Content="添加电压钳"
                                                         Click="OnAddVoltageClampClick"
                                                         Background="DarkRed"
                                                         Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
-                                                <Button Content="Add Probe"
+                                                <Button Content="添加探针"
                                                         Click="OnAddProbeClick"
                                                         Background="DarkCyan"
                                                         Foreground="White"
@@ -643,7 +643,7 @@
                                         BorderThickness="1"
                                         Padding="10">
                                         <StackPanel>
-                                                <TextBlock Text="Select Channel to Add:"
+                                                <TextBlock Text="选择要添加的通道："
                                                            Foreground="#CCCCCC"
                                                            Margin="0,0,0,5"/>
                                                 <StackPanel x:Name="ChannelSelectorList"/>

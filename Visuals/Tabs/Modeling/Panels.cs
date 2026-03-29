@@ -189,7 +189,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             var panel = new StackPanel { Margin = new Thickness(10, 5, 0, 5) };
 
-            panel.Children.Add(new TextBlock { Text = "Color (Hex):", Foreground = Brushes.Gray });
+            panel.Children.Add(new TextBlock { Text = "颜色 (Hex)：", Foreground = Brushes.Gray });
             var tbColor = new TextBox { Text = entity.CurrentColor.ToString(), Background = Brushes.DarkGray, Foreground = Brushes.White };
             tbColor.LostFocus += (s, e) =>
             {
@@ -204,41 +204,41 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             if (entity is AxonVisual axonEntity)
             {
-                panel.Children.Add(new TextBlock { Text = "Base Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "基底半径 (µm)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbBaseRadius = new TextBox { Text = axonEntity.BaseRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbBaseRadius.LostFocus += (s, e) => { if (double.TryParse(tbBaseRadius.Text, out double v)) axonEntity.BaseRadius = v; };
                 panel.Children.Add(tbBaseRadius);
 
-                panel.Children.Add(new TextBlock { Text = "Top Radius (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "顶端半径 (µm)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbTopRadius = new TextBox { Text = axonEntity.TopRadius.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbTopRadius.LostFocus += (s, e) => { if (double.TryParse(tbTopRadius.Text, out double v)) axonEntity.TopRadius = v; };
                 panel.Children.Add(tbTopRadius);
 
-                panel.Children.Add(new TextBlock { Text = "Length (µm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+                panel.Children.Add(new TextBlock { Text = "长度 (µm)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
                 var tbLength = new TextBox { Text = axonEntity.Length.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
                 tbLength.LostFocus += (s, e) => { if (double.TryParse(tbLength.Text, out double v)) axonEntity.Length = v; };
                 panel.Children.Add(tbLength);
             }
 
             // Cm (µF/cm²)
-            panel.Children.Add(new TextBlock { Text = "Cm (µF/cm²):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+            panel.Children.Add(new TextBlock { Text = "膜电容 (Cm, µF/cm²)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
             var tbCm = new TextBox { Text = entity.Cm.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
             tbCm.LostFocus += (s, e) => { if (double.TryParse(tbCm.Text, out double v) && v > 0) entity.Cm = v; else tbCm.Text = entity.Cm.ToString("F2"); };
             panel.Children.Add(tbCm);
 
             // Ra (Ω·cm)
-            panel.Children.Add(new TextBlock { Text = "Ra (Ω·cm):", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
+            panel.Children.Add(new TextBlock { Text = "电阻 (Ra, Ω·cm)：", Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 0) });
             var tbRa = new TextBox { Text = entity.Ra.ToString("F2"), Background = Brushes.DarkGray, Foreground = Brushes.White };
             tbRa.LostFocus += (s, e) => { if (double.TryParse(tbRa.Text, out double v) && v > 0) entity.Ra = v; else tbRa.Text = entity.Ra.ToString("F2"); };
             panel.Children.Add(tbRa);
 
-            var channelHeader = new TextBlock { Text = "Ion Channels:", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) };
+            var channelHeader = new TextBlock { Text = "离子通道：", Foreground = Brushes.Gray, Margin = new Thickness(0, 10, 0, 0) };
             panel.Children.Add(channelHeader);
 
             var channelListPanel = new StackPanel();
             panel.Children.Add(channelListPanel);
 
-            var btnAddChannel = new Button { Content = "+ Add Channel", Margin = new Thickness(0, 5, 0, 0), Background = Brushes.DarkSlateGray, Foreground = Brushes.White };
+            var btnAddChannel = new Button { Content = "+ 添加通道", Margin = new Thickness(0, 5, 0, 0), Background = Brushes.DarkSlateGray, Foreground = Brushes.White };
             btnAddChannel.Click += (s, e) =>
             {
                 _currentOperatingEntity = entity;
@@ -297,7 +297,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                     Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)),
                     Foreground = Brushes.White,
                     Margin = new Thickness(2, 0, 2, 0),
-                    ToolTip = "Edit channel value for this entity"
+                    ToolTip = "编辑该实体的通道数值"
                 };
                 btnGear.Click += (s, e) =>
                 {
@@ -327,7 +327,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             var win = new Window
             {
-                Title = $"Edit Channel: {channelName}",
+                Title = $"编辑通道： {channelName}",
                 Width = 340,
                 Height = 180,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
@@ -338,8 +338,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var panel = new StackPanel { Margin = new Thickness(15) };
 
             string unitText = ch.IsPermeability
-                ? "Permeability P (cm/s) \u2014 GHK, not conductance"
-                : "Conductance g (mS/cm\u00b2)";
+                ? "渗透率 P (cm/s) — GHK，非电导率"
+                : "电导 g (mS/cm\u00b2)";
             panel.Children.Add(new TextBlock
             {
                 Text = unitText,
@@ -368,7 +368,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
 
             var btnOK = new Button
             {
-                Content = "OK",
+                Content = "确定",
                 Width = 60,
                 Padding = new Thickness(0, 4, 0, 4),
                 Margin = new Thickness(0, 0, 8, 0),
@@ -388,13 +388,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 }
                 else
                 {
-                    MessageBox.Show("Invalid numeric value.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("数值无效。", "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
 
             var btnCancel = new Button
             {
-                Content = "Cancel",
+                Content = "取消",
                 Width = 60,
                 Padding = new Thickness(0, 4, 0, 4),
                 Background = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
