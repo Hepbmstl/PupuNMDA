@@ -1,4 +1,9 @@
-#<!--
+
+# PupuNMDA
+Neuron Modeling and Dynamics Analysis XD
+
+
+
  Copyright 2026 [Hepbmstl Hepupu]
 
  Pupu NMDA / NeuronCAD
@@ -15,7 +20,4 @@
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
--->
 
-# PupuNMDA
-Neuron Modeling and Dynamics Analysis XD
