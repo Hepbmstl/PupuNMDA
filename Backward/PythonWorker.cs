@@ -9,10 +9,12 @@ using Python.Runtime;
 namespace NeuronCAD.Backward
 {
     /// <summary>
-    /// 专用 Python 工作线程管理器。
-    /// 所有 Python 操作均调度到该固定线程执行，保证 GIL 始终在同一线程获取/释放，
-    /// 同时满足 Matplotlib GUI 需要稳定线程的要求。
-    /// Python 运行时随此线程存活，直到应用程序关闭时调用 Shutdown()。
+    /// Dedicated Python worker thread manager.
+    /// All Python operations are dispatched to this dedicated thread to ensure the
+    /// GIL is always acquired/released on the same thread and to satisfy Matplotlib
+    /// GUI requirements for a stable thread.
+    /// The Python runtime lives with this thread until Shutdown() is called at
+    /// application exit.
     /// </summary>
     public static class PythonWorker
     {
@@ -30,8 +32,8 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 确保 Python 工作线程已启动并完成初始化。
-        /// 线程安全，可多次调用；仅首次调用执行实际启动。
+        /// Ensure the Python worker thread is started and initialized.
+        /// Thread-safe and callable multiple times; only the first call performs startup.
         /// </summary>
         public static Task EnsureStartedAsync()
         {
@@ -89,7 +91,7 @@ namespace NeuronCAD.Backward
                 string? dllPath = FindPythonDll();
                 if (string.IsNullOrEmpty(dllPath))
                     throw new InvalidOperationException(
-                        "无法自动定位 Python DLL，请安装 Python 3.8-3.12 或设置 PYTHONNET_PYDLL 环境变量。");
+                        "Cannot locate Python DLL automatically. Please install Python 3.8-3.12 or set the PYTHONNET_PYDLL environment variable.");
                 Runtime.PythonDLL = dllPath;
             }
             PythonEngine.Initialize();
@@ -97,20 +99,20 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 将 Python 操作调度到专用线程执行。
-        /// 操作在 GIL 保护下运行，调用方通过 await 等待完成。
+        /// Dispatch Python actions to the dedicated thread.
+        /// Actions run under GIL protection; callers await completion.
         /// </summary>
         public static Task RunAsync(Action action)
         {
             if (_queue == null || _queue.IsAddingCompleted)
-                throw new InvalidOperationException("Python 工作线程未启动或已关闭。");
+                throw new InvalidOperationException("Python worker thread is not started or has been shut down.");
             var item = new WorkItem { Work = action };
             _queue.Add(item);
             return item.Tcs.Task;
         }
 
         /// <summary>
-        /// 关闭工作线程。应在应用程序退出时调用。
+        /// Shut down the worker thread. Should be called on application exit.
         /// </summary>
         public static void Shutdown()
         {
@@ -120,18 +122,18 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
-        /// 自动检测系统中可用的 Python DLL 路径。
-        /// 优先级：PYTHONNET_PYDLL 环境变量 → where python 推断 → 常见安装路径扫描。
-        /// pythonnet 3.0.x 支持 Python 3.8-3.12。
+        /// Automatically detect an available Python DLL path on the system.
+        /// Priority: PYTHONNET_PYDLL env var → infer from 'where python' → scan common install locations.
+        /// pythonnet 3.0.x supports Python 3.8-3.12.
         /// </summary>
         private static string? FindPythonDll()
         {
-            // 1. 环境变量
+            // 1. Environment variable
             string? envDll = Environment.GetEnvironmentVariable("PYTHONNET_PYDLL");
             if (!string.IsNullOrEmpty(envDll) && File.Exists(envDll))
                 return envDll;
 
-            // 2. 通过 where python 获取可执行文件路径，推断 DLL
+            // 2. Use 'where python' to get executable path and infer DLL
             try
             {
                 var psi = new ProcessStartInfo("where", "python")
@@ -160,9 +162,9 @@ namespace NeuronCAD.Backward
                     }
                 }
             }
-            catch { /* 忽略，继续尝试 */ }
+            catch { /* ignore and continue trying */ }
 
-            // 3. 常见安装路径扫描
+            // 3. Scan common installation paths
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string[] searchRoots = new[]
@@ -190,7 +192,7 @@ namespace NeuronCAD.Backward
                             if (File.Exists(candidate)) return candidate;
                         }
                     }
-                    catch { /* 忽略权限问题 */ }
+                    catch { /* ignore permission issues */ }
                 }
             }
 

@@ -11,47 +11,45 @@ using NeuronCAD.Visuals.Tabs.Simulation;
 namespace NeuronCAD.Visuals.Tabs.Shared
 {
     /// <summary>
-    /// 跨模式共享的场景状态单例，持有实体列表、连接控制器、设备列表等核心数据。
-    /// Modeling 和 Simulation 交互控制器通过引用此对象共享同一份三维场景数据。
-    /// 由 MainWindow.InitializeControllers 创建，注入到各控制器中。
+    /// Singleton scene state shared across modes; holds core data such as the entity list, connection controller, and device list.
+    /// Modeling and Simulation interaction controllers share the same 3D scene data by referencing this object.
+    /// Created by MainWindow.InitializeControllers and injected into controllers.
     /// </summary>
     public class SharedSceneState
     {
-        /// <summary>HelixToolkit 三维视口控件引用，用于添加/移除 Visual3D 子元素。</summary>
+        /// <summary>Reference to the HelixToolkit 3D viewport control, used to add/remove Visual3D children.</summary>
         public HelixViewport3D HelixViewport { get; }
 
-        /// <summary>视口控制器，负责环境初始化（网格、灯光）、手势配置和射线投影计算。</summary>
+        /// <summary>Viewport controller responsible for environment initialization (grid, lighting), gesture configuration, and raycasting computations.</summary>
         public ViewportController ViewportController { get; }
 
-        /// <summary>连接控制器，负责管理实体间连接线的增删查改和可视化更新。</summary>
+        /// <summary>Connection controller that manages creation, deletion, and visualization updates of connections between entities.</summary>
         public ConnectionController ConnectionController { get; }
 
-        /// <summary>仿真注册表，负责管理建模组件的全局登记和区室化切分。</summary>
+        /// <summary>Simulation registry responsible for global registration of modeling components and compartmentalization.</summary>
         public SimulationRegistry SimulationRegistry { get; }
 
         /// <summary>
-        /// 建模实体列表 (Soma, Axon, Dend)。
-        /// 由 Modeling 模式的 InteractionController 创建和修改，Simulation 模式只读引用。
+        /// List of modeling entities (Soma, Axon, Dend). Created and modified by the InteractionController in Modeling mode; read-only in Simulation mode.
         /// </summary>
         public List<IVisualEntity> Entities { get; } = new();
 
         /// <summary>
-        /// 附属设备列表 (Stimulation, Probe)。
-        /// 由 Simulation 模式的 SimulationInteractionController 创建和修改，Modeling 模式只读引用。
+        /// List of attached devices (Stimulation, Probe). Created and modified by SimulationInteractionController in Simulation mode; read-only in Modeling mode.
         /// </summary>
         public List<IAttachedDevice> Devices { get; } = new();
 
         /// <summary>
-        /// 上一次仿真完成后的仿真数据（包含区室化结果和探针/刺激绑定信息）。
-        /// 由 MainWindow.OnBeginSimulationClick 在仿真成功后写入，供 Reporting 面板读取探针映射。
+        /// Simulation data from the last completed run (includes compartmentalization results and probe/stimulation bindings).
+        /// Written by MainWindow.OnBeginSimulationClick after a successful simulation; read by the Reporting panel for probe mapping.
         /// </summary>
         public SimulationData? LastSimulationData { get; set; }
 
         /// <summary>
-        /// 构造函数，基于给定的 HelixViewport3D 创建视口控制器和连接控制器。
-        /// 由 MainWindow.InitializeControllers 调用。
+        /// Constructor: creates viewport and connection controllers from the provided HelixViewport3D.
+        /// Called by MainWindow.InitializeControllers.
         /// </summary>
-        /// <param name="helixViewport">XAML 中定义的 HelixViewport3D 实例</param>
+        /// <param name="helixViewport">HelixViewport3D instance defined in XAML</param>
         public SharedSceneState(HelixViewport3D helixViewport)
         {
             HelixViewport = helixViewport;
@@ -62,20 +60,18 @@ namespace NeuronCAD.Visuals.Tabs.Shared
     }
 
     /// <summary>
-    /// WPF 可视化树辅助工具类，提供 Visual3D 层级查询方法。
-    /// 被 InteractionController 和 SimulationInteractionController 的命中测试逻辑广泛调用，
-    /// 用于判断射线命中的 Visual3D 是否属于某个实体或设备。
+    /// WPF visual-tree helper providing Visual3D hierarchy query methods.
+    /// Widely used by InteractionController and SimulationInteractionController hit-test logic to determine whether a raycast-hit Visual3D belongs to a particular entity or device.
     /// </summary>
     public static class VisualTreeUtils
     {
         /// <summary>
-        /// 判断 hitVisual 是否是 selfVisual 本身或其子级 Visual3D。
-        /// 通过向上遍历可视化树实现。
-        /// 被 InteractionController.HitTestEntity、SimulationInteractionController.HitTestDevice 等方法调用。
+        /// Determine whether hitVisual is selfVisual or a child Visual3D of it.
+        /// Implemented by traversing up the visual tree. Called by InteractionController.HitTestEntity, SimulationInteractionController.HitTestDevice, etc.
         /// </summary>
-        /// <param name="hitVisual">射线命中的 Visual3D</param>
-        /// <param name="selfVisual">目标实体的根 Visual3D</param>
-        /// <returns>true 表示 hitVisual 属于 selfVisual 的可视化树</returns>
+        /// <param name="hitVisual">The Visual3D hit by a raycast</param>
+        /// <param name="selfVisual">The root Visual3D of the target entity</param>
+        /// <returns>true if hitVisual belongs to the visual tree of selfVisual</returns>
         public static bool IsSelfOrChild(Visual3D hitVisual, Visual3D selfVisual)
         {
             if (hitVisual == selfVisual) return true;

@@ -8,78 +8,78 @@ using HelixToolkit.Wpf;
 namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 {
     /// <summary>
-    /// 可视化实体抽象基类，实现 IVisualEntity 接口的公共逻辑。
-    /// 持有 HelixToolkit 三维模型 (GeometryModel3D)、材质管理、线框模式切换、
-    /// 离子通道表面散点可视化等功能。
-    /// 派生类：SomaVisual（圆台，继承 AxonVisual）、AxonVisual（圆台/圆柱）、DendVisual（AxonVisual 套壳）。
-    /// 调用者：InteractionController（放置/选择/移动/显示模式切换）、
-    /// PropertiesPanelController（属性编辑和通道管理）、MainWindow（编辑弹窗）。
+    /// Abstract base class for visual entities, implementing common IVisualEntity logic.
+    /// Holds a HelixToolkit 3D model (GeometryModel3D), material management, wireframe mode toggle,
+    /// and visualization for ion channel surface point clouds.
+    /// Derived classes: SomaVisual (frustum, inherits AxonVisual), AxonVisual (frustum/cylinder), DendVisual (wrapper around AxonVisual).
+    /// Callers: InteractionController (placing/selecting/moving/display mode toggles),
+    /// PropertiesPanelController (property editing and channel management), MainWindow (edit dialogs).
     /// </summary>
     public abstract class VisualEntityBase : IVisualEntity
     {
-        /// <summary>实体唯一标识符 (GUID)，在构造时自动生成。用于面板节点索引和连接字典 Key。</summary>
+        /// <summary>Unique identifier (GUID) for the entity, generated in the constructor. Used for panel node indices and connection dictionary keys.</summary>
         public string Id { get; private set; }
 
-        /// <summary>HelixToolkit 三维视觉对象根节点，包含主网格模型和子级散点/线框。</summary>
+        /// <summary>Root ModelVisual3D for HelixToolkit 3D visuals, containing the main mesh model and child point/wireframe visuals.</summary>
         public ModelVisual3D Visual3D { get; private set; }
 
-        /// <summary>是否处于选中状态。由 SetSelected 方法管理。</summary>
+        /// <summary>Whether the entity is selected. Managed by SetSelected method.</summary>
         public bool IsSelected { get; private set; }
 
-        /// <summary>是否参与射线命中测试。被 InteractionController 在放置/移动时禁用以避免自命中。</summary>
+        /// <summary>Whether the entity participates in hit testing. Disabled by InteractionController during placing/moving to avoid self-intersection.</summary>
         public bool IsHitTestVisible { get; private set; } = true;
 
-        /// <summary>实体在世界坐标系中的中心位置（抽象属性，由派生类根据变换矩阵计算）。</summary>
+        /// <summary>The entity's center position in world coordinates (abstract; computed by derived classes from the transform).</summary>
         public abstract Point3D CenterPosition { get; }
 
-        /// <summary>主几何模型，持有 MeshGeometry3D 和材质。由派生类的 UpdateGeometry 方法更新。</summary>
+        /// <summary>Main geometry model holding MeshGeometry3D and materials. Updated by derived classes' UpdateGeometry method.</summary>
         protected GeometryModel3D MainModel;
 
-        /// <summary>默认材质（未选中时使用），颜色由 SetColor 设置。</summary>
+        /// <summary>Default material (used when not selected); color set by SetColor.</summary>
         protected Material _defaultMaterial;
 
-        /// <summary>选中状态材质（橙色高亮），在 SetSelected(true) 时应用。</summary>
+        /// <summary>Material used when selected (orange highlight); applied when SetSelected(true) is called.</summary>
         protected Material _selectedMaterial;
 
-        /// <summary>当前实体颜色，被 SetColor 更新，被面板读取 (CurrentColor 属性)。</summary>
+        /// <summary>Current entity color, updated by SetColor and exposed to panels via CurrentColor property.</summary>
         protected Color _current_color = Colors.Gray;
 
-        /// <summary>线框模式下的线段可视化对象。在 Wireframe 模式时从网格三角面提取边线。</summary>
+        /// <summary>Wireframe visual used in Wireframe mode. Edges are extracted from mesh triangles when in wireframe.</summary>
         private LinesVisual3D? _wireframe;
 
-        /// <summary>当前显示模式（Normal/Wireframe）。由 SetDisplayMode 管理。</summary>
+        /// <summary>Current display mode (Normal/Wireframe). Managed by SetDisplayMode.</summary>
         private VisualDisplayMode _displayMode = VisualDisplayMode.Normal;
 
-        /// <summary>当前颜色的公开只读属性，供 PropertiesPanelController 面板读取。</summary>
+        /// <summary>Public read-only property for current color, used by PropertiesPanelController.</summary>
         public Color CurrentColor => _current_color;
 
         /// <summary>
-        /// 实体绑定的离子通道字典。
-        /// 被 PropertiesPanelController 的通道选择器弹窗操作添加/删除。
+        /// Dictionary of ion channels bound to this entity.
+        /// Channels are added/removed by the channel selector dialog in PropertiesPanelController.
         /// </summary>
         public Dictionary<string, ChannelProperty> Channels { get; set; } = new Dictionary<string, ChannelProperty>();
 
-        /// <summary>离子通道可视化图层字典，Key 为通道名称，Value 为 ModelVisual3D（合并网格）。由 UpdateChannelVisuals 管理。</summary>
+        /// <summary>Dictionary of channel visualization layers. Key: channel name. Value: ModelVisual3D (merged mesh). Managed by UpdateChannelVisuals.</summary>
         private Dictionary<string, ModelVisual3D> _channelVisuals = new Dictionary<string, ModelVisual3D>();
 
-        /// <summary>散点随机数生成器（全局共享），用于 UpdateChannelVisuals 中的蒙特卡洛采样。</summary>
+        /// <summary>Shared random generator used for Monte Carlo sampling in UpdateChannelVisuals.</summary>
         private static readonly Random Rnd = new Random();
 
-        /// <summary>比膜电容 (µF/cm²)，标准值 1.0。</summary>
+        /// <summary>Membrane capacitance (µF/cm²), default 1.0.</summary>
         public double Cm { get; set; } = 1.0;
 
-        /// <summary>轴向电阻率 (Ω·cm)，标准值 100.0。</summary>
+        /// <summary>Axial resistivity (Ω·cm), default 100.0.</summary>
         public double Ra { get; set; } = 100.0;
 
-        /// <summary>仿真后该实体被切分的区室数量。未仿真时为 0。</summary>
+        /// <summary>Number of compartments this entity is split into after simulation. 0 when not simulated.</summary>
         public int CompartmentCount { get; set; } = 0;
 
-        /// <summary>仿真后该实体拥有的区室全局 ID 列表。未仿真时为空。</summary>
+        /// <summary>List of global compartment IDs owned by this entity after simulation. Empty when not simulated.</summary>
         public List<int> CompartmentIds { get; set; } = new List<int>();
 
         /// <summary>
-        /// 基类构造函数，初始化 GUID、Visual3D 容器、主几何模型和默认材质。
-        /// 由派生类构造函数通过 base() 调用。
+        /// Base class constructor. Initializes GUID, Visual3D container, main geometry model and default materials.
+        /// Called by derived class constructors via base().
         /// </summary>
         protected VisualEntityBase()
         {
@@ -95,14 +95,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             Visual3D.Content = MainModel;
 
-            // 初始化变换矩阵为单位矩阵，确保 CombinedManipulator.Bind 有合法目标
+            // Initialize transform to identity to ensure CombinedManipulator.Bind has a valid target
             Visual3D.Transform = new System.Windows.Media.Media3D.MatrixTransform3D(Matrix3D.Identity);
         }
 
         /// <summary>
-        /// 设置实体选中状态，切换材质为选中高亮色或默认色。
-        /// 同时更新线框颜色。
-        /// 被 InteractionController.ForceSelect 和 StartPlacing/ConfirmAction 等方法调用。
+        /// Set selection state for the entity, toggling materials to selected highlight or default.
+        /// Also updates wireframe appearance.
+        /// Called by InteractionController.ForceSelect and actions like StartPlacing/ConfirmAction.
         /// </summary>
         public void SetSelected(bool isSelected)
         {
@@ -118,8 +118,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 设置实体颜色并更新默认材质。
-        /// 被 PropertiesPanelController 中颜色编辑文本框的 LostFocus 回调调用。
+        /// Set the entity color and update the default material.
+        /// Called from PropertiesPanelController color edit textbox LostFocus callback.
         /// </summary>
         public void SetColor(Color color)
         {
@@ -136,8 +136,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 设置实体透明度 (0.0~1.0)，通过调整颜色 Alpha 通道和重建材质实现。
-        /// 预留接口，可用于半透明可视化效果。
+        /// Set entity opacity (0.0~1.0) by adjusting alpha channel and rebuilding materials.
+        /// Reserved for semi-transparent visualization effects.
         /// </summary>
         public void SetOpacity(double opacity)
         {
@@ -163,9 +163,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 设置实体是否参与射线命中测试。
-        /// 在放置/移动模式中禁用以避免鼠标射线命中自身。
-        /// 被 InteractionController.StartPlacing/ConfirmAction/ShowGimbal/HideGimbal 调用。
+        /// Set whether the entity participates in hit testing.
+        /// Disabled during placing/moving to avoid self-selection.
+        /// Called by InteractionController.StartPlacing/ConfirmAction/ShowGimbal/HideGimbal.
         /// </summary>
         public void SetHitTestVisible(bool isVisible)
         {
@@ -173,8 +173,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 切换实体显示模式。Normal 模式显示材质和散点，Wireframe 模式显示线框并隐藏材质和散点。
-        /// 被 InteractionController.ShowGimbal（切为 Wireframe）和 HideGimbal（切为 Normal）调用。
+        /// Toggle display mode. Normal shows materials and point clouds; Wireframe shows edges and hides materials/points.
+        /// Called by InteractionController.ShowGimbal (switch to Wireframe) and HideGimbal (switch to Normal).
         /// </summary>
         public void SetDisplayMode(VisualDisplayMode mode)
         {
@@ -183,30 +183,30 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             if (_displayMode == VisualDisplayMode.Normal)
             {
-                // 恢复正常材质
+                // Restore normal materials
                 MainModel.Material = IsSelected ? _selectedMaterial : _defaultMaterial;
                 MainModel.BackMaterial = IsSelected ? _selectedMaterial : _defaultMaterial;
 
-                // 移除线框
+                // Remove wireframe
                 if (_wireframe != null)
                 {
                     Visual3D.Children.Remove(_wireframe);
                 }
 
-                // 恢复通道散点显示
+                // Restore channel point visuals
                 foreach (var visual in _channelVisuals.Values)
                 {
                     if (!Visual3D.Children.Contains(visual))
                         Visual3D.Children.Add(visual);
                 }
             }
-            else // Wireframe 模式
+            else // Wireframe mode
             {
-                // 清除材质使模型透明
+                // Clear materials to make the model transparent
                 MainModel.Material = null;
                 MainModel.BackMaterial = null;
 
-                // 构建并显示线框
+                // Build and show wireframe
                 EnsureWireframe();
                 RebuildWireframeFromCurrentMesh();
 
@@ -215,7 +215,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                     Visual3D.Children.Add(_wireframe);
                 }
 
-                // 隐藏通道散点，保证线框模式视线不被遮挡
+                // Hide channel point visuals to keep wireframe unobstructed
                 foreach (var visual in _channelVisuals.Values)
                 {
                     Visual3D.Children.Remove(visual);
@@ -224,10 +224,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 刷新离子通道表面可视化。
-        /// 使用低密度三维小球体代替屏幕空间散点，球体合并为单个网格以减少绘制调用。
-        /// 球体具有固定三维尺寸，不会随视角距离变化而改变大小。
-        /// 每通道最多 MaxChannelParticles 个粒子，密度按电导比例缩放。
+        /// Refresh ion channel surface visualization.
+        /// Use low-density 3D spheres instead of screen-space points; spheres are merged into a single mesh to reduce draw calls.
+        /// Spheres have a fixed 3D size and do not change with camera distance.
+        /// Each channel has up to MaxChannelParticles particles; density scales with conductance.
         /// </summary>
         public void UpdateChannelVisuals()
         {
@@ -236,14 +236,14 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             const double ParticleRadius = 0.15;
             const int ParticleSeg = 4;
 
-            // 1. 清理当前图层
+            // 1. Clear current layers
             foreach (var vis in _channelVisuals.Values)
             {
                 Visual3D.Children.Remove(vis);
             }
             _channelVisuals.Clear();
 
-            // 2. 拦截空数据
+            // 2. Guard against empty data
             if (MainModel.Geometry is not MeshGeometry3D mesh ||
                 mesh.Positions == null || mesh.TriangleIndices == null || mesh.Positions.Count == 0)
                 return;
@@ -252,7 +252,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             var indices = mesh.TriangleIndices;
             int triangleCount = indices.Count / 3;
 
-            // 3. 预计算累积面积（面积加权采样）
+            // 3. Precompute cumulative triangle areas (area-weighted sampling)
             double[] cumulativeAreas = new double[triangleCount];
             double totalArea = 0;
 
@@ -272,7 +272,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
 
             if (totalArea <= 0) return;
 
-            // 4. 为每个通道生成固定三维大小的粒子网格
+            // 4. Generate fixed-size particle mesh for each channel
             foreach (var kvp in Channels)
             {
                 var channel = kvp.Value;
@@ -305,7 +305,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                     double py = u * p0.Y + v * p1.Y + w * p2.Y;
                     double pz = u * p0.Z + v * p1.Z + w * p2.Z;
 
-                    // 沿法线偏移，避免 Z-Fighting
+                    // Offset along normal to avoid Z-fighting
                     Vector3D normal = Vector3D.CrossProduct(p1 - p0, p2 - p0);
                     if (normal.LengthSquared > 1e-10)
                     {
@@ -335,7 +335,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 懒初始化线框对象。在首次进入 Wireframe 模式时调用。
+        /// Lazy-initialize the wireframe object. Called on first switch to Wireframe mode.
         /// </summary>
         private void EnsureWireframe()
         {
@@ -350,8 +350,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 更新线框颜色：选中时橙色，未选中时使用实体当前颜色。
-        /// 被 SetSelected、SetColor、SetOpacity 调用。
+        /// Update wireframe color: orange when selected, otherwise use the entity's current color.
+        /// Called by SetSelected, SetColor, SetOpacity.
         /// </summary>
         private void UpdateWireframeAppearance()
         {
@@ -361,9 +361,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
         }
 
         /// <summary>
-        /// 通知几何数据已变更。当派生类的半径/长度等参数修改触发网格重建后调用。
-        /// 在 Wireframe 模式下同步重建线框数据，同时强制刷新通道散点。
-        /// 被派生类的 UpdateGeometry 方法在末尾调用。
+        /// Notify that geometry has changed. Call after derived classes rebuild meshes due to radius/length changes.
+        /// Rebuilds wireframe in Wireframe mode and forces a refresh of channel point clouds.
+        /// Typically called at the end of derived UpdateGeometry implementations.
         /// </summary>
         protected void NotifyGeometryChanged()
         {
@@ -373,13 +373,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 RebuildWireframeFromCurrentMesh();
             }
 
-            // 当尺寸（半径、长度）修改触发网格变更时，必须强制同步点云数据
+            // When dimensions (radius, length) change and mesh is rebuilt, force sync of point cloud data
             UpdateChannelVisuals();
         }
 
         /// <summary>
-        /// 从当前 MeshGeometry3D 的三角面数据中提取所有唯一边线，重建线框顶点集合。
-        /// 在 Wireframe 模式下由 NotifyGeometryChanged 和 SetDisplayMode 调用。
+        /// Extract all unique edges from the current MeshGeometry3D triangle data and rebuild the wireframe vertex collection.
+        /// Called by NotifyGeometryChanged and SetDisplayMode when in Wireframe mode.
         /// </summary>
         private void RebuildWireframeFromCurrentMesh()
         {
@@ -390,7 +390,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             var positions = mesh.Positions;
             var indices = mesh.TriangleIndices;
 
-            // 使用 HashSet 去重边线（无向边：始终取较小索引在前）
+            // Use a HashSet to deduplicate edges (undirected edges: always store smaller index first)
             var edges = new HashSet<(int a, int b)>();
 
             void AddEdge(int i1, int i2)
@@ -411,7 +411,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
                 AddEdge(i2, i0);
             }
 
-            // 将去重后的边线转为线段顶点对
+            // Convert deduplicated edges to segment vertex pairs
             var pts = new Point3DCollection(edges.Count * 2);
             foreach (var (a, b) in edges)
             {
@@ -422,88 +422,88 @@ namespace NeuronCAD.Visuals.Tabs.Modeling.Visuals
             _wireframe.Points = pts;
         }
 
-        // ====== 派生类抽象契约 ======
+        // ====== Abstract contract for derived classes ======
 
-        /// <summary>获取实体尺寸信息字符串（由派生类实现）。</summary>
+        /// <summary>Get a string describing the entity's dimensions (implemented by derived classes).</summary>
         public abstract string GetDimensionInfo();
 
-        /// <summary>将实体对齐到指定世界坐标和法线方向（由派生类根据几何特征实现）。</summary>
+        /// <summary>Align the entity to the specified world position and normal (implemented by derived classes based on geometry).</summary>
         public abstract void AlignTo(Point3D position, Vector3D normal);
 
-        /// <summary>更新几何网格（由派生类在参数变更时调用，末尾应调用 NotifyGeometryChanged）。</summary>
+        /// <summary>Update the geometry mesh (called by derived classes when parameters change; should call NotifyGeometryChanged at the end).</summary>
         protected abstract void UpdateGeometry();
     }
 
     /// <summary>
-    /// 锚点模式枚举，描述锚点在实体表面的定位方式。
-    /// 被 AnchorRef.Mode 使用，由 AxonVisual.TryWorldPointToAnchor 和
-    /// AttachedDeviceBase.CalculateWorldNormal 根据命中位置决定。
+    /// Anchor mode enum describing how an anchor is positioned on the entity surface.
+    /// Used by AnchorRef.Mode; chosen by AxonVisual.TryWorldPointToAnchor and
+    /// AttachedDeviceBase.CalculateWorldNormal based on hit location.
     /// </summary>
     public enum AnchorMode
     {
-        /// <summary>锚点在圆柱/圆台侧面（Axon/Dend），使用 AxialT 和 Angle 定位。</summary>
+        /// <summary>Anchor located on the cylindrical/frustum side (Axon/Dend), positioned using AxialT and Angle.</summary>
         AxonCylinder,
-        /// <summary>锚点在 Soma 圆台表面（预留，当前 SomaVisual 使用 AxonCylinder）。</summary>
+        /// <summary>Anchor on Soma frustum surface (reserved; current SomaVisual uses AxonCylinder).</summary>
         SomaCylinder,
-        /// <summary>锚点在 Soma 表面均匀分布（已废弃，Soma 现已改为圆台逻辑）。</summary>
+        /// <summary>Anchor uniformly distributed on Soma surface (deprecated; Soma now uses frustum logic).</summary>
         SomaUniform,
-        /// <summary>锚点在 Axon/Dend 底面端盖 (Z=0)。</summary>
+        /// <summary>Anchor on the start cap of Axon/Dend (Z=0).</summary>
         AxonCapStart,
-        /// <summary>锚点在 Axon/Dend 顶面端盖 (Z=Length)。</summary>
+        /// <summary>Anchor on the end cap of Axon/Dend (Z=Length).</summary>
         AxonCapEnd
     }
 
     /// <summary>
-    /// 锚点引用数据类，描述实体表面上一个精确位置。
-    /// 通过 (Mode, AxialT, Angle) 三元组唯一确定表面位置。
-    /// 被 Connection（实体间连接线端点）和 IAttachedDevice（仿真设备吸附点）持有。
+    /// Anchor reference data class describing a precise location on an entity surface.
+    /// Uniquely determined by the tuple (Mode, AxialT, Angle).
+    /// Held by Connection endpoints and IAttachedDevice attachment points.
     /// </summary>
     public sealed class AnchorRef
     {
-        /// <summary>锚点定位模式（侧面圆柱/端盖/球面等）。</summary>
+        /// <summary>Anchor positioning mode (side/cap/sphere etc.).</summary>
         public AnchorMode Mode { get; set; }
 
         /// <summary>
-        /// 轴向参数 (0.0~1.0)，0.0 表示底端 (Z=0)，1.0 表示顶端 (Z=Length)。
-        /// 对 Soma 类型无实际意义。
+        /// Axial parameter (0.0~1.0), where 0.0 indicates the base (Z=0) and 1.0 the tip (Z=Length).
+        /// Not meaningful for Soma types.
         /// </summary>
         public double AxialT { get; set; }
 
         /// <summary>
-        /// 周向角度 (弧度)，表示在横截面上的旋转位置。
-        /// 对端盖锚点和 Soma 类型无实际意义。
+        /// Circumferential angle (radians) indicating rotation around the cross-section.
+        /// Not meaningful for cap anchors and Soma types.
         /// </summary>
         public double Angle { get; set; }
     }
 
     /// <summary>
-    /// 两个实体之间的连接数据类，持有连接两端的实体引用和锚点信息。
-    /// 由 InteractionController.ConfirmAction 或 ShowContextMenu 中的 "Connect" 操作创建。
-    /// 被 ConnectionController 管理生命周期和可视化更新。
+    /// Connection data class between two entities, holding references to endpoints and anchor information.
+    /// Created by InteractionController.ConfirmAction or the "Connect" operation in the context menu.
+    /// Managed by ConnectionController for lifecycle and visualization updates.
     /// </summary>
     public class Connection
     {
-        /// <summary>连接唯一标识符 (GUID)，用于 ConnectionController 字典索引。</summary>
+        /// <summary>Unique identifier (GUID) for the connection, used as dictionary key in ConnectionController.</summary>
         public string Id { get; } = Guid.NewGuid().ToString();
 
-        /// <summary>连接端点 A 的实体引用。</summary>
+        /// <summary>Reference to the entity at endpoint A.</summary>
         public IVisualEntity A { get; }
 
-        /// <summary>连接端点 B 的实体引用。</summary>
+        /// <summary>Reference to the entity at endpoint B.</summary>
         public IVisualEntity B { get; }
 
-        /// <summary>端点 A 在实体表面的锚点位置。可被拖拽修改。</summary>
+        /// <summary>Anchor position for endpoint A on the entity surface. Can be dragged to modify.</summary>
         public AnchorRef AnchorA { get; set; }
 
-        /// <summary>端点 B 在实体表面的锚点位置。可被拖拽修改。</summary>
+        /// <summary>Anchor position for endpoint B on the entity surface. Can be dragged to modify.</summary>
         public AnchorRef AnchorB { get; set; }
 
-        /// <summary>连接权重，预留用于仿真计算中的突触强度等参数。</summary>
+        /// <summary>Connection weight, reserved for parameters like synaptic strength in simulation calculations.</summary>
         public double Weight { get; set; } = 1.0;
 
         /// <summary>
-        /// 构造函数，创建连接两个实体的 Connection 实例。
-        /// 由 InteractionController.ConfirmAction 和右键菜单 Connect 操作调用。
+        /// Constructor creating a Connection instance between two entities.
+        /// Called by InteractionController.ConfirmAction and the context menu Connect operation.
         /// </summary>
         public Connection(IVisualEntity a, IVisualEntity b, AnchorRef anchorA, AnchorRef anchorB, double weight = 1.0)
         {

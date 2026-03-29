@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -18,7 +19,7 @@ namespace NeuronCAD.Backward
     #region JSON Data Models
 
     /// <summary>
-    /// 项目文件根节点。包含驱动 Hines_method.py 完整仿真所需的全部数据。
+    /// Root node of the project file. Contains all data required to drive a full simulation in Hines_method.py.
     /// </summary>
     public class ProjectData
     {
@@ -119,9 +120,9 @@ namespace NeuronCAD.Backward
     #endregion
 
     /// <summary>
-    /// 项目保存/加载管理器。
-    /// 序列化：从 SharedSceneState + UI 参数构建 ProjectData → JSON。
-    /// 反序列化：从 JSON → ProjectData → 重建场景实体、连接、设备及全局参数。
+    /// Project save/load manager.
+    /// Serialization: build ProjectData from SharedSceneState + UI parameters → JSON.
+    /// Deserialization: JSON → ProjectData → rebuild scene entities, connections, devices, and global parameters.
     /// </summary>
     public static class SaveLoadManager
     {
@@ -129,13 +130,13 @@ namespace NeuronCAD.Backward
         {
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = null, // 保持原始属性名
+            PropertyNamingPolicy = null, // keep original property names
         };
 
         #region Save
 
         /// <summary>
-        /// 将当前场景状态序列化为 ProjectData 并写入 JSON 文件。
+        /// Serialize the current scene state into ProjectData and write to a JSON file.
         /// </summary>
         public static void Save(
             string filePath,
@@ -310,17 +311,17 @@ namespace NeuronCAD.Backward
         #region Load
 
         /// <summary>
-        /// 从 JSON 文件加载 ProjectData。
+        /// Load ProjectData from a JSON file.
         /// </summary>
         public static ProjectData Load(string filePath)
         {
             string json = File.ReadAllText(filePath);
             return JsonSerializer.Deserialize<ProjectData>(json, JsonOpts)
-                ?? throw new InvalidOperationException("无法解析项目文件。");
+                ?? throw new InvalidOperationException("Failed to parse project file.");
         }
 
         /// <summary>
-        /// 将 ProjectData 应用到场景：清空当前状态 → 重建实体 → 重建连接 → 重建设备 → 恢复全局参数。
+        /// Apply ProjectData to the scene: clear current state → rebuild entities → rebuild connections → rebuild devices → restore global parameters.
         /// </summary>
         public static void ApplyToScene(
             ProjectData project,
@@ -341,24 +342,24 @@ namespace NeuronCAD.Backward
             Action<string> setTbLSeg,
             Action<bool> setRbNSeg)
         {
-            // ── 1. 清空当前场景 ──
+            // ── 1. Clear current scene ──
             modelingInteraction.Deactivate();
             simulationInteraction.Deactivate();
 
-            // 移除所有设备
+            // Remove all devices
             foreach (var device in scene.Devices.ToList())
             {
                 scene.HelixViewport.Children.Remove(device.Visual3D);
             }
             scene.Devices.Clear();
 
-            // 移除所有连接
+            // Remove all connections
             foreach (var connId in scene.ConnectionController.ConnectionsById.Keys.ToList())
             {
                 scene.ConnectionController.Remove(connId);
             }
 
-            // 移除所有实体
+            // Remove all entities
             foreach (var entity in scene.Entities.ToList())
             {
                 scene.HelixViewport.Children.Remove(entity.Visual3D);
@@ -366,7 +367,7 @@ namespace NeuronCAD.Backward
             }
             scene.Entities.Clear();
 
-            // ── 2. 恢复全局环境参数到 UI ──
+            // ── 2. Restore global environment parameters to UI ──
             var env = project.GlobalEnvironment;
             setTbVInit(env.V_init.ToString(CultureInfo.InvariantCulture));
             setTbDt(env.dt.ToString(CultureInfo.InvariantCulture));
@@ -384,7 +385,7 @@ namespace NeuronCAD.Backward
             setTbCaInf(env.CA_INF.ToString(CultureInfo.InvariantCulture));
             setTbTauCa(env.TAU_CA.ToString(CultureInfo.InvariantCulture));
 
-            // ── 3. 恢复区室化参数 ──
+            // ── 3. Restore segmentation parameters ──
             var seg = project.Segmentation;
             bool isNSeg = seg.Mode == "NSeg";
             setRbNSeg(isNSeg);
@@ -397,11 +398,14 @@ namespace NeuronCAD.Backward
             scene.SimulationRegistry.NSeg = seg.NSeg;
             scene.SimulationRegistry.LSeg = seg.LSeg;
 
-            // ── 4. 恢复 HH / CA 参数 ──
+            // ── 4. Restore HH / CA parameters ──
             ApplyHHParams(project.HH_PARAMS);
             ApplyCaParams(project.CA_PARAMS);
 
-            // ── 5. 重建实体 ──
+            // ── 4b. Diagnostic output: display all loaded global parameters ──
+            TraceLoadedParams(project);
+
+            // ── 5. Rebuild entities ──
             var entityMap = new Dictionary<string, IVisualEntity>();
 
             foreach (var ed in project.Entities)
@@ -426,30 +430,30 @@ namespace NeuronCAD.Backward
                         break;
                 }
 
-                // 通过反射设置 Id（保持与保存时一致）
+                // Set Id via reflection (preserve saved value)
                 SetEntityId(entity, ed.Id);
 
-                // 设置几何参数（会触发 UpdateGeometry）
+                // Set geometry parameters (triggers UpdateGeometry)
                 entity.BaseRadius = ed.BaseRadius;
                 entity.TopRadius = ed.TopRadius;
                 entity.Length = ed.Length;
 
-                // 设置生物物理参数
+                // Set biophysical parameters
                 entity.Ra = ed.Ra;
                 entity.Cm = ed.Cm;
 
-                // 恢复变换矩阵（包含空间位置和旋转信息）
+                // Restore transformation matrix (includes position and rotation)
                 if (ed.Transform.Length == 16)
                 {
                     var m = ArrayToMatrix3D(ed.Transform);
                     entity.Visual3D.Transform = new MatrixTransform3D(m);
                 }
 
-                // 恢复离子通道
+                // Restore ion channels
                 entity.Channels.Clear();
                 foreach (var chEntry in ed.Channels)
                 {
-                    // 从 GlobalBiophysics 获取基础颜色信息，如不存在则用默认灰色
+                    // Retrieve base color from GlobalBiophysics; use default gray if missing
                     Color chColor = Colors.Gray;
                     if (GlobalBiophysics.GlobalChannels.TryGetValue(chEntry.Key, out var globalCh))
                         chColor = globalCh.Color;
@@ -459,18 +463,18 @@ namespace NeuronCAD.Backward
                 }
                 entity.UpdateChannelVisuals();
 
-                // 添加到场景
+                // Add to scene
                 scene.HelixViewport.Children.Add(entity.Visual3D);
                 scene.Entities.Add(entity);
                 scene.SimulationRegistry.Register(entity);
 
-                // 触发面板更新
+                // Trigger panel update
                 modelingInteraction.NotifyEntityLoaded(entity);
 
                 entityMap[ed.Id] = entity;
             }
 
-            // ── 6. 重建连接 ──
+            // ── 6. Rebuild connections ──
             foreach (var cd in project.Connections)
             {
                 if (!entityMap.TryGetValue(cd.EntityA_Id, out var entityA)) continue;
@@ -483,7 +487,7 @@ namespace NeuronCAD.Backward
                 scene.ConnectionController.Add(conn);
             }
 
-            // ── 7. 重建设备 ──
+            // ── 7. Rebuild devices ──
             foreach (var dd in project.Devices)
             {
                 if (!entityMap.TryGetValue(dd.TargetEntityId, out var targetEntity)) continue;
@@ -583,7 +587,7 @@ namespace NeuronCAD.Backward
 
         private static void SetConnectionId(Connection conn, string id)
         {
-            // Connection.Id 只有 get 访问器，通过反射设置私有后备字段
+            // Connection.Id has only a get accessor; set the private backing field via reflection
             var field = typeof(Connection).GetField("<Id>k__BackingField",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             field?.SetValue(conn, id);
@@ -637,6 +641,81 @@ namespace NeuronCAD.Backward
             if (p.TryGetValue("tau_hT_k2", out v)) IonChannelParams.TauHT_k2 = v;
             if (p.TryGetValue("tau_hT_Q10", out v)) IonChannelParams.TauHT_Q10 = v;
             if (p.TryGetValue("tau_hT_Tref", out v)) IonChannelParams.TauHT_Tref = v;
+        }
+
+        /// <summary>
+        /// Diagnostic output: print loaded global project parameters to the Debug Output window,
+        /// allowing developers to verify that JSON → IonChannelParams overrides were applied correctly.
+        /// </summary>
+        private static void TraceLoadedParams(ProjectData project)
+        {
+            var ci = CultureInfo.InvariantCulture;
+            var env = project.GlobalEnvironment;
+
+            Debug.WriteLine("╔══════════════════════════════════════════════════════════╗");
+            Debug.WriteLine("║         NeuronCAD: Loaded Project Parameters             ║");
+            Debug.WriteLine("╠══════════════════════════════════════════════════════════╣");
+
+            Debug.WriteLine("║ [GlobalEnvironment]");
+            Debug.WriteLine($"║   V_init   = {env.V_init.ToString(ci)} mV");
+            Debug.WriteLine($"║   dt       = {env.dt.ToString(ci)} ms");
+            Debug.WriteLine($"║   STEPS    = {env.STEPS}");
+            Debug.WriteLine($"║   celsius  = {env.celsius.ToString(ci)} °C");
+            Debug.WriteLine($"║   CA_OUT   = {env.CA_OUT.ToString(ci)} mM");
+            Debug.WriteLine($"║   CA_INF   = {env.CA_INF.ToString(ci)} mM");
+            Debug.WriteLine($"║   TAU_CA   = {env.TAU_CA.ToString(ci)} ms");
+
+            Debug.WriteLine("║ [E_TABLE]");
+            foreach (var kvp in project.E_TABLE)
+                Debug.WriteLine($"║   E_{kvp.Key} = {kvp.Value.E.ToString(ci)} mV");
+
+            Debug.WriteLine("║ [HH_PARAMS] (IonChannelParams after overwrite)");
+            Debug.WriteLine($"║   vtraub   = {IonChannelParams.Vtraub.ToString(ci)}");
+            Debug.WriteLine($"║   αm: A={IonChannelParams.AlphaM_A.ToString(ci)}, V={IonChannelParams.AlphaM_V.ToString(ci)}, k={IonChannelParams.AlphaM_k.ToString(ci)}");
+            Debug.WriteLine($"║   βm: A={IonChannelParams.BetaM_A.ToString(ci)}, V={IonChannelParams.BetaM_V.ToString(ci)}, k={IonChannelParams.BetaM_k.ToString(ci)}");
+            Debug.WriteLine($"║   αh: A={IonChannelParams.AlphaH_A.ToString(ci)}, V={IonChannelParams.AlphaH_V.ToString(ci)}, k={IonChannelParams.AlphaH_k.ToString(ci)}");
+            Debug.WriteLine($"║   βh: A={IonChannelParams.BetaH_A.ToString(ci)}, V={IonChannelParams.BetaH_V.ToString(ci)}, k={IonChannelParams.BetaH_k.ToString(ci)}");
+            Debug.WriteLine($"║   αn: A={IonChannelParams.AlphaN_A.ToString(ci)}, V={IonChannelParams.AlphaN_V.ToString(ci)}, k={IonChannelParams.AlphaN_k.ToString(ci)}");
+            Debug.WriteLine($"║   βn: A={IonChannelParams.BetaN_A.ToString(ci)}, V={IonChannelParams.BetaN_V.ToString(ci)}, k={IonChannelParams.BetaN_k.ToString(ci)}");
+
+            Debug.WriteLine("║ [CA_PARAMS] (IonChannelParams after overwrite)");
+            Debug.WriteLine($"║   shift={IonChannelParams.Shift.ToString(ci)}, actshift={IonChannelParams.ActShift.ToString(ci)}");
+            Debug.WriteLine($"║   m∞: Vh={IonChannelParams.InfMT_Vh.ToString(ci)}, k={IonChannelParams.InfMT_k.ToString(ci)}");
+            Debug.WriteLine($"║   h∞: Vh={IonChannelParams.InfHT_Vh.ToString(ci)}, k={IonChannelParams.InfHT_k.ToString(ci)}");
+            Debug.WriteLine($"║   τm: base={IonChannelParams.TauMT_base.ToString(ci)}, V1={IonChannelParams.TauMT_V1.ToString(ci)}, k1={IonChannelParams.TauMT_k1.ToString(ci)}, V2={IonChannelParams.TauMT_V2.ToString(ci)}, k2={IonChannelParams.TauMT_k2.ToString(ci)}, Q10={IonChannelParams.TauMT_Q10.ToString(ci)}, Tref={IonChannelParams.TauMT_Tref.ToString(ci)}");
+            Debug.WriteLine($"║   τh: Vth={IonChannelParams.TauHT_Vthresh.ToString(ci)}, V1={IonChannelParams.TauHT_V1.ToString(ci)}, k1={IonChannelParams.TauHT_k1.ToString(ci)}, base={IonChannelParams.TauHT_base.ToString(ci)}, V2={IonChannelParams.TauHT_V2.ToString(ci)}, k2={IonChannelParams.TauHT_k2.ToString(ci)}, Q10={IonChannelParams.TauHT_Q10.ToString(ci)}, Tref={IonChannelParams.TauHT_Tref.ToString(ci)}");
+
+            Debug.WriteLine("╚══════════════════════════════════════════════════════════╝");
+        }
+
+        /// <summary>
+        /// For external UI calls: generate a human-readable summary string of loaded parameters.
+        /// </summary>
+        public static string GetLoadedParamsSummary(ProjectData project)
+        {
+            var ci = CultureInfo.InvariantCulture;
+            var env = project.GlobalEnvironment;
+            var lines = new List<string>
+            {
+                "── Global Environment ──",
+                $"  V_init={env.V_init.ToString(ci)} mV, dt={env.dt.ToString(ci)} ms, STEPS={env.STEPS}",
+                $"  celsius={env.celsius.ToString(ci)}°C, CA_OUT={env.CA_OUT.ToString(ci)} mM, CA_INF={env.CA_INF.ToString(ci)} mM, TAU_CA={env.TAU_CA.ToString(ci)} ms",
+                "── E_TABLE ──",
+            };
+            foreach (var kvp in project.E_TABLE)
+                lines.Add($"  E_{kvp.Key} = {kvp.Value.E.ToString(ci)} mV");
+
+            lines.Add("── HH_PARAMS ──");
+            lines.Add($"  vtraub = {IonChannelParams.Vtraub.ToString(ci)}");
+            foreach (var kvp in project.HH_PARAMS)
+                lines.Add($"  {kvp.Key} = {kvp.Value.ToString(ci)}");
+
+            lines.Add("── CA_PARAMS ──");
+            foreach (var kvp in project.CA_PARAMS)
+                lines.Add($"  {kvp.Key} = {kvp.Value.ToString(ci)}");
+
+            lines.Add($"── Entities: {project.Entities.Count}, Connections: {project.Connections.Count}, Devices: {project.Devices.Count} ──");
+            return string.Join("\n", lines);
         }
 
         #endregion

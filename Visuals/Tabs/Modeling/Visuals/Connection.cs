@@ -6,32 +6,28 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     /// <summary>
-    /// 连接线的可视化表示，包含一条线段和两个端点球体。
-    /// 每个 ConnectionVisual 对应一个 Connection 数据对象。
-    /// 由 ConnectionController.Add 创建，端点球体可被 InteractionController 拖拽。
+    /// Visual representation of a connection, consisting of a line segment and two endpoint spheres.
+    /// Each ConnectionVisual corresponds to a Connection data object.
+    /// Created by ConnectionController.Add; endpoint spheres can be dragged by InteractionController.
     /// </summary>
     public sealed class ConnectionVisual
     {
-        /// <summary>Visual3D 根节点容器，持有线段和两个端点球体作为子元素。</summary>
+        /// <summary>Root ModelVisual3D container holding the line and two endpoint spheres as child elements.</summary>
         public ModelVisual3D Visual3D { get; } = new ModelVisual3D();
-
-        /// <summary>连接线段可视化对象（深天蓝色线段）。</summary>
+        /// <summary>Visual for the connection line (DeepSkyBlue).</summary>
         public LinesVisual3D Line { get; } = new LinesVisual3D { Thickness = 1.5, Color = Colors.DeepSkyBlue };
-
-        /// <summary>端点 A 的球体可视化对象（白色，可拖拽改变锚点位置）。</summary>
+        /// <summary>Sphere visual for endpoint A (white, draggable to change anchor position).</summary>
         public SphereVisual3D EndA { get; } = new SphereVisual3D { Radius = 0.4, Fill = System.Windows.Media.Brushes.White };
-
-        /// <summary>端点 B 的球体可视化对象（白色，可拖拽改变锚点位置）。</summary>
+        /// <summary>Sphere visual for endpoint B (white, draggable to change anchor position).</summary>
         public SphereVisual3D EndB { get; } = new SphereVisual3D { Radius = 0.4, Fill = System.Windows.Media.Brushes.White };
-
-        /// <summary>对应的 Connection 数据对象 ID，用于与 ConnectionController 的字典索引关联。</summary>
+        /// <summary>Associated Connection data object ID, used to index into ConnectionController dictionaries.</summary>
         public string ConnectionId { get; }
 
         /// <summary>
-        /// 构造函数，创建连接线可视化并将子元素添加到容器。
-        /// 由 ConnectionController.Add 调用。
+        /// Constructor: create the connection visual and add child elements to the container.
+        /// Called by ConnectionController.Add.
         /// </summary>
-        /// <param name="connectionId">关联的 Connection ID</param>
+        /// <param name="connectionId">Associated Connection ID</param>
         public ConnectionVisual(string connectionId)
         {
             ConnectionId = connectionId;
@@ -41,11 +37,11 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 更新连接线两端的世界坐标位置。
-        /// 被 ConnectionController.Update 调用。
+        /// Update the world coordinates of the connection endpoints.
+        /// Called by ConnectionController.Update.
         /// </summary>
-        /// <param name="pA">端点 A 的世界坐标</param>
-        /// <param name="pB">端点 B 的世界坐标</param>
+        /// <param name="pA">World coordinate of endpoint A</param>
+        /// <param name="pB">World coordinate of endpoint B</param>
         public void Update(Point3D pA, Point3D pB)
         {
             Line.Points = new Point3DCollection { pA, pB };
@@ -55,36 +51,36 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
     }
 
     /// <summary>
-    /// 连接控制器，管理所有实体间连接 (Connection) 的生命周期和可视化更新。
-    /// 持有连接数据字典和对应的可视化字典。
-    /// 由 SharedSceneState 构造时创建，被 InteractionController（创建/拖拽连接端点）
-    /// 和 MainWindow（每帧渲染时调用 UpdateAll）使用。
+    /// Controller that manages the lifecycle and visualization updates of Connections between entities.
+    /// Holds the connection data dictionary and the corresponding visuals dictionary.
+    /// Created during SharedSceneState construction; used by InteractionController (creating/dragging endpoints)
+    /// and MainWindow (calls UpdateAll per frame).
     /// </summary>
     public sealed class ConnectionController
     {
-        /// <summary>HelixToolkit 视口引用，用于添加/移除连接线的 Visual3D。</summary>
+        /// <summary>HelixToolkit viewport reference, used to add/remove connection Visual3D objects.</summary>
         private readonly HelixViewport3D _viewport;
 
-        /// <summary>连接数据字典，Key 为 Connection.Id。</summary>
+        /// <summary>Dictionary of connection data, keyed by Connection.Id.</summary>
         public Dictionary<string, Connection> ConnectionsById { get; } = new();
 
-        /// <summary>连接可视化字典，Key 为 Connection.Id，与 ConnectionsById 一一对应。</summary>
+        /// <summary>Dictionary of connection visuals, keyed by Connection.Id, corresponding to ConnectionsById.</summary>
         public Dictionary<string, ConnectionVisual> VisualsById { get; } = new();
 
         /// <summary>
-        /// 构造函数。由 SharedSceneState 创建。
+        /// Constructor. Created by SharedSceneState.
         /// </summary>
-        /// <param name="viewport">HelixToolkit 视口实例</param>
+        /// <param name="viewport">HelixToolkit viewport instance</param>
         public ConnectionController(HelixViewport3D viewport)
         {
             _viewport = viewport;
         }
 
         /// <summary>
-        /// 添加一条新连接并创建对应的可视化对象。
-        /// 被 InteractionController.ConfirmAction（放置时自动连接）和右键菜单 Connect 操作调用。
+        /// Add a new connection and create the corresponding visual object.
+        /// Called by InteractionController.ConfirmAction (auto-connect on placement) and the right-click 'Connect' menu action.
         /// </summary>
-        /// <param name="connection">连接数据对象</param>
+        /// <param name="connection">Connection data object</param>
         public void Add(Connection connection)
         {
             ConnectionsById[connection.Id] = connection;
@@ -97,10 +93,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 移除指定连接及其可视化对象。
-        /// 预留接口，可在删除实体时联动清理。
+        /// Remove the specified connection and its visual object.
+        /// Reserved for cleanup when deleting entities.
         /// </summary>
-        /// <param name="id">连接 ID</param>
+        /// <param name="id">Connection ID</param>
         public void Remove(string id)
         {
             if (VisualsById.TryGetValue(id, out var v))
@@ -112,10 +108,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 更新指定连接的可视化位置。通过 IAnchoredEntity.TryAnchorToWorldPoint 计算端点世界坐标。
-        /// 被 InteractionController.UpdateDraggingConnectionEndpoint（拖拽连接端点时）和 UpdateAll 调用。
+        /// Update the visual position for the specified connection. Uses IAnchoredEntity.TryAnchorToWorldPoint to compute endpoint world coordinates.
+        /// Called by InteractionController.UpdateDraggingConnectionEndpoint (when dragging endpoints) and UpdateAll.
         /// </summary>
-        /// <param name="id">连接 ID</param>
+        /// <param name="id">Connection ID</param>
         public void Update(string id)
         {
             if (!ConnectionsById.TryGetValue(id, out var c)) return;
@@ -131,9 +127,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 更新所有连接的可视化位置。
-        /// 被 MainWindow.InitializeControllers 注册到 CompositionTarget.Rendering 事件中每帧调用，
-        /// 以及 InteractionController.UpdateObjectPosition 在实体移动时调用。
+        /// Update visual positions for all connections.
+        /// Registered to CompositionTarget.Rendering by MainWindow.InitializeControllers and called each frame, and also invoked by InteractionController.UpdateObjectPosition when entities move.
         /// </summary>
         public void UpdateAll()
         {

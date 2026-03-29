@@ -5,65 +5,65 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Simulation
 {
     /// <summary>
-    /// 区室化切分模式枚举。
+    /// Enumeration for segmentation (compartmentalization) modes.
     /// </summary>
     public enum SegmentationMode
     {
-        /// <summary>按区室数量切分：每个组件固定切分为 NSeg 个区室。</summary>
+        /// <summary>Segment by fixed number of compartments: split each component into NSeg compartments.</summary>
         NSeg,
-        /// <summary>按区室长度切分：每隔 LSeg µm 切分一个区室。</summary>
+        /// <summary>Segment by compartment length: split every LSeg µm into one compartment.</summary>
         LSeg
     }
 
     /// <summary>
-    /// 仿真探针数据类，对应 Hines_method.py 的 insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms)。
-    /// 在按下 Begin 时由 SimulationRegistry.ResolveDevices 根据 ProbeDevice 空间位置自动创建。
+    /// Simulation probe data class, corresponding to Hines_method.py's insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms).
+    /// Created automatically by SimulationRegistry.ResolveDevices based on ProbeDevice spatial positions when Begin is pressed.
     /// </summary>
     public class SimProbe
     {
-        /// <summary>探针自动分配的全局编号 (0-based)。</summary>
+        /// <summary>Automatically assigned global probe id (0-based).</summary>
         public int ProbeId { get; set; }
 
-        /// <summary>探针采样开始时间 (ms)，对应 Hines_method 中的 probe_start_ms。</summary>
+        /// <summary>Probe sampling start time (ms), corresponding to probe_start_ms in Hines_method.</summary>
         public double StartMs { get; set; }
 
-        /// <summary>探针采样持续时间 (ms)，对应 Hines_method 中的 probe_duration_ms。</summary>
+        /// <summary>Probe sampling duration (ms), corresponding to probe_duration_ms in Hines_method.</summary>
         public double DurationMs { get; set; }
 
-        /// <summary>探针绑定的区室全局编号 (Compartment.GlobalId)。</summary>
+        /// <summary>Global compartment id bound to the probe (Compartment.GlobalId).</summary>
         public int SegmentId { get; set; }
 
-        /// <summary>关联的视觉设备 ID (GUID)，用于追溯到 ProbeDevice。</summary>
+        /// <summary>Associated visual device ID (GUID) for tracing back to the ProbeDevice.</summary>
         public string SourceDeviceId { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// 仿真刺激数据类，对应 Hines_method.py 的 insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration)。
-    /// 在按下 Begin 时由 SimulationRegistry.ResolveDevices 根据 StimulationDevice 空间位置自动创建。
+    /// Simulation stimulation data class, corresponding to Hines_method.py's insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration).
+    /// Created automatically by SimulationRegistry.ResolveDevices based on StimulationDevice spatial positions when Begin is pressed.
     /// </summary>
     public class SimStimulation
     {
-        /// <summary>刺激自动分配的全局编号 (0-based)。</summary>
+        /// <summary>Automatically assigned global stimulation id (0-based).</summary>
         public int StimulationId { get; set; }
 
-        /// <summary>刺激绑定的区室全局编号 (Compartment.GlobalId)。</summary>
+        /// <summary>Global compartment id bound to the stimulation (Compartment.GlobalId).</summary>
         public int SegmentId { get; set; }
 
-        /// <summary>刺激电流强度 (µA)。</summary>
+        /// <summary>Stimulation current amplitude (µA).</summary>
         public double Stimulation_uA { get; set; }
 
-        /// <summary>刺激开始时间 (ms)。</summary>
+        /// <summary>Stimulation start time (ms).</summary>
         public double StimStart { get; set; }
 
-        /// <summary>刺激持续时间 (ms)。</summary>
+        /// <summary>Stimulation duration (ms).</summary>
         public double StimDuration { get; set; }
 
-        /// <summary>关联的视觉设备 ID (GUID)，用于追溯到 StimulationDevice。</summary>
+        /// <summary>Associated visual device ID (GUID) for tracing back to the StimulationDevice.</summary>
         public string SourceDeviceId { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// 电压钳协议步骤数据。
+    /// Voltage clamp protocol step data.
     /// </summary>
     public class SimVCStep
     {
@@ -72,125 +72,125 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
     }
 
     /// <summary>
-    /// 仿真电压钳数据类，对应 Hines_method.py 的 insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol)。
+    /// Simulation voltage-clamp data class, corresponding to Hines_method.py's insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol).
     /// </summary>
     public class SimVoltageClamp
     {
-        /// <summary>电压钳自动分配的全局编号 (0-based)。</summary>
+        /// <summary>Automatically assigned global voltage-clamp id (0-based).</summary>
         public int VCId { get; set; }
 
-        /// <summary>电压钳绑定的区室全局编号 (Compartment.GlobalId)。</summary>
+        /// <summary>Global compartment id bound to the voltage clamp (Compartment.GlobalId).</summary>
         public int SegmentId { get; set; }
 
-        /// <summary>串联电阻 (MΩ)。</summary>
+        /// <summary>Series resistance (MΩ).</summary>
         public double Rs { get; set; }
 
-        /// <summary>电压钳协议步骤列表。</summary>
+        /// <summary>List of voltage-clamp protocol steps.</summary>
         public List<SimVCStep> Protocol { get; set; } = new();
 
-        /// <summary>关联的视觉设备 ID (GUID)。</summary>
+        /// <summary>Associated visual device ID (GUID).</summary>
         public string SourceDeviceId { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// 仿真完整数据包，包含区室化切分结果和设备绑定结果。
-    /// 由 SimulationRegistry.BuildSimulationData 一次性生成，可直接传入 Hines_method.py。
+    /// Complete simulation payload containing compartmentalization results and device bindings.
+    /// Generated once by SimulationRegistry.BuildSimulationData and can be passed directly to Hines_method.py.
     /// </summary>
     public class SimulationData
     {
-        /// <summary>所有区室列表（按 GlobalId 顺序）。</summary>
+        /// <summary>List of all compartments (ordered by GlobalId).</summary>
         public List<Compartment> Compartments { get; set; } = new();
 
-        /// <summary>所有探针绑定列表。</summary>
+        /// <summary>List of all probe bindings.</summary>
         public List<SimProbe> Probes { get; set; } = new();
 
-        /// <summary>所有电流钳绑定列表。</summary>
+        /// <summary>List of all current-clamp bindings.</summary>
         public List<SimStimulation> Stimulations { get; set; } = new();
 
-        /// <summary>所有电压钳绑定列表。</summary>
+        /// <summary>List of all voltage-clamp bindings.</summary>
         public List<SimVoltageClamp> VoltageClamps { get; set; } = new();
     }
 
     /// <summary>
-    /// 区室数据类，表示切分后的一个离散区室（对应 Hines_method.py 中的 Segment）。
-    /// 所有物理量纲统一为微级别国际单位：
-    ///   长度: µm, 直径: µm, 比膜电容: µF/cm², 轴向电阻率: Ω·cm, 电压: mV, 时间: ms
+    /// Compartment data class representing a discrete compartment after segmentation (corresponds to Segment in Hines_method.py).
+    /// Physical units are standardized to micron-scale SI-derived units:
+    ///   Length: µm, Diameter: µm, Specific membrane capacitance: µF/cm², Axial resistivity: Ω·cm, Voltage: mV, Time: ms
     /// </summary>
     public class Compartment
     {
-        /// <summary>全局唯一编号 (0-based)，用于 Hines 矩阵索引。</summary>
+        /// <summary>Global unique id (0-based) used for Hines matrix indexing.</summary>
         public int GlobalId { get; set; }
 
-        /// <summary>所属建模实体 ID (GUID)。</summary>
+        /// <summary>Parent modeling entity ID (GUID).</summary>
         public string ParentEntityId { get; set; } = string.Empty;
 
-        /// <summary>所属实体类型标识（"Soma" / "Axon" / "Dend"）。</summary>
+        /// <summary>Parent entity type identifier ("Soma" / "Axon" / "Dend").</summary>
         public string ParentEntityType { get; set; } = string.Empty;
 
-        /// <summary>在所属实体中的序号 (0-based)。</summary>
+        /// <summary>Index within the parent entity (0-based).</summary>
         public int Index { get; set; }
 
-        /// <summary>区室长度 (µm)。</summary>
+        /// <summary>Compartment length (µm).</summary>
         public double Length_um { get; set; }
 
-        /// <summary>区室直径 (µm)，取圆柱中心位置处所属组件的直径。</summary>
+        /// <summary>Compartment diameter (µm), taken at the component center position.</summary>
         public double Diameter_um { get; set; }
 
-        /// <summary>比膜电容 (µF/cm²)。</summary>
+        /// <summary>Specific membrane capacitance (µF/cm²).</summary>
         public double Cm { get; set; }
 
-        /// <summary>轴向电阻率 (Ω·cm)。</summary>
+        /// <summary>Axial resistivity (Ω·cm).</summary>
         public double Ra { get; set; }
 
-        /// <summary>离子通道属性字典，Key 为通道名称，Value 为 ChannelProperty 引用。</summary>
+        /// <summary>Dictionary of ion channel properties; key is channel name, value is ChannelProperty reference.</summary>
         public Dictionary<string, ChannelProperty> Channels { get; set; } = new();
 
-        /// <summary>连接的其他区室的全局编号列表（用于构建 Hines 矩阵的耦合关系）。</summary>
+        /// <summary>List of global ids of connected compartments (used to build coupling in the Hines matrix).</summary>
         public List<int> ConnectedIds { get; set; } = new();
     }
 
     /// <summary>
-    /// 仿真注册表，负责管理所有建模组件的全局登记和区室化切分。
-    /// 当 Modeling 模式下创建/删除实体时，通过 Register/Unregister 自动同步。
-    /// 当 Simulation 模式下按下 Begin 时，调用 Compartmentalize 执行区室化切分。
-    /// 切分结果可直接用于对接 Hines_method.py 的 init_segment / add_connection 接口。
+    /// Simulation registry responsible for managing global registration of all modeling components and performing compartmentalization.
+    /// Synchronized automatically via Register/Unregister when entities are created/removed in Modeling mode.
+    /// When Begin is pressed in Simulation mode, Compartmentalize is called to perform segmentation.
+    /// The segmentation results can be used directly with Hines_method.py's init_segment / add_connection interfaces.
     /// </summary>
     public class SimulationRegistry
     {
-        /// <summary>当前切分模式（按数量或按长度）。</summary>
+        /// <summary>Current segmentation mode (by count or by length).</summary>
         public SegmentationMode Mode { get; set; } = SegmentationMode.NSeg;
 
-        /// <summary>每组件区室数量（NSeg 模式下使用）。</summary>
+        /// <summary>Number of compartments per component (used in NSeg mode).</summary>
         public int NSeg { get; set; } = 5;
 
-        /// <summary>区室间距 (µm)（LSeg 模式下使用）。</summary>
+        /// <summary>Compartment spacing (µm) used in LSeg mode.</summary>
         public double LSeg { get; set; } = 20.0;
 
         /// <summary>
-        /// 已注册的建模实体字典，Key 为实体 ID。
-        /// 由 InteractionController.OnEntityAdded/OnEntityRemoved 事件驱动更新。
+        /// Dictionary of registered modeling entities, keyed by entity ID.
+        /// Updated by InteractionController.OnEntityAdded/OnEntityRemoved events.
         /// </summary>
         public Dictionary<string, IVisualEntity> RegisteredEntities { get; } = new();
 
-        /// <summary>将实体登记到全局注册表。</summary>
+        /// <summary>Register an entity to the global registry.</summary>
         public void Register(IVisualEntity entity)
         {
             RegisteredEntities[entity.Id] = entity;
         }
 
-        /// <summary>将实体从全局注册表移除。</summary>
+        /// <summary>Remove an entity from the global registry.</summary>
         public void Unregister(string entityId)
         {
             RegisteredEntities.Remove(entityId);
         }
 
         /// <summary>
-        /// 对所有已注册实体执行区室化切分。
-        /// 每个组件被切分成若干圆柱体区室，直径为圆柱中心位置处组件的直径。
-        /// 同一组件内的区室线性连接，实体间的连接通过锚点映射到最近区室。
+        /// Perform compartmentalization for all registered entities.
+        /// Each component is split into cylindrical compartments whose diameters are taken at the component center positions.
+        /// Compartments within the same entity are linearly connected; inter-entity connections are mapped from anchors to the nearest compartments.
         /// </summary>
-        /// <param name="connections">实体间连接字典（来自 ConnectionController.ConnectionsById）。</param>
-        /// <returns>所有区室的列表，按 GlobalId 顺序排列。</returns>
+        /// <param name="connections">Dictionary of inter-entity connections (from ConnectionController.ConnectionsById).</param>
+        /// <returns>List of all compartments ordered by GlobalId.</returns>
         public List<Compartment> Compartmentalize(Dictionary<string, Connection> connections)
         {
             var compartments = new List<Compartment>();
@@ -210,16 +210,16 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
                     for (int i = 0; i < n; i++)
                     {
-                        // t: 当前区室中心在组件轴向方向上的归一化位置 [0, 1]
+                        // t: normalized axial position of the compartment center within the component [0, 1]
                         double t = (i + 0.5) / n;
-                        // 在底面半径和顶面半径之间线性插值得到中心处半径
+                        // Linearly interpolate between base and top radius to obtain the center radius
                         double radius = axon.BaseRadius + (axon.TopRadius - axon.BaseRadius) * t;
 
                         var comp = new Compartment
                         {
                             GlobalId = globalId,
                             ParentEntityId = entity.Id,
-                            ParentEntityType = axon.VisualType, // "Axon" 或 "Dend"
+                            ParentEntityType = axon.VisualType, // "Axon" or "Dend"
                             Index = i,
                             Length_um = segLen,
                             Diameter_um = radius * 2.0,
@@ -232,7 +232,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                         globalId++;
                     }
 
-                    // 同一实体内相邻区室线性连接
+                    // Linear connections between adjacent compartments within the same entity
                     for (int i = 0; i < ids.Count - 1; i++)
                     {
                         compartments[ids[i]].ConnectedIds.Add(ids[i + 1]);
@@ -243,7 +243,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 entityCompartmentMap[entity.Id] = ids;
             }
 
-            // 处理实体间连接：将 Connection 的锚点位置映射到对应区室
+            // Handle inter-entity connections: map Connection anchor positions to corresponding compartments
             foreach (var conn in connections.Values)
             {
                 if (entityCompartmentMap.TryGetValue(conn.A.Id, out var compA) &&
@@ -263,7 +263,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
             return compartments;
         }
 
-        /// <summary>根据切分模式计算给定长度的区室数量。</summary>
+        /// <summary>Compute the number of compartments for a given length according to the segmentation mode.</summary>
         private int ComputeSegmentCount(double totalLength)
         {
             if (Mode == SegmentationMode.NSeg)
@@ -272,8 +272,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 根据锚点的轴向位置参数 (AxialT) 映射到最近的区室全局编号。
-        /// 用于将实体间连接端点定位到具体的区室。
+        /// Map an anchor's axial position parameter (AxialT) to the nearest compartment global id.
+        /// Used to locate inter-entity connection endpoints to specific compartments.
         /// </summary>
         private static int ResolveCompartmentByAnchor(AnchorRef anchor, List<int> compartmentIds)
         {
@@ -286,17 +286,17 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 一次性构建完整的仿真数据包：区室化切分 + 设备绑定。
-        /// 在按下 Begin 时由 MainWindow.OnBeginSimulationClick 调用。
+        /// Build a complete simulation payload in one step: compartmentalization + device binding.
+        /// Called by MainWindow.OnBeginSimulationClick when Begin is pressed.
         /// </summary>
-        /// <param name="connections">实体间连接字典。</param>
-        /// <param name="devices">场景中所有已放置的设备列表。</param>
-        /// <returns>包含区室、探针和刺激数据的 SimulationData。</returns>
+        /// <param name="connections">Dictionary of inter-entity connections.</param>
+        /// <param name="devices">List of all placed devices in the scene.</param>
+        /// <returns>SimulationData containing compartments, probes, and stimulation data.</returns>
         public SimulationData BuildSimulationData(
             Dictionary<string, Connection> connections,
             List<IAttachedDevice> devices)
         {
-            // 1. 区室化切分（同时得到 entityCompartmentMap 用于设备绑定）
+            // 1. Compartmentalize (also produce entityCompartmentMap for device binding)
             var compartments = new List<Compartment>();
             var entityCompartmentMap = new Dictionary<string, List<int>>();
             int globalId = 0;
@@ -343,12 +343,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
                 entityCompartmentMap[entity.Id] = ids;
 
-                // 将区室信息写回实体
+                // Write compartment info back to entity
                 entity.CompartmentCount = ids.Count;
                 entity.CompartmentIds = new List<int>(ids);
             }
 
-            // 实体间连接
+            // Inter-entity connections
             foreach (var conn in connections.Values)
             {
                 if (entityCompartmentMap.TryGetValue(conn.A.Id, out var compA) &&
@@ -365,7 +365,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
                 }
             }
 
-            // 2. 设备绑定：将 Probe/Stimulation/VoltageClamp 按空间位置映射到最近的区室
+            // 2. Device binding: map Probe/Stimulation/VoltageClamp spatial positions to the nearest compartment
             var probes = new List<SimProbe>();
             var stimulations = new List<SimStimulation>();
             var voltageClamps = new List<SimVoltageClamp>();
@@ -375,7 +375,7 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
 
             foreach (var device in devices)
             {
-                // 查找设备所属实体对应的区室列表
+                // Find compartment list corresponding to the device's target entity
                 if (!entityCompartmentMap.TryGetValue(device.TargetEntity.Id, out var compIds) || compIds.Count == 0)
                     continue;
 

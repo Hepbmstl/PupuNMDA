@@ -14,10 +14,10 @@ using NeuronCAD.Visuals.Tabs.Simulation;
 namespace NeuronCAD.Visuals.Tabs.Reporting
 {
     /// <summary>
-    /// Reporting 模式下的左侧面板控制器。
-    /// 提供 Components / Probes 两个子标签页：
-    ///   Components — 列出建模实体及其属性，支持选择区室后绘制变量时间曲线。
-    ///   Probes — 列出仿真探针，支持选择双变量绘制动态相图。
+    /// Controller for the left-side panel in Reporting mode.
+    /// Provides two sub-tabs: Components and Probes:
+    ///   Components — lists modeling entities and their properties; supports plotting variable time series for a selected compartment.
+    ///   Probes — lists simulation probes; supports plotting phase portraits with two selected variables.
     /// </summary>
     public class ReportingPanelController
     {
@@ -62,7 +62,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         }
 
         /// <summary>
-        /// 重建两个子标签页的面板内容。
+        /// Rebuilds the contents of both sub-tab panels.
         /// </summary>
         public void Rebuild()
         {
@@ -125,7 +125,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
 
             var stack = new StackPanel { Margin = new Thickness(4) };
 
-            // --- 属性区 ---
+            // --- Properties ---
             AddLabel(stack, $"Type: {typeName}");
             AddLabel(stack, $"Cm: {entity.Cm} µF/cm²");
             AddLabel(stack, $"Ra: {entity.Ra} Ω·cm");
@@ -147,7 +147,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             int compCount = entity.CompartmentCount;
             AddLabel(stack, $"Compartments: {compCount}", FontWeights.Bold);
 
-            // --- 变量选择 ---
+            // --- Variable selection ---
             AddLabel(stack, "Variable:", topMargin: 8);
             var varCombo = new ComboBox
             {
@@ -161,7 +161,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(varCombo);
             _entityVarCombos[entity.Id] = varCombo;
 
-            // --- 时间范围 ---
+            // --- Time range ---
             AddLabel(stack, "Start (ms):");
             var tbStart = MakeTextBox("0");
             stack.Children.Add(tbStart);
@@ -172,7 +172,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(tbEnd);
             _entityEndTimeBoxes[entity.Id] = tbEnd;
 
-            // --- 选中区室显示 ---
+            // --- Selected compartment display ---
             var compartmentLabel = new TextBlock
             {
                 Text = compCount > 0
@@ -186,7 +186,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(compartmentLabel);
             _entityCompartmentLabels[entity.Id] = compartmentLabel;
 
-            // --- 绘图按钮 ---
+            // --- Plot button ---
             var btnPlot = MakeButton("Plot Variable", Color.FromRgb(0x00, 0x7A, 0xCC), compCount > 0);
             string eid = entity.Id;
             btnPlot.Click += async (s, e) => await OnPlotVariableClick(eid, btnPlot);
@@ -208,7 +208,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         {
             if (!_entitySelectedCompartment.TryGetValue(entityId, out int segId))
             {
-                MessageBox.Show("请先在视口中点击选择一个区室。", "Reporting",
+                MessageBox.Show("Please click to select a compartment in the viewport first.", "Reporting",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -223,7 +223,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"绘图失败：\n{ex.Message}", "Plot Error",
+                MessageBox.Show($"Plot failed:\n{ex.Message}", "Plot Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -293,7 +293,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             AddLabel(stack, $"Start: {simProbe.StartMs} ms");
             AddLabel(stack, $"Duration: {simProbe.DurationMs} ms");
 
-            // X 轴变量
+            // X-axis variable
             AddLabel(stack, "X-axis variable:", topMargin: 8);
             var xCombo = new ComboBox
             {
@@ -306,7 +306,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             xCombo.SelectedIndex = 0;
             stack.Children.Add(xCombo);
 
-            // Y 轴变量
+            // Y-axis variable
             AddLabel(stack, "Y-axis variable:");
             var yCombo = new ComboBox
             {
@@ -319,7 +319,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             yCombo.SelectedIndex = 3;
             stack.Children.Add(yCombo);
 
-            // 绘制按钮
+            // Plot button
             var btnPlot = MakeButton("Plot Phase Portrait", Color.FromRgb(0x00, 0x80, 0x80), true);
             int probeId = simProbe.ProbeId;
             btnPlot.Click += async (s, e) =>
@@ -328,7 +328,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 string yVar = yCombo.SelectedItem?.ToString() ?? "n";
                 if (xVar == yVar)
                 {
-                    MessageBox.Show("X 轴和 Y 轴变量不可相同。", "Reporting",
+                    MessageBox.Show("X-axis and Y-axis variables cannot be the same.", "Reporting",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -339,7 +339,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"绘图失败：\n{ex.Message}", "Plot Error",
+                    MessageBox.Show($"Plot failed:\n{ex.Message}", "Plot Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally

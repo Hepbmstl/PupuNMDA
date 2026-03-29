@@ -9,36 +9,36 @@ using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 namespace NeuronCAD.Visuals.Tabs.Simulation
 {
     /// <summary>
-    /// 仿真模式下的属性面板控制器。
-    /// 职责：管理左侧面板中 Stimulation/Probe 设备的参数配置卡片。
-    /// 由 MainWindow.InitializeControllers 创建，订阅 SimulationInteractionController 的事件总线。
+    /// Properties panel controller for Simulation mode.
+    /// Responsibilities: manage parameter cards for Stimulation/Probe devices in the left panel.
+    /// Created by MainWindow.InitializeControllers and subscribes to SimulationInteractionController events.
     /// </summary>
     public class SimulationPanelController
     {
-        /// <summary>仿真属性面板容器（左侧栏 StackPanel）。</summary>
+        /// <summary>Container for simulation property panels (left-side StackPanel).</summary>
         private readonly StackPanel _container;
 
-        /// <summary>仿真交互控制器引用，用于订阅设备增删事件。</summary>
+        /// <summary>Reference to the simulation interaction controller, used to subscribe to device add/remove events.</summary>
         private readonly SimulationInteractionController _interaction;
 
-        /// <summary>设备 ID 到属性卡片 Expander 的映射字典。</summary>
+        /// <summary>Mapping from device ID to its property card Expander.</summary>
         private readonly Dictionary<string, Expander> _uiNodes = new Dictionary<string, Expander>();
 
-        /// <summary>设备 ID 到 IAttachedDevice 的映射字典，用于面板点击时导航。</summary>
+        /// <summary>Mapping from device ID to IAttachedDevice, used for navigation on panel click.</summary>
         private readonly Dictionary<string, IAttachedDevice> _deviceMap = new Dictionary<string, IAttachedDevice>();
 
-        /// <summary>相机跳转回调，由 MainWindow 注入。</summary>
+        /// <summary>Camera navigation callback, injected by MainWindow.</summary>
         private readonly Action<Point3D>? _navigateToPoint;
 
-        /// <summary>标记是否正在通过代码设置展开状态（防止递归触发选中）。</summary>
+        /// <summary>Flag indicating whether expand state is being set programmatically (prevents recursive selection).</summary>
         private bool _suppressExpandEvent;
 
         /// <summary>
-        /// 构造函数。由 MainWindow.InitializeControllers 调用，注入 UI 容器并订阅事件。
+        /// Constructor. Called by MainWindow.InitializeControllers; injects the UI container and subscribes to events.
         /// </summary>
-        /// <param name="container">仿真属性面板 StackPanel</param>
-        /// <param name="interaction">仿真交互控制器</param>
-        /// <param name="navigateToPoint">相机导航回调（可选）</param>
+        /// <param name="container">Simulation property panel StackPanel</param>
+        /// <param name="interaction">Simulation interaction controller</param>
+        /// <param name="navigateToPoint">Camera navigation callback (optional)</param>
         public SimulationPanelController(StackPanel container, SimulationInteractionController interaction, Action<Point3D>? navigateToPoint = null)
         {
             _container = container;
@@ -51,8 +51,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 处理设备添加事件：为新设备创建参数卡片并添加到面板。
-        /// 被 SimulationInteractionController.OnDeviceAdded 事件触发调用。
+        /// Handle device-added event: create a parameter card for the new device and add it to the panel.
+        /// Invoked by SimulationInteractionController.OnDeviceAdded event.
         /// </summary>
         private void HandleDeviceAdded(IAttachedDevice device)
         {
@@ -63,8 +63,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 处理设备删除事件：移除对应的参数卡片。
-        /// 被 SimulationInteractionController.OnDeviceRemoved 事件触发调用。
+        /// Handle device-removed event: remove the corresponding parameter card.
+        /// Invoked by SimulationInteractionController.OnDeviceRemoved event.
         /// </summary>
         private void HandleDeviceRemoved(IAttachedDevice device)
         {
@@ -77,8 +77,8 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 处理设备选中变更事件：展开对应卡片并高亮边框。
-        /// 被 SimulationInteractionController.OnDeviceSelectionChanged 事件触发调用。
+        /// Handle device selection changed event: expand the corresponding card and highlight its border.
+        /// Invoked by SimulationInteractionController.OnDeviceSelectionChanged event.
         /// </summary>
         private void HandleDeviceSelectionChanged(IAttachedDevice? selectedDevice)
         {
@@ -110,12 +110,12 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
-        /// 构建设备参数卡片 Expander，包含目标实体信息和类型特定参数输入框。
-        /// StimulationDevice：Voltage、StartTime、Duration；ProbeDevice：Threshold。
-        /// 由 HandleDeviceAdded 调用。
+        /// Build a device parameter card Expander containing target entity information and type-specific input fields.
+        /// StimulationDevice: Current (µA), StartTime, Duration; ProbeDevice: Threshold.
+        /// Called by HandleDeviceAdded.
         /// </summary>
-        /// <param name="device">目标设备</param>
-        /// <returns>构建完成的 Expander 控件</returns>
+        /// <param name="device">Target device</param>
+        /// <returns>Constructed Expander control</returns>
         private Expander BuildDeviceNode(IAttachedDevice device)
         {
             string devType;

@@ -1,7 +1,7 @@
 {
   "model_info": {
     "name": "tcD_Dissociated_TC_Cell",
-    "description": "9-compartment dissociated thalamocortical relay cell model (Destexhe et al. 1998). Mechanisms: passive leak, hh2 (Traub-modified Na/K), itGHK (T-type Ca via GHK), cadecay (submembrane Ca shell).",
+    "description": "9-compartment dissociated thalamocortical relay cell model (Destexhe et al. 1998). Mechanisms: passive leak, itGHK (T-type Ca via GHK), cadecay (submembrane Ca shell). Note: hh2 is NOT inserted in the tcD voltage-clamp protocol (tcD_vc.oc).",
     "references": "Destexhe A, Neubig M, Ulrich D and Huguenard JR. J. Neurosci. 18: 3574-3588, 1998."
   },
   "global_environment": {
@@ -21,41 +21,72 @@
   "hh2_kinetics": {
     "_comment": "Traub-modified HH kinetics from hh2.mod. v2 = V - vtraub. Rate functions defined in terms of v2.",
     "vtraub": -63.0,
-    "alpha_m_A": 0.32,  "alpha_m_V": 13.0, "alpha_m_k": 4.0,
-    "beta_m_A":  0.28,  "beta_m_V":  40.0, "beta_m_k": 5.0,
-    "alpha_h_A": 0.128, "alpha_h_V": 17.0, "alpha_h_k": 18.0,
-    "beta_h_A":  4.0,   "beta_h_V":  40.0, "beta_h_k": 5.0,
-    "alpha_n_A": 0.032, "alpha_n_V": 15.0, "alpha_n_k": 5.0,
-    "beta_n_A":  0.5,   "beta_n_V":  10.0, "beta_n_k": 40.0
+    "alpha_m_A": 0.32,
+    "alpha_m_V": 13.0,
+    "alpha_m_k": 4.0,
+    "beta_m_A": 0.28,
+    "beta_m_V": 40.0,
+    "beta_m_k": 5.0,
+    "alpha_h_A": 0.128,
+    "alpha_h_V": 17.0,
+    "alpha_h_k": 18.0,
+    "beta_h_A": 4.0,
+    "beta_h_V": 40.0,
+    "beta_h_k": 5.0,
+    "alpha_n_A": 0.032,
+    "alpha_n_V": 15.0,
+    "alpha_n_k": 5.0,
+    "beta_n_A": 0.5,
+    "beta_n_V": 10.0,
+    "beta_n_k": 40.0
   },
   "ca_kinetics": {
     "_comment": "T-type Ca channel kinetics from ITGHK.mod. Raw Vh values; shift/actshift applied in kinetic functions. Q10 values from tcD_vc.oc (qm=2.5, qh=2.5).",
     "shift": -1.0,
     "actshift": 0.0,
-    "inf_mT_Vh": 57.0,  "inf_mT_k": 6.2,
-    "inf_hT_Vh": 81.0,  "inf_hT_k": 4.0,
-    "tau_mT_base": 0.612, "tau_mT_V1": 132.0, "tau_mT_k1": 16.7,
-    "tau_mT_V2": 16.8,    "tau_mT_k2": 18.2,
-    "tau_mT_Q10": 2.5,    "tau_mT_Tref": 24.0,
+    "inf_mT_Vh": 57.0,
+    "inf_mT_k": 6.2,
+    "inf_hT_Vh": 81.0,
+    "inf_hT_k": 4.0,
+    "tau_mT_base": 0.612,
+    "tau_mT_V1": 132.0,
+    "tau_mT_k1": 16.7,
+    "tau_mT_V2": 16.8,
+    "tau_mT_k2": 18.2,
+    "tau_mT_Q10": 2.5,
+    "tau_mT_Tref": 24.0,
     "tau_hT_Vthresh": -80.0,
-    "tau_hT_V1": 467.0,   "tau_hT_k1": 66.6,
-    "tau_hT_base": 28.0,  "tau_hT_V2": 22.0,  "tau_hT_k2": 10.5,
-    "tau_hT_Q10": 2.5,    "tau_hT_Tref": 24.0
+    "tau_hT_V1": 467.0,
+    "tau_hT_k1": 66.6,
+    "tau_hT_base": 28.0,
+    "tau_hT_V2": 22.0,
+    "tau_hT_k2": 10.5,
+    "tau_hT_Q10": 2.5,
+    "tau_hT_Tref": 24.0
   },
   "spatial_regions": {
     "soma": {
       "description": "Somatic compartment",
-      "segments": ["soma"]
+      "segments": [
+        "soma"
+      ]
     },
     "proximal_dendrites": {
       "description": "Primary branching segments (dend1[0], dend2[0])",
-      "segments": ["dend1[0]", "dend2[0]"]
+      "segments": [
+        "dend1[0]",
+        "dend2[0]"
+      ]
     },
     "distal_dendrites": {
       "description": "All remaining distal dendritic segments",
       "segments": [
-        "dend1[1]", "dend1[2]",
-        "dend2[1]", "dend2[2]", "dend2[3]", "dend2[4]"
+        "dend1[1]",
+        "dend1[2]",
+        "dend2[1]",
+        "dend2[2]",
+        "dend2[3]",
+        "dend2[4]"
       ]
     }
   },
@@ -68,10 +99,6 @@
         "cm": 0.88,
         "Ra": 173.0
       },
-      "hh2": {
-        "gnabar": 0.003,
-        "gkbar": 0.005
-      },
       "itGHK": {
         "pcabar": 1.7e-5
       },
@@ -86,10 +113,6 @@
         "cm": 0.88,
         "Ra": 173.0
       },
-      "hh2": {
-        "gnabar": 0.003,
-        "gkbar": 0.005
-      },
       "itGHK": {
         "pcabar": 1.7e-5
       },
@@ -103,10 +126,6 @@
         "e_pas": -76.5,
         "cm": 0.88,
         "Ra": 173.0
-      },
-      "hh2": {
-        "gnabar": 0.003,
-        "gkbar": 0.005
       },
       "itGHK": {
         "pcabar": 1.7e-5

@@ -8,20 +8,21 @@ using HelixToolkit.Wpf;
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     /// <summary>
-    /// 视口控制器，负责初始化 3D 视口环境（照明、网格、手势配置）和提供射线投影工具方法。
-    /// 由 MainWindow.InitializeControllers 创建，存储在 SharedSceneState.ViewportController 中。
-    /// 被 InteractionController/SimulationInteractionController 的 UpdateCrosshair 和 UpdateObjectPosition 使用。
+    /// Viewport controller responsible for initializing the 3D viewport environment (lighting, grid, gesture configuration)
+    /// and providing ray projection utility methods.
+    /// Created by MainWindow.InitializeControllers and stored in SharedSceneState.ViewportController.
+    /// Used by InteractionController/SimulationInteractionController's UpdateCrosshair and UpdateObjectPosition.
     /// </summary>
     public class ViewportController
     {
-        /// <summary>HelixViewport3D 实例引用，由构造函数注入。</summary>
+        /// <summary>Reference to the HelixViewport3D instance, injected via the constructor.</summary>
         private readonly HelixViewport3D _viewport;
 
         /// <summary>
-        /// 构造函数，初始化视口环境和手势配置。
-        /// 由 MainWindow.InitializeControllers 调用。
+        /// Constructor that initializes the viewport environment and gesture configuration.
+        /// Called by MainWindow.InitializeControllers.
         /// </summary>
-        /// <param name="viewport">HelixViewport3D 实例</param>
+        /// <param name="viewport">HelixViewport3D instance</param>
         public ViewportController(HelixViewport3D viewport)
         {
             _viewport = viewport;
@@ -29,12 +30,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             ConfigureGestures();
         }
 
-        /// <summary>获取当前摄像机位置（世界坐标）。被外部查询调用。</summary>
+        /// <summary>Get the current camera position (world coordinates). Used by external callers.</summary>
         public Point3D CameraPosition => _viewport.Camera.Position;
 
         /// <summary>
-        /// 初始化视口环境：坐标系、黑色背景、默认灯光、Z=0 平面网格。
-        /// 由构造函数调用。
+        /// Initialize the viewport environment: coordinate system, black background, default lights, and a Z=0 plane grid.
+        /// Called by the constructor.
         /// </summary>
         private void InitializeEnvironment()
         {
@@ -43,7 +44,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             _viewport.Background = Brushes.Black;
             _viewport.Children.Add(new DefaultLights());
 
-            // 基础网格 (Z=0 平面)
+            // Base grid (Z=0 plane)
             var grid = new GridLinesVisual3D
             {
                 Width = 200,
@@ -59,8 +60,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 配置视口手势：右键旋转、左键平移、加载时自动缩放适配。
-        /// 由构造函数调用。
+        /// Configure viewport gestures: right-click rotate, left-click pan, and auto-zoom to extents when loaded.
+        /// Called by the constructor.
         /// </summary>
         private void ConfigureGestures()
         {
@@ -70,37 +71,37 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 将屏幕坐标转换为 3D 射线。
-        /// 被 UnProjectToZPlane 内部调用。
+        /// Convert screen coordinates to a 3D ray.
+        /// Used internally by UnProjectToZPlane.
         /// </summary>
-        /// <param name="screenPoint">屏幕坐标</param>
-        /// <returns>3D 射线</returns>
+        /// <param name="screenPoint">Screen coordinates</param>
+        /// <returns>3D ray</returns>
         public Ray3D GetRay(Point screenPoint)
         {
             return Viewport3DHelper.Point2DtoRay3D(_viewport.Viewport, screenPoint);
         }
 
         /// <summary>
-        /// 将屏幕坐标投影到指定高度的水平面 (Z = planeHeight)。
-        /// 被 InteractionController.UpdateObjectPosition 和 UpdateCrosshair 调用，用于在无实体命中时将鼠标投影到地面。
+        /// Project screen coordinates onto the horizontal plane at the specified height (Z = planeHeight).
+        /// Called by InteractionController.UpdateObjectPosition and UpdateCrosshair to project the mouse to the ground when no entity is hit.
         /// </summary>
-        /// <param name="screenPoint">屏幕坐标</param>
-        /// <param name="planeHeight">平面高度 (Z 值)</param>
-        /// <returns>投影点世界坐标，或 null（射线平行于平面或交点在摄像机后方）</returns>
+        /// <param name="screenPoint">Screen coordinates</param>
+        /// <param name="planeHeight">Plane height (Z value)</param>
+        /// <returns>Projected point in world coordinates, or null (if the ray is parallel to the plane or the intersection is behind the camera)</returns>
         public Point3D? UnProjectToZPlane(Point screenPoint, double planeHeight)
         {
             var ray = GetRay(screenPoint);
 
-            // 平面方程: Z = planeHeight
-            // 射线 Z(t) = Origin.Z + t * Direction.Z
-            // 解 t: planeHeight = Origin.Z + t * Direction.Z
+            // Plane equation: Z = planeHeight
+            // Ray Z(t) = Origin.Z + t * Direction.Z
+            // Solve for t: planeHeight = Origin.Z + t * Direction.Z
             // t = (planeHeight - Origin.Z) / Direction.Z
 
-            if (Math.Abs(ray.Direction.Z) < 1e-6) return null; // 射线平行于平面
+            if (Math.Abs(ray.Direction.Z) < 1e-6) return null; // Ray is parallel to the plane
 
             double t = (planeHeight - ray.Origin.Z) / ray.Direction.Z;
 
-            // t < 0 表示交点在摄像机后方
+            // t < 0 means the intersection is behind the camera
             if (t < 0) return null;
 
             return ray.Origin + ray.Direction * t;

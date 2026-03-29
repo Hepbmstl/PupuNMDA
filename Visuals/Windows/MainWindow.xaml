@@ -312,7 +312,7 @@
                                                                                      GroupName="SegMode"/>
                                                                 </StackPanel>
 
-                                                                <TextBlock Text="NSeg (每个组件的区室数):"
+                                                                <TextBlock Text="NSeg (compartments per segment):"
                                                                            Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
@@ -324,8 +324,8 @@
                                                                          Padding="4"
                                                                          Margin="0,0,0,8"/>
 
-                                                                <TextBlock Text="LSeg (µm, 区室间距):"
-                                                                           Foreground="#CCC"
+                                                                <TextBlock Text="LSeg (µm, compartment spacing):"
+                                                                                Foreground="#CCC"
                                                                            FontSize="11"
                                                                            Margin="0,0,0,2"/>
                                                                 <TextBox x:Name="TbLSeg"

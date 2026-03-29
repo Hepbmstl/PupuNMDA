@@ -13,90 +13,91 @@ using NeuronCAD.Visuals.Tabs.Shared;
 namespace NeuronCAD.Visuals.Tabs.Modeling
 {
     /// <summary>
-    /// 建模交互状态枚举，追踪 InteractionController 当前所处的操作阶段。
-    /// 由 InteractionController._currentState 持有。
+    /// Interaction states for modeling interactions, tracking the current operation stage of InteractionController.
+    /// Held by InteractionController._currentState.
     /// </summary>
     public enum InteractionState
     {
-        /// <summary>空闲状态，可进行选中/右键操作</summary>
+        /// <summary>Idle state: selection and right-click operations available</summary>
         Idle,
-        /// <summary>放置新实体中（跟随鼠标移动，左键确认，右键取消）</summary>
+        /// <summary>Placing a new entity (follows mouse; left-click to confirm; right-click to cancel)</summary>
         Placing,
-        /// <summary>移动已有实体中（跟随鼠标移动，左键确认，右键取消）</summary>
+        /// <summary>Moving an existing entity (follows mouse; left-click to confirm; right-click to cancel)</summary>
         Moving,
-        /// <summary>拖拽连接线端点中（修改锚点位置）</summary>
+        /// <summary>Dragging a connection endpoint (modifying anchor position)</summary>
         DraggingConnectionEndpoint,
-        /// <summary>选择连接目标中（右键菜单 Connect 后，等待左键点击目标实体）</summary>
+        /// <summary>Selecting connection target (after right-click menu 'Connect', waiting for left-click on target entity)</summary>
         SelectingConnectionTarget
     }
 
     /// <summary>
-    /// 建模模式专属交互控制器，实现 IViewportInteractionHandler 接口。
-    /// 职责：实体放置、选中、移动、删除、连接创建/拖拽、右键上下文菜单、万向轮操纵器管理。
-    /// 由 MainWindow.InitializeControllers 创建，注入 SharedSceneState 和回调委托。
+    /// Interaction controller specific to Modeling mode, implementing IViewportInteractionHandler.
+    /// Responsibilities: entity placement, selection, movement, deletion, connection creation/dragging,
+    /// right-click context menus, and gimbal manipulator management.
+    /// Created by MainWindow.InitializeControllers; injects SharedSceneState and callback delegates.
     /// </summary>
     public class InteractionController : IViewportInteractionHandler
     {
-        /// <summary>共享场景状态引用，持有实体列表、连接控制器和视口。由构造函数注入。</summary>
+        /// <summary>Reference to the shared scene state, holding the entity list, connection controller and viewport. Injected via constructor.</summary>
         private readonly SharedSceneState _scene;
 
-        /// <summary>准星和坐标 HUD 更新回调，指向 MainWindow.UpdateCursorInfo。由 OnMouseMove 调用。</summary>
+        /// <summary>Crosshair and coordinate HUD update callback, points to MainWindow.UpdateCursorInfo. Called by OnMouseMove.</summary>
         private readonly Action<Point, Point3D?> _updateCursorInfo;
 
-        /// <summary>尺寸编辑请求回调（可选），指向 MainWindow.ShowEditPopup。由右键菜单 "Resize..." 触发。</summary>
+        /// <summary>Resize request callback (optional), points to MainWindow.ShowEditPopup. Triggered by right-click menu 'Resize...'.</summary>
         private readonly Action<IVisualEntity>? _onResizeRequested;
 
-        /// <summary>当前交互状态。由各事件处理方法修改。</summary>
+        /// <summary>Current interaction state. Modified by event handlers.</summary>
         private InteractionState _currentState = InteractionState.Idle;
 
-        /// <summary>当前活跃的实体（正在放置/移动/选中的实体）。</summary>
+        /// <summary>The currently active entity (being placed/moved/selected).</summary>
         private IVisualEntity? _activeEntity;
 
-        /// <summary>鼠标按下时的屏幕位置，用于判断是否发生了拖拽（区分点击和视口旋转）。</summary>
+        /// <summary>Screen position when mouse was pressed; used to detect dragging (distinguish click from viewport rotate).</summary>
         private Point _mouseDownPos;
 
-        /// <summary>标记鼠标是否正在拖拽视口（旋转/平移视角），若为 true 则 MouseUp 时不执行命中测试。</summary>
+        /// <summary>Flag indicating whether the mouse is dragging the viewport (rotating/panning); if true, hit tests are skipped on MouseUp.</summary>
         private bool _isDraggingViewport = false;
 
-        /// <summary>标记下一次命中测试是否应被跳过。在 ConfirmAction 后设为 true，防止确认点击同时触发选中。</summary>
+        /// <summary>Flag to skip the next hit test. Set to true after ConfirmAction to prevent confirmation click from also selecting.</summary>
         private bool _suppressNextHitTest = false;
 
-        /// <summary>HelixToolkit 万向轮操纵器引用，用于在选中实体上显示平移/旋转手柄。由 ShowGimbal/HideGimbal 管理。</summary>
+        /// <summary>Reference to the HelixToolkit gimbal manipulator, used to show translation/rotation handles on selected entities. Managed by ShowGimbal/HideGimbal.</summary>
         private CombinedManipulator _gimbal;
 
-        /// <summary>放置模式下鼠标悬停命中的目标实体（用于自动建立连接）。由 UpdateObjectPosition 更新。</summary>
+        /// <summary>Target entity hit by mouse hover during placing mode (used for auto-connecting). Updated by UpdateObjectPosition.</summary>
         private IVisualEntity? _placingTargetEntity;
 
-        /// <summary>放置模式下鼠标悬停命中的目标表面点（用于计算连接锚点）。由 UpdateObjectPosition 更新。</summary>
+        /// <summary>Target surface point hit by mouse hover during placing mode (used to compute connection anchors). Updated by UpdateObjectPosition.</summary>
         private Point3D? _placingTargetPoint;
 
-        /// <summary>正在拖拽的连接线 ID。在 DraggingConnectionEndpoint 状态使用。由 TryBeginDragConnectionEndpoint 设置。</summary>
+        /// <summary>ID of the connection currently being dragged. Used in DraggingConnectionEndpoint state. Set by TryBeginDragConnectionEndpoint.</summary>
         private string? _dragConnId;
 
-        /// <summary>标记正在拖拽的是端点 A (true) 还是端点 B (false)。由 TryBeginDragConnectionEndpoint 设置。</summary>
+        /// <summary>Flag indicating whether the dragged end is endpoint A (true) or endpoint B (false). Set by TryBeginDragConnectionEndpoint.</summary>
         private bool _dragEndIsA;
 
-        /// <summary>右键菜单 "Connect" 操作的源实体引用。在 SelectingConnectionTarget 状态使用。</summary>
+        /// <summary>Reference to the source entity for the right-click 'Connect' action. Used in SelectingConnectionTarget state.</summary>
         private IVisualEntity? _connectSourceEntity;
 
-        /// <summary>正在被拖拽的连接端点球体引用，用于临时变色为橙红色。由 TryBeginDragConnectionEndpoint 设置。</summary>
+        /// <summary>Reference to the connection endpoint sphere being dragged, used to temporarily change color to orange-red. Set by TryBeginDragConnectionEndpoint.</summary>
         private SphereVisual3D? _dragSphere;
 
-        /// <summary>实体添加事件，在放置确认后触发。被 PropertiesPanelController.HandleEntityAdded 订阅，用于创建属性面板卡片。</summary>
+        /// <summary>Entity added event, fired after placement confirmation. Subscribed by PropertiesPanelController.HandleEntityAdded to create property panel cards.</summary>
         public event Action<IVisualEntity> OnEntityAdded;
 
-        /// <summary>实体删除事件，在 DeleteSelected 后触发。被 PropertiesPanelController.HandleEntityRemoved 订阅，用于移除属性面板卡片。</summary>
+        /// <summary>Entity removed event, fired after DeleteSelected. Subscribed by PropertiesPanelController.HandleEntityRemoved to remove property panel cards.</summary>
         public event Action<IVisualEntity> OnEntityRemoved;
 
-        /// <summary>选中实体变更事件，选中/取消选中时触发。被 PropertiesPanelController.HandleSelectionChanged 订阅，用于高亮/折叠面板卡片。</summary>
+        /// <summary>Selection changed event, fired on select/deselect. Subscribed by PropertiesPanelController.HandleSelectionChanged to highlight/collapse panel cards.</summary>
         public event Action<IVisualEntity?> OnSelectionChanged;
 
         /// <summary>
-        /// 构造函数。由 MainWindow.InitializeControllers 调用，注入共享场景状态和回调委托。
+        /// Constructor. Called by MainWindow.InitializeControllers; injects shared scene state and callback delegates.
         /// </summary>
-        /// <param name="scene">共享场景状态</param>
-        /// <param name="updateCursorInfo">准星/HUD 更新回调</param>
-        /// <param name="onResizeRequested">尺寸编辑请求回调（可选）</param>
+        /// <param name="scene">Shared scene state</param>
+        /// <param name="updateCursorInfo">Crosshair/HUD update callback</param>
+        /// <param name="onResizeRequested">Resize request callback (optional)</param>
         public InteractionController(
             SharedSceneState scene,
             Action<Point, Point3D?> updateCursorInfo,
@@ -110,10 +111,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         #region Public API
 
         /// <summary>
-        /// 开始放置新实体：将实体添加到视口并进入 Placing 状态。
-        /// 被 MainWindow.OnAddSomaClick/OnAddAxonClick/OnAddDendClick 调用。
+        /// Begin placing a new entity: add the entity to the viewport and enter the Placing state.
+        /// Called by MainWindow.OnAddSomaClick/OnAddAxonClick/OnAddDendClick.
         /// </summary>
-        /// <param name="newEntity">要放置的新实体</param>
+        /// <param name="newEntity">The new entity to place</param>
         public void StartPlacing(IVisualEntity newEntity)
         {
             if (_currentState != InteractionState.Idle) return;
@@ -125,8 +126,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 删除当前选中的实体及其视觉对象，同时触发 OnEntityRemoved 和 OnSelectionChanged 事件。
-        /// 被右键上下文菜单 "Delete" 选项调用。
+        /// Delete the currently selected entity and its visual object, and trigger OnEntityRemoved and OnSelectionChanged.
+        /// Invoked by the right-click context menu 'Delete'.
         /// </summary>
         public void DeleteSelected()
         {
@@ -144,8 +145,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 将当前选中的实体进入移动模式（跟随鼠标重新定位），隐藏万向轮并关闭命中测试。
-        /// 被右键上下文菜单 "Move" 选项调用。
+        /// Enter moving mode for the currently selected entity (follow mouse), hide the gimbal and disable hit testing.
+        /// Invoked by the right-click context menu 'Move'.
         /// </summary>
         public void StartMovingSelected()
         {
@@ -159,10 +160,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 强制选中或取消选中实体（取消旧选中、设置新选中、显示万向轮、触发事件）。
-        /// 被 PerformHitTest（点击命中后）和 PropertiesPanelController（面板展开时）调用。
+        /// Force select or deselect an entity (clear previous selection, set new selection, show gimbal, fire events).
+        /// Called by PerformHitTest (on click hit) and PropertiesPanelController (on panel expand).
         /// </summary>
-        /// <param name="entity">要选中的实体，null 表示取消选中</param>
+        /// <param name="entity">Entity to select, or null to deselect</param>
         public void ForceSelect(IVisualEntity? entity)
         {
             if (_activeEntity != null && _activeEntity != entity)
@@ -183,8 +184,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 停用建模交互：取消当前操作并清除选中状态。
-        /// 被 MainWindow.SwitchTab 在切换标签页时调用。
+        /// Deactivate modeling interactions: cancel the current action and clear selection.
+        /// Called by MainWindow.SwitchTab when switching tabs.
         /// </summary>
         public void Deactivate()
         {
@@ -193,8 +194,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 通知外部（属性面板等）有实体被加载（从文件恢复），触发 OnEntityAdded 事件。
-        /// 被 SaveLoadManager.ApplyToScene 调用。
+        /// Notify external callers (properties panel, etc.) that an entity was loaded (restored from file), triggering OnEntityAdded.
+        /// Called by SaveLoadManager.ApplyToScene.
         /// </summary>
         public void NotifyEntityLoaded(IVisualEntity entity)
         {
@@ -202,8 +203,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 通知外部（属性面板等）有实体被移除，触发 OnEntityRemoved 事件。
-        /// 被 MainWindow.ClearScene 调用。
+        /// Notify external callers that an entity was removed, triggering OnEntityRemoved.
+        /// Called by MainWindow.ClearScene.
         /// </summary>
         public void NotifyEntityRemoved(IVisualEntity entity)
         {
@@ -214,8 +215,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         #region Input Handlers (IViewportInteractionHandler)
 
         /// <summary>
-        /// 鼠标按下事件处理。空闲状态下尝试开始拖拽连接端点；放置/移动状态下左键确认、右键取消。
-        /// 由 MainWindow.OnViewportMouseDown 路由调用。
+        /// Mouse down event handler. In Idle state attempts to begin dragging a connection endpoint; in Placing/Moving states left-click confirms and right-click cancels.
+        /// Routed from MainWindow.OnViewportMouseDown.
         /// </summary>
         public void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -240,8 +241,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 鼠标移动事件处理。更新准星 HUD；根据当前状态更新连接端点拖拽、实体位置或视口旋转判定。
-        /// 由 MainWindow.OnViewportMouseMove 路由调用。
+        /// Mouse move event handler. Updates crosshair HUD; depending on current state updates dragging endpoint, entity position, or viewport rotation detection.
+        /// Routed from MainWindow.OnViewportMouseMove.
         /// </summary>
         public void OnMouseMove(object sender, MouseEventArgs e)
         {
@@ -269,9 +270,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 鼠标释放事件处理。DraggingConnectionEndpoint 状态完成端点拖拽；SelectingConnectionTarget 状态选择连接目标或取消；
-        /// Idle 状态左键执行命中测试选中实体，右键显示上下文菜单。
-        /// 由 MainWindow.OnViewportMouseUp 路由调用。
+        /// Mouse up event handler. In DraggingConnectionEndpoint state completes endpoint drag; in SelectingConnectionTarget state selects a connection target or cancels; in Idle state left-click performs hit test selection and right-click shows context menu.
+        /// Routed from MainWindow.OnViewportMouseUp.
         /// </summary>
         public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
@@ -337,18 +337,18 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             }
         }
 
-        /// <summary>鼠标滚轮事件处理（当前无自定义逻辑，由 HelixViewport3D 内置缩放处理）。</summary>
+        /// <summary>Mouse wheel event handler (no custom logic currently; handled by HelixViewport3D built-in zoom).</summary>
         public void OnMouseWheel(object sender, MouseWheelEventArgs e) { }
         #endregion
 
         #region Core Logic & Hit Testing
 
         /// <summary>
-        /// 在场景实体列表中执行射线命中测试，返回最近命中的实体。
-        /// 被 OnMouseUp（SelectingConnectionTarget 状态）和 PerformHitTest 调用。
+        /// Perform a ray hit test across the scene entity list and return the nearest hit entity.
+        /// Used by OnMouseUp (SelectingConnectionTarget state) and PerformHitTest.
         /// </summary>
-        /// <param name="mousePos">鼠标在视口中的屏幕坐标</param>
-        /// <returns>命中的实体，或 null</returns>
+        /// <param name="mousePos">Mouse screen coordinates in the viewport</param>
+        /// <returns>The hit entity, or null</returns>
         private IVisualEntity? HitTestEntity(Point mousePos)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -364,12 +364,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 在指定实体上执行射线命中测试，返回命中点的世界坐标。
-        /// 被 OnMouseUp（创建连接时获取精确命中点）调用。
+        /// Perform a ray hit test on the specified entity and return the hit point in world coordinates.
+        /// Used by OnMouseUp to obtain a precise hit point when creating a connection.
         /// </summary>
-        /// <param name="mousePos">鼠标在视口中的屏幕坐标</param>
-        /// <param name="entity">目标实体</param>
-        /// <returns>命中点世界坐标，或 null</returns>
+        /// <param name="mousePos">Mouse screen coordinates in the viewport</param>
+        /// <param name="entity">Target entity</param>
+        /// <returns>Hit point in world coordinates, or null</returns>
         private Point3D? HitTestPointOnEntity(Point mousePos, IVisualEntity entity)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);
@@ -385,8 +385,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         #region Position Updates
 
         /// <summary>
-        /// 更新准星位置和坐标 HUD 显示。排除当前活跃实体以避免自命中。
-        /// 在 OnMouseMove 中每次鼠标移动时调用。
+        /// Update crosshair position and coordinate HUD display, excluding the currently active entity to avoid self-hits.
+        /// Called on every mouse move in OnMouseMove.
         /// </summary>
         private void UpdateCrosshair(Point mousePos)
         {
@@ -397,8 +397,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 更新连接线端点拖拽位置，将鼠标命中点转换为新锚点并刷新连接可视化。
-        /// 在 DraggingConnectionEndpoint 状态下由 OnMouseMove 调用。
+        /// Update the dragging connection endpoint position by converting mouse hits to a new anchor and refreshing connection visuals.
+        /// Called during OnMouseMove while in DraggingConnectionEndpoint state.
         /// </summary>
         private void UpdateDraggingConnectionEndpoint(Point mousePos)
         {
@@ -423,9 +423,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 更新正在放置/移动的实体位置。优先吸附到其他实体表面，否则投影到 Z=0 平面。
-        /// 同时更新连接线和附属设备位置，记录悬停目标用于自动创建连接。
-        /// 在 Placing/Moving 状态下由 OnMouseMove 调用。
+        /// Update the position of the entity being placed/moved. Prefer snapping to other entity surfaces; otherwise project to the Z=0 plane.
+        /// Also update connections and attached devices, and record hover targets for auto-creating connections.
+        /// Called during OnMouseMove while in Placing/Moving states.
         /// </summary>
         private void UpdateObjectPosition(Point mousePos)
         {
@@ -471,8 +471,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         #region Validation & Utilities
 
         /// <summary>
-        /// 确认放置/移动操作：将实体注册到场景列表、创建自动连接、重置状态。
-        /// Placing 状态还会触发 OnEntityAdded 事件。由 OnMouseDown 左键点击时调用。
+        /// Confirm placement/move action: register the entity to the scene list, create auto-connections, and reset state.
+        /// Placing state also triggers the OnEntityAdded event. Called on left-click in OnMouseDown.
         /// </summary>
         private void ConfirmAction()
         {
@@ -515,8 +515,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 取消当前操作：Placing 状态移除实体，Moving 状态恢复实体状态。
-        /// 由 OnMouseDown 右键点击时调用。
+        /// Cancel the current action: remove the entity if in Placing state, restore entity state if in Moving state.
+        /// Called on right-click in OnMouseDown.
         /// </summary>
         private void CancelAction()
         {
@@ -535,8 +535,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 执行点击命中测试：检查是否点击了万向轮或场景实体，并更新选中状态。
-        /// 在 Idle 状态由 OnMouseUp 左键调用。
+        /// Perform a click hit test: check whether the gimbal or a scene entity was clicked, and update selection accordingly.
+        /// Called on left mouse up in Idle state.
         /// </summary>
         private void PerformHitTest(Point mousePos)
         {
@@ -566,10 +566,10 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 在选中实体上显示万向轮操纵器（CombinedManipulator），同时切换实体为线框显示模式。
-        /// 被 ForceSelect 在选中实体时调用。
+        /// Show the gimbal manipulator (CombinedManipulator) on the selected entity and switch the entity to wireframe display mode.
+        /// Called by ForceSelect when an entity is selected.
         /// </summary>
-        /// <param name="entity">要显示万向轮的实体</param>
+        /// <param name="entity">Entity to show the gimbal for</param>
         private void ShowGimbal(IVisualEntity entity)
         {
             HideGimbal();
@@ -590,8 +590,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 隐藏并清理万向轮操纵器，恢复实体的正常显示模式和命中测试。
-        /// 被 ForceSelect、DeleteSelected、StartMovingSelected、ConfirmAction 等调用。
+        /// Hide and clean up the gimbal manipulator, restoring the entity's normal display mode and hit testing.
+        /// Called by ForceSelect, DeleteSelected, StartMovingSelected, ConfirmAction, etc.
         /// </summary>
         private void HideGimbal()
         {
@@ -609,8 +609,8 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// 显示右键上下文菜单，提供 Move/Resize/Connect/Delete 操作。
-        /// 在 Idle 状态且有选中实体时由 OnMouseUp 右键调用。
+        /// Show the right-click context menu offering Move/Resize/Connect/Delete operations.
+        /// Called on right mouse up in Idle state when an entity is selected.
         /// </summary>
         private void ShowContextMenu()
         {
@@ -648,12 +648,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         #endregion
 
         /// <summary>
-        /// 尝试开始拖拽连接线端点球体。遍历所有连接可视化端点进行命中测试。
-        /// 命中后进入 DraggingConnectionEndpoint 状态，并将球体变为橙红色。
-        /// 在 Idle 状态由 OnMouseDown 左键调用。
+        /// Try to begin dragging a connection endpoint sphere. Iterate over all connection visual endpoints to perform hit tests.
+        /// On hit, enter the DraggingConnectionEndpoint state and set the sphere color to orange-red.
+        /// Called on left mouse down in Idle state.
         /// </summary>
-        /// <param name="mousePos">鼠标在视口中的屏幕坐标</param>
-        /// <returns>是否成功开始拖拽</returns>
+        /// <param name="mousePos">Mouse screen coordinates in the viewport</param>
+        /// <returns>Whether the drag was successfully started</returns>
         private bool TryBeginDragConnectionEndpoint(Point mousePos)
         {
             var hits = _scene.HelixViewport.Viewport.FindHits(mousePos);

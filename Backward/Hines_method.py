@@ -11,15 +11,15 @@ except Exception:
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-FARADAY = 96485.3       # 库仑/摩尔 (C/mol)
-R_GAS = 8.314           # 焦耳/(摩尔·开尔文) (J/(mol*K))
-CELSIUS = 24.0          # 模拟温度 (degC) — tcD_vc.oc: celsius=24
+FARADAY = 96485.3       # Coulomb per mole (C/mol)
+R_GAS = 8.314           # Joules per (mol*K) (J/(mol*K))
+CELSIUS = 24.0          # Simulation temperature (degC) — tcD_vc.oc: celsius=24
 TEMP_K = CELSIUS + 273.15
-Z_CA = 2.0              # 钙离子化合价
+Z_CA = 2.0              # Calcium ion valence
 
-CA_OUT = 2.0            # 胞外钙浓度 (mM)
-CA_INF = 2.4e-4         # 胞内稳态游离钙浓度 (mM) — cadecay.mod: cainf=2.4e-4
-TAU_CA = 5.0            # 钙离子衰减时间常数 (ms) — cadecay.mod: taur=5
+CA_OUT = 2.0            # Extracellular Ca concentration (mM)
+CA_INF = 2.4e-4         # Intracellular steady-state free Ca (mM) — cadecay.mod: cainf=2.4e-4
+TAU_CA = 5.0            # Ca decay time constant (ms) — cadecay.mod: taur=5
 
 E_TABLE = {
     "Na": {"E": 50.0},
@@ -118,11 +118,11 @@ def set_env(V_init: float= -70.0,
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
     global CELSIUS, TEMP_K, CA_OUT, CA_INF, TAU_CA
 
-    V = V_init # 初始化所有区室的电压
-    DT = dt # 模拟步长
+    V = V_init # Initialize membrane potential for all segments
+    DT = dt # Simulation timestep (ms)
     DEL = dt / 2
-    STEPS = steps # 模拟步数
-    N_NODE = n_node # 区室总数
+    STEPS = steps # Number of simulation steps
+    N_NODE = n_node # Total number of compartments (segments)
     HISTORY_V = np.zeros((steps + 1, n_node))
     HISTORY_M = np.zeros((steps + 1, n_node))
     HISTORY_H = np.zeros((steps + 1, n_node))
@@ -137,19 +137,19 @@ def set_env(V_init: float= -70.0,
     CA_INF = ca_inf
     TAU_CA = tau_ca
 
-def set_E(table : dict): # 设置所有离子的电位
+def set_E(table : dict): # Set reversal potentials for ions
     global E_TABLE
     E_TABLE = table
 
 def set_hh_params(params):
-    """从 C# 传入 HH 门控参数字典，更新 HH_PARAMS。"""
+    """Update HH_PARAMS from a dictionary passed from C#."""
     global HH_PARAMS
     for key in params:
         if key in HH_PARAMS:
             HH_PARAMS[key] = float(params[key])
 
 def set_ca_params(params):
-    """从 C# 传入 Ca T-type 通道参数字典，更新 CA_PARAMS。"""
+    """Update CA_PARAMS from a dictionary passed from C#."""
     global CA_PARAMS
     for key in params:
         if key in CA_PARAMS:
@@ -157,11 +157,11 @@ def set_ca_params(params):
 
 def insert_probe(probe_id, segment_id, probe_start_ms, probe_duration_ms):
     """
-    注册一个区间探针，参考 insert_stimulation 的参数顺序。
-    - probe_id: 探针唯一标识
-    - segment_id: 监听的区室 id
-    - probe_start_ms: 监听开始时间 (ms)
-    - probe_duration_ms: 监听持续时间 (ms)
+    Register an interval probe. See `insert_stimulation` for parameter ordering.
+    - probe_id: unique probe identifier
+    - segment_id: segment id to monitor
+    - probe_start_ms: probe start time (ms)
+    - probe_duration_ms: probe duration (ms)
     """
     global PROBE_LIST
     PROBE_LIST.append((probe_id, segment_id, probe_start_ms, probe_duration_ms))
@@ -171,32 +171,31 @@ def insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, s
     STIMULATION.append((stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration))
 
 def insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol):
-    """
-    注册一个电压钳装置，模拟 NEURON 的 SEClamp。
+        """
+        Register a voltage clamp device, similar to NEURON's SEClamp.
 
-    参数:
-    - vc_id:       电压钳唯一标识 (int)
-    - segment_id:  钳制的区室 id (int)
-    - rs_MOhm:     串联电阻 (MΩ)，对应 SEClamp.rs
-    - protocol:    协议列表，每个元素是 [duration_ms, amplitude_mV]
-                   按顺序执行，例如 [[100, -115], [1000, -65], [1000, -65]]
+        Parameters:
+        - vc_id:       unique voltage clamp id (int)
+        - segment_id:  target segment id (int)
+        - rs_MOhm:     series resistance in MΩ (corresponds to SEClamp.rs)
+        - protocol:    list of [duration_ms, amplitude_mV] steps executed sequentially,
+                                     e.g. [[100, -115], [1000, -65], [1000, -65]]
 
-    在 Hines 矩阵中的实现:
-      g_vc = 1 / rs (单位 mS，因 rs 输入为 MΩ，1/MΩ = µS = 10^-3 mS → 但
-                      此处直接当作绝对电导加入矩阵行，与 g_Na_half 等相同量纲)
-      A[i,i] += g_vc
-      b[i]   += g_vc * V_cmd
-    """
-    global VOLTAGE_CLAMP
-    VOLTAGE_CLAMP.append((vc_id, segment_id, rs_MOhm, protocol))
+        In the Hines matrix, the clamp contributes an effective conductance:
+            g_vc = 1e-3 / rs_MOhm (mS)
+            A[i,i] += g_vc
+            b[i]   += g_vc * V_cmd
+        """
+        global VOLTAGE_CLAMP
+        VOLTAGE_CLAMP.append((vc_id, segment_id, rs_MOhm, protocol))
 
 @dataclass
 class Segment:
     uid: str
-    Ra: float          # 局部轴向电阻率 (ohm * cm)，标准值通常为 35.4 到 100
-    D: float           # 直径 (um)
-    L: float           # 长度 (um)
-    Cm: float          # 比膜电容 (uF/cm^2)，标准值通常为 1.0
+    Ra: float          # Local axial resistivity (ohm * cm), typical values ~35.4–100
+    D: float           # Diameter (um)
+    L: float           # Length (um)
+    Cm: float          # Specific membrane capacitance (uF/cm^2), typical ~1.0
     id: int
     ca_shell_depth_um: float = 0.1
 
@@ -204,21 +203,21 @@ class Segment:
     connected_segments: list = field(default_factory=list)
     @property
     def surface_area_cm2(self):
-        # 将表面积单位从 um^2 转换为 cm^2 (乘 10^-8)
+        # Convert surface area from um^2 to cm^2 (multiply by 1e-8)
         return np.pi * self.D * self.L * 1e-8
     
     @property
     def cross_area_um2(self):
-        # 截面积保持 um^2 用于轴向电阻计算
+        # Cross-sectional area in um^2 for axial resistance calculations
         return np.pi * (self.D / 2)**2
     
     @property
     def absolute_C(self):
-        # 结果单位：uF
+        # Result units: uF
         return self.Cm * self.surface_area_cm2
         
     def get_absolute_g_max(self, ion_name):
-        # 结果单位：mS
+        # Result units: mS
         return self.channels.get(ion_name, 0.0) * self.surface_area_cm2
     
     def add_channels(self, name:str, g_max:float):
@@ -237,21 +236,21 @@ class Segment:
         return None
     
     def get_absolute_P_max(self, ion_name):
-        """提取渗透率并转换为与面积相关的绝对系数"""
-        # 结果保留 cm/s * cm^2 = cm^3/s 的比例，后续 GHK 函数会统一转换量纲
+        """Extract permeability and convert to an absolute, area-related coefficient."""
+        # Returns value scaled as cm/s * cm^2 = cm^3/s; units are handled in GHK evaluation
         return self.channels.get(ion_name, 0.0) * self.surface_area_cm2
     
     @property
     def gamma_Ca(self):
         """
-        计算法拉第几何转换系数 (浓度通量因子)
-        单位换算推导：将绝对电流 (uA) 转化为浓度变化 (mM/ms)
-        假设钙离子聚集在膜下 d = 0.1 um 的壳层中
+        Compute Faraday geometric conversion factor (concentration flux factor).
+        Unit derivation: convert absolute current (uA) to concentration change (mM/ms).
+        Assumes Ca accumulates in a submembrane shell of depth d = 0.1 um.
         """
         d_um = self.ca_shell_depth_um
-        shell_volume_L = self.surface_area_cm2 * (d_um * 1e-4) * 1e-3 # 升
+        shell_volume_L = self.surface_area_cm2 * (d_um * 1e-4) * 1e-3 # liters
         # d[Ca]/dt = - I / (Z * F * Volume)
-        # I(uA)=1e-6 A, d[Ca]/dt 单位 mM/ms = mol/(L·s):
+        # I(uA)=1e-6 A, d[Ca]/dt units mM/ms = mol/(L·s)
         # gamma = 1e-6 / (Z * F * Volume_L)
         return 1e-6 / (Z_CA * FARADAY * shell_volume_L)
 
@@ -261,17 +260,17 @@ def init_segment(uid: str, Ra: float, D: float, L: float, Cm: float, id: int, ca
     SEGMENT[id] = new_seg
 
 
-def add_connection(id, target_uid): # 连接区室
+def add_connection(id, target_uid):  # Connect compartments
     SEGMENT[id].add_connection(target_uid)
 
 
 def add_channel_to_segment(segment_id, channel_name, g_max):
-    """为已初始化的区室添加离子通道。"""
+    """Add an ion channel to an initialized segment."""
     SEGMENT[segment_id].add_channels(channel_name, g_max)
 
 
 def clear_environment():
-    """重置所有全局状态，用于下一次仿真运行前清理。"""
+    """Reset all global state to prepare for the next simulation run."""
     global SEGMENT, V, DT, DEL, STEPS, N_NODE
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
@@ -307,12 +306,12 @@ def clear_environment():
 
 
 def get_current_step():
-    """返回当前仿真步数，供外部轮询进度。"""
+    """Return the current simulation step for external polling."""
     return CURRENT_STEP
 
 
 def is_simulation_running():
-    """返回仿真是否正在运行。"""
+    """Return whether the simulation is currently running."""
     return SIMULATION_RUNNING
 
 
@@ -320,7 +319,7 @@ def is_simulation_running():
 # simulation
 
 def calculate_Kij(seg_i: Segment, seg_j: Segment):
-    # 计算绝对电阻，单位转换为 kOhm
+    # Compute axial resistance with unit conversion to kOhm
     # R (kOhm) = Ra (ohm*cm) * 10 * L (um) / Area (um^2)
     R_i = seg_i.Ra * 10.0 * (seg_i.L / 2) / seg_i.cross_area_um2
     R_j = seg_j.Ra * 10.0 * (seg_j.L / 2) / seg_j.cross_area_um2
@@ -436,8 +435,8 @@ def tau_hT(V):
 
 def gating_update_tau_inf(DEL, xi_old, inf, tau):
     """
-    基于 tau 和 inf 的 Crank-Nicolson 门控更新 (与 gating_update 一致的全步长推进)
-    使用 DEL=dt/2 实现 dt 步长的 CN 格式，匹配 NEURON cnexp 精度
+    Crank-Nicolson gating update based on tau and inf (full-step update consistent with gating_update).
+    Using DEL=dt/2 implements a CN format over a dt step to match NEURON's cnexp accuracy.
     """
     decay = (1 - DEL / tau) / (1 + DEL / tau)
     drive = (2 * DEL / tau * inf) / (1 + DEL / tau)
@@ -459,35 +458,35 @@ def gating_update(DEL, xi_old, alpha, beta, tadj=1.0):
 
 def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
 
-    # 如果该区室没有 T 通道，直接截断数据流
+    # If the segment has no T-type channel, short-circuit
     if P_max_abs == 0.0:
         return 0.0, 0.0
 
-    # 无量纲电压因子 k
+    # Dimensionless voltage factor k
     k = (Z_CA * FARADAY) / (1000.0 * R_GAS * TEMP_K)
     z = k * V
     
-    # 概率因子与常数前缀
-    # 量纲对齐：P_max_abs(cm^3/s) * 2F(C/mol) * 10^-3 -> mA (随后转为 uA 乘 1000)
+    # Probability factor and constant prefix
+    # Unit alignment: P_max_abs(cm^3/s) * 2F(C/mol) * 1e-3 -> mA (then converted to uA by *1000)
     GHK_prefix = P_max_abs * (m_T**2) * h_T * (Z_CA * FARADAY * 1e-3) * 1000.0
     
-    # 奇点状态截获 (V 极小)
+    # Handle singular case (V near zero)
     if abs(z) < 1e-4:
-        # 泰勒展开极限状态 (L'Hôpital's limit)
-        # f(z) = z*(Ci - Co*e^{-z})/(1-e^{-z}) ≈ (Ci-Co) + z*(Ci+Co)/2 + O(z²)
+        # Taylor expansion for the limit (L'Hôpital's rule)
+        # f(z) = z*(Ci - Co*e^{-z})/(1-e^{-z}) ≈ (Ci-Co) + z*(Ci+Co)/2 + O(z^2)
         I_T_abs = GHK_prefix * ((Cai - Cao) + z * (Cai + Cao) / 2.0)
         g_Ca_eq = GHK_prefix * k * ((Cai + Cao) / 2.0)
         return I_T_abs, g_Ca_eq
 
-    # 正常状态空间推演
+    # Normal case
     exp_z = np.exp(z)
     exp_minus_z = np.exp(-z)
     
-    # 1. 绝对电流求值
+    # 1. Evaluate absolute current
     f_z = z * (Cai - Cao * exp_minus_z) / (1.0 - exp_minus_z)
     I_T_abs = GHK_prefix * f_z
     
-    # 2. 偏导数 (Jacobian) 求值 (链式求导解析解)
+    # 2. Compute Jacobian (analytic derivative via chain rule)
     denominator = (exp_z - 1.0)
     f_prime_z = ((Cai * exp_z * (1.0 + z) - Cao) * denominator - (Cai * z * exp_z - Cao * z) * exp_z) / (denominator**2)
     g_Ca_eq = GHK_prefix * k * f_prime_z
@@ -500,10 +499,10 @@ def evaluate_GHK_and_Jacobian(V, Cai, Cao, P_max_abs, m_T, h_T):
 
 def _compute_vc_current(segment_id, V_membrane, t_current):
     """
-    计算指定区室在给定时间点的电压钳电流 (µA)。
-    I_vc = g_vc * (V_cmd - V_membrane)，g_vc = 1e-3 / rs_MOhm (mS)
-    正值 = 注入电流，负值 = 吸出电流。
-    若该区室不受任何电压钳作用，返回 0.0。
+    Compute the voltage-clamp current (µA) for a given segment at a given time.
+    I_vc = g_vc * (V_cmd - V_membrane), g_vc = 1e-3 / rs_MOhm (mS)
+    Positive = injected current, negative = withdrawn current.
+    If no clamp applies to the segment, return 0.0.
     """
     total_I = 0.0
     for vc in VOLTAGE_CLAMP:
@@ -524,23 +523,23 @@ def _compute_vc_current(segment_id, V_membrane, t_current):
     return total_I
 
 
-# 状态容器：维度为 (steps + 1, N_NODE)
+# State containers: shape (steps + 1, N_NODE)
 def start_simulation(progress_callback=None):
     global CURRENT_STEP, SIMULATION_RUNNING
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
-        raise RuntimeError("请先调用 set_env")
+        raise RuntimeError("Please call set_env before starting the simulation.")
     
     if HISTORY_MT is None or HISTORY_HT is None or HISTORY_CA is None:
-        raise RuntimeError("请先调用 set_env")
+        raise RuntimeError("Please call set_env before starting the simulation.")
     SIMULATION_RUNNING = True
     CURRENT_STEP = 0
 
     try:
-        # 建立 segment_id 到 矩阵索引 i 的映射，保证 O(1) 寻址时间复杂度
+        # Build mapping from segment_id to matrix index i for O(1) lookup
         seg_list = list(SEGMENT.values())
         seg_id_to_idx = {seg.id: i for i, seg in enumerate(seg_list)}
         
-        # 初始状态装载
+        # Load initial state
         for i, seg in enumerate(seg_list):
             HISTORY_V[0, i] = V
             m0, n0, h0 = init_gates(V)
@@ -556,7 +555,7 @@ def start_simulation(progress_callback=None):
             CURRENT_STEP = step
             if progress_callback is not None:
                 progress_callback(step)
-            t_current = step * DT  # 当前绝对时间 (ms)
+            t_current = step * DT  # Current absolute time (ms)
             
             V_t = HISTORY_V[step]
             m_t = HISTORY_M[step]
@@ -579,10 +578,10 @@ def start_simulation(progress_callback=None):
             I_T_abs = np.zeros(N_NODE)
             g_Ca_eq = np.zeros(N_NODE)
             
-            # Q10 温度校正 (hh2.mod: tadj = 3.0 ^ ((celsius-36)/10))
+            # Q10 temperature adjustment (hh2.mod: tadj = 3.0 ** ((celsius-36)/10))
             tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
 
-            # 步骤 1: 门控变量与电导状态更新
+            # Step 1: update gating variables and conductances
             for i, seg in enumerate(seg_list):
                 v_current = V_t[i]
 
@@ -605,7 +604,7 @@ def start_simulation(progress_callback=None):
             A = np.zeros((N_NODE, N_NODE))
             b = np.zeros(N_NODE)
             
-            # 步骤 2: 矩阵组装与刺激电流注入
+            # Step 2: assemble matrix and inject stimulation currents
             for i, seg in enumerate(seg_list):
                 C_factor = seg.absolute_C / DEL
                 sum_Kij = 0.0
@@ -626,27 +625,24 @@ def start_simulation(progress_callback=None):
                         g_L_abs[i] * E_TABLE["L"]["E"] -
                         I_T_abs[i] + g_Ca_eq[i] * V_t[i])
                 
-                # --- 外部刺激数据流 (电流钳) ---
-                # 遍历所有刺激配置，若命中当前空间位置与时间窗口，叠加电流至已知项向量 b
+                # --- External stimulation (current clamp) ---
+                # Iterate stim configurations; if active for this segment/time, add current to RHS vector b
                 for stim in STIMULATION:
                     stim_id, s_id, stim_uA, stim_start, stim_duration = stim
                     if seg.id == s_id:
                         if stim_start <= t_current <= (stim_start + stim_duration):
                             b[i] += stim_uA
 
-                # --- 电压钳数据流 ---
-                # 遍历所有电压钳配置，在目标区室注入大电导以钳制电压
-                # g_vc = 1/rs (rs in MΩ → g_vc in µS = 10^-3 mS)
-                # 注意此处需要与矩阵中其他电导量纲对齐:
-                # g_Na_half 等为 mS (由 surface_area_cm2 * g_max_mS/cm2)
-                # SEClamp 的 rs 单位是 MΩ, 所以 g_vc = 1/rs MΩ = 1e-3/rs mS → 不对
-                # 实际上 NEURON SEClamp: i = (V_cmd - V) / rs，i 单位 nA
-                # 我们的电流单位是 µA，所以 i = (V_cmd - V) / rs * 1e-3 (nA→µA)
-                # 等价于 g_vc = 1e-3 / rs (mS 量纲，匹配矩阵)
+                # --- Voltage clamp handling ---
+                # Iterate voltage clamp configs and inject an effective conductance to clamp voltage
+                # g_vc ~ 1/rs (rs in MΩ -> g_vc in µS = 1e-3 mS)
+                # Note: align units with other conductances in the matrix (mS)
+                # NEURON SEClamp uses i = (V_cmd - V)/rs in nA, our units are µA,
+                # so i = (V_cmd - V)/rs * 1e-3 (nA -> µA), equivalently g_vc = 1e-3 / rs (mS)
                 for vc in VOLTAGE_CLAMP:
                     vc_id, vc_seg_id, rs_MOhm, protocol = vc
                     if seg.id == vc_seg_id:
-                        # 确定当前时间对应的协议步骤
+                        # Determine the protocol step corresponding to the current time
                         t_elapsed = t_current
                         v_cmd = None
                         t_acc = 0.0
@@ -656,13 +652,13 @@ def start_simulation(progress_callback=None):
                                 break
                             t_acc += step_dur
                         if v_cmd is None:
-                            # 超出协议总时长，使用最后一步的电压
+                            # If beyond protocol duration, use the last step's voltage
                             v_cmd = protocol[-1][1] if protocol else V
                         g_vc = 1e-3 / rs_MOhm  # mS
                         A[i, i] += g_vc
                         b[i] += g_vc * v_cmd
 
-            # 步骤 3: 隐式求解与时间步推进
+            # Step 3: implicit solve and time-step advance
             V_half = linalg.solve(A, b)
             HISTORY_V[step + 1] = 2 * V_half - V_t
             HISTORY_M[step + 1] = m_half
@@ -676,15 +672,15 @@ def start_simulation(progress_callback=None):
                 Ca_current = Ca_t[i]
                 drive_channel = -seg.gamma_Ca * I_T_abs[i]
                 if drive_channel <= 0.0:
-                    drive_channel = 0.0  # Cannot pump inward (cadecay.mod)
+                    drive_channel = 0.0  # Cannot pump inward (matching cadecay.mod behavior)
 
-                # 隐式 Euler 积分 (匹配 cadecay.mod 的 derivimplicit 方法)
+                # Implicit Euler integration (matching cadecay.mod's derivimplicit):
                 # cai' = drive + (cainf - cai)/taur
                 # cai_new = (cai_old + DT*(drive + cainf/taur)) / (1 + DT/taur)
                 HISTORY_CA[step + 1, i] = (Ca_current + DT * (drive_channel + CA_INF / TAU_CA)) / (1.0 + DT / TAU_CA)
 
-            # --- 探针数据登记 ---
-            # 检查当前步长是否触发探针，若触发则打包整个状态空间的标量与向量参数
+            # --- Probe data logging ---
+            # Check whether probes are active at the current step; if so, package scalars/vectors
             for probe in PROBE_LIST:
                 probe_id, p_seg_id, probe_start_ms, probe_duration_ms = probe
                 if probe_start_ms <= t_current <= (probe_start_ms + probe_duration_ms):
@@ -692,10 +688,10 @@ def start_simulation(progress_callback=None):
                     if idx is None:
                         continue
                     
-                    # 提取目标区室的 Segment 实例
+                    # Extract the target Segment instance
                     target_seg = SEGMENT[p_seg_id]
                     
-                    # 计算当前时刻的连续导数
+                    # Compute continuous derivatives at the current time
                     dV_dt, dm_dt, dh_dt, dn_dt = compute_continuous_derivatives(
                         segment_id=p_seg_id, step=step
                     )
@@ -733,12 +729,12 @@ def start_simulation(progress_callback=None):
     finally:
         SIMULATION_RUNNING = False
 # -----------------------------------------------------------------------------------
-# 外部接口层
+# External interface layer
 
 def export_history_matrices():
     """
-    提供给外部运行时的时序状态流出口。
-    保证 C-contiguous 连续内存状态。
+    Export time-series state matrices for external runtimes.
+    Ensures C-contiguous memory layout.
     """
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     return (
@@ -751,8 +747,8 @@ def export_history_matrices():
 
 def export_calcium_history_matrices():
     """
-    提供钙离子相关的时序状态流出口。
-    保证 C-contiguous 连续内存状态。
+    Export calcium-related time-series matrices.
+    Ensures C-contiguous memory layout.
     """
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
     return (
@@ -763,8 +759,8 @@ def export_calcium_history_matrices():
 
 def export_probe_data_json() -> str:
     """
-    提供给外部运行时的探针数据出口。
-    使用 JSON 字符串格式越过 C# 与 Python 之间的字典封送障碍。
+    Export probe data for external runtimes as a JSON string.
+    This bypasses dictionary marshaling between C# and Python.
     """
     return json.dumps(PROBE_SAVE_DATA)
 
@@ -783,13 +779,14 @@ def compute_continuous_derivatives(segment_id: int, step: int,
                                    V_override=None, m_override=None, 
                                    h_override=None, n_override=None):
     """
-    计算局部区室连续导数。
-    状态变更：通过 override 参数实现降维假设。未提供 override 的变量将提取其历史真实态。
+    Compute continuous derivatives for a local segment.
+    State overrides: provide reduced-dimension values via override parameters;
+    if not provided, historical values are used.
     """
     global SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, STIMULATION, DT, E_TABLE
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
-        raise RuntimeError("请先调用 set_env")
+        raise RuntimeError("Please call set_env before using this function.")
 
     seg = SEGMENT[segment_id]
     seg_list = list(SEGMENT.values())
@@ -802,19 +799,19 @@ def compute_continuous_derivatives(segment_id: int, step: int,
     n_t = HISTORY_N[step]
     t_current = step * DT
 
-    # 状态路由：如果传入重载值(网格坐标)，则覆盖历史值
+    # State routing: if override values (e.g., grid coordinates) are provided, they replace history
     V_i = V_override if V_override is not None else V_t[idx]
     m_i = m_override if m_override is not None else m_t[idx]
     h_i = h_override if h_override is not None else h_t[idx]
     n_i = n_override if n_override is not None else n_t[idx]
 
-    # 计算门控变量导数 (含 Q10 温度校正，匹配 hh2.mod)
+    # Compute gating variable derivatives (includes Q10 temperature correction, matching hh2.mod)
     tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
     dm_dt = tadj_hh * (alpha_m(V_i) * (1 - m_i) - beta_m(V_i) * m_i)
     dh_dt = tadj_hh * (alpha_h(V_i) * (1 - h_i) - beta_h(V_i) * h_i)
     dn_dt = tadj_hh * (alpha_n(V_i) * (1 - n_i) - beta_n(V_i) * n_i)
 
-    # 计算电流状态
+    # Compute ionic currents
     g_Na = (m_i**3) * h_i * seg.get_absolute_g_max("Na")
     g_K = (n_i**4) * seg.get_absolute_g_max("K")
     g_L = seg.get_absolute_g_max("L")
@@ -841,7 +838,7 @@ def compute_continuous_derivatives(segment_id: int, step: int,
         target_seg = SEGMENT[connected_id]
         target_idx = seg_id_to_idx[connected_id]
         K_ij = calculate_Kij(seg, target_seg)
-        V_j = V_t[target_idx] # 严格使用真实历史邻居电位
+        V_j = V_t[target_idx] # Strictly use historical neighbor voltages
         I_axial += K_ij * (V_j - V_i)
 
     I_stim = 0.0
@@ -852,7 +849,7 @@ def compute_continuous_derivatives(segment_id: int, step: int,
 
     dV_dt = (-I_ion + I_axial + I_stim) / seg.absolute_C
 
-    # 必须完整返回所有 4 个维度的偏导数，由外部绘图函数进行二次提取
+    # Must return all four derivative dimensions; external plotting functions will extract what they need
     return dV_dt, dm_dt, dh_dt, dn_dt
 
 
@@ -862,7 +859,7 @@ from scipy.optimize import fsolve
 # Phase portrait helpers (vectorized)
 
 def _get_var_range(var_name):
-    """返回变量的绘图范围。"""
+    """Return plotting range for a given variable."""
     if var_name == 'V':
         return -100.0, 60.0
     elif var_name == 'Ca':
@@ -940,7 +937,7 @@ def _tau_hT_vec(V):
     return np.where(Vs < Vth, branch_low, branch_high)
 
 def _evaluate_GHK_vec(V, Cai, Cao, P_max_abs, m_T, h_T):
-    """向量化 GHK 电流计算 (仅绝对电流，不返回 Jacobian)。"""
+    """Vectorized GHK current evaluation (absolute current only; does not return Jacobian)."""
     if P_max_abs == 0.0:
         return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
     k_ghk = (Z_CA * FARADAY) / (1000.0 * R_GAS * TEMP_K)
@@ -958,8 +955,8 @@ def _evaluate_GHK_vec(V, Cai, Cao, P_max_abs, m_T, h_T):
 
 def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     """
-    向量化计算相平面上网格点的导数。
-    返回 (dX_grid, dY_grid, all_derivs_dict)。
+    Vectorized computation of derivatives on a phase-plane grid.
+    Returns (dX_grid, dY_grid, all_derivs_dict).
     """
     seg = SEGMENT[segment_id]
     seg_list = list(SEGMENT.values())
@@ -967,7 +964,9 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     idx = seg_id_to_idx[segment_id]
     t_current = step * DT
 
-    # 历史状态
+    if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
+        raise RuntimeError("Please call set_env before using this function.")
+    # Historical state
     V_hist = float(HISTORY_V[step, idx])
     m_hist = float(HISTORY_M[step, idx])
     h_hist = float(HISTORY_H[step, idx])
@@ -976,7 +975,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     mT_hist = float(HISTORY_MT[step, idx]) if HISTORY_MT is not None else inf_mT(V_hist)
     hT_hist = float(HISTORY_HT[step, idx]) if HISTORY_HT is not None else inf_hT(V_hist)
 
-    # 构建状态：轴上变量用网格值，其它用历史值
+    # Build state: axis variables use grid values, others use historical values
     state = {'V': V_hist, 'm': m_hist, 'h': h_hist, 'n': n_hist,
              'Ca': Ca_hist, 'mT': mT_hist, 'hT': hT_hist}
     state[x_var] = X_grid
@@ -985,7 +984,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     V_s = state['V']; m_s = state['m']; h_s = state['h']; n_s = state['n']
     Ca_s = state['Ca']; mT_s = state['mT']; hT_s = state['hT']
 
-    # 确保所有变量都能广播
+    # Ensure all variables can be broadcast
     shape = X_grid.shape
     V_s  = np.broadcast_to(np.asarray(V_s, dtype=float), shape).copy()
     m_s  = np.broadcast_to(np.asarray(m_s, dtype=float), shape).copy()
@@ -995,7 +994,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     mT_s = np.broadcast_to(np.asarray(mT_s, dtype=float), shape).copy()
     hT_s = np.broadcast_to(np.asarray(hT_s, dtype=float), shape).copy()
 
-    # --- HH 门控导数 ---
+    # --- HH gating derivatives ---
     tadj_hh = 3.0 ** ((CELSIUS - 36.0) / 10.0)
     am = _alpha_m_vec(V_s); bm = _beta_m_vec(V_s)
     ah = _alpha_h_vec(V_s); bh = _beta_h_vec(V_s)
@@ -1004,22 +1003,22 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
     dh = tadj_hh * (ah * (1 - h_s) - bh * h_s)
     dn = tadj_hh * (an * (1 - n_s) - bn * n_s)
 
-    # --- CaT 门控导数 ---
+    # --- CaT gating derivatives ---
     dmT = (_inf_mT_vec(V_s) - mT_s) / _tau_mT_vec(V_s)
     dhT = (_inf_hT_vec(V_s) - hT_s) / _tau_hT_vec(V_s)
 
-    # --- 离子电流 ---
+    # --- Ionic currents ---
     g_Na = (m_s**3) * h_s * seg.get_absolute_g_max("Na")
     g_K  = (n_s**4) * seg.get_absolute_g_max("K")
     g_L  = seg.get_absolute_g_max("L")
     I_ion = g_Na * (V_s - E_TABLE["Na"]["E"]) + g_K * (V_s - E_TABLE["K"]["E"]) + g_L * (V_s - E_TABLE["L"]["E"])
 
-    # T-type Ca 电流
+    # T-type Ca current
     P_Ca_abs = seg.get_absolute_P_max("CaT")
     I_T = _evaluate_GHK_vec(V_s, Ca_s, CA_OUT, P_Ca_abs, mT_s, hT_s)
     I_ion = I_ion + I_T
 
-    # 轴向电流 (邻居电压使用历史值)
+    # Axial currents (neighbor voltages use historical values)
     I_axial = np.zeros(shape)
     V_t = HISTORY_V[step]
     for connected_id in seg.connected_segments:
@@ -1028,7 +1027,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
         K_ij = calculate_Kij(seg, target_seg)
         I_axial += K_ij * (V_t[target_idx] - V_s)
 
-    # 外部刺激
+    # External stimulation
     I_stim = 0.0
     for stim in STIMULATION:
         _, s_id, stim_uA, stim_start, stim_duration = stim
@@ -1037,7 +1036,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
 
     dV = (-I_ion + I_axial + I_stim) / seg.absolute_C
 
-    # Ca 衰减
+    # Ca decay
     drive_ca = np.maximum(-seg.gamma_Ca * I_T, 0.0) if P_Ca_abs > 0 else 0.0
     dCa = drive_ca + (CA_INF - Ca_s) / TAU_CA
 
@@ -1046,7 +1045,7 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
 
 
 def _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_val, y_val):
-    """标量版本—用于 fsolve 求解平衡点。"""
+    """Scalar version — used by fsolve to solve for equilibria."""
     X_arr = np.array([[x_val]]); Y_arr = np.array([[y_val]])
     dX, dY, _ = _phase_derivatives_grid(segment_id, step, x_var, y_var, X_arr, Y_arr)
     return [float(dX[0, 0]), float(dY[0, 0])]
@@ -1054,8 +1053,8 @@ def _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_val, y_val):
 
 def find_equilibria(segment_id, step, x_var, y_var, Nx=40, Ny=40, tol=1e-6):
     """
-    在相平面上寻找平衡点 (dX=0 且 dY=0 的交点)。
-    返回符合条件的 (x, y) 坐标列表。
+    Search for equilibria on the phase plane (intersections where dX=0 and dY=0).
+    Returns a list of (x, y) coordinates that satisfy the conditions.
     """
     x_lo, x_hi = _get_var_range(x_var)
     y_lo, y_hi = _get_var_range(y_var)
@@ -1065,11 +1064,11 @@ def find_equilibria(segment_id, step, x_var, y_var, Nx=40, Ny=40, tol=1e-6):
 
     dX, dY, _ = _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid)
 
-    # 在网格上寻找 dX 和 dY 同时接近零或变号的候选种子
+    # Search the grid for candidate seeds where dX and dY are near zero or change sign
     candidates = []
     for i in range(Ny - 1):
         for j in range(Nx - 1):
-            # 检查 dX 在相邻格子间是否变号
+            # Check whether dX changes sign between adjacent grid cells
             sx = (np.sign(dX[i, j]) != np.sign(dX[i, j+1]) or
                   np.sign(dX[i, j]) != np.sign(dX[i+1, j]))
             sy = (np.sign(dY[i, j]) != np.sign(dY[i, j+1]) or
@@ -1077,7 +1076,7 @@ def find_equilibria(segment_id, step, x_var, y_var, Nx=40, Ny=40, tol=1e-6):
             if sx and sy:
                 candidates.append((X_grid[i, j], Y_grid[i, j]))
 
-    # 用 fsolve 精化
+    # Refine candidates using fsolve
     equilibria = []
     seen = set()
     for x0, y0 in candidates:
@@ -1099,11 +1098,11 @@ def find_equilibria(segment_id, step, x_var, y_var, Nx=40, Ny=40, tol=1e-6):
 
 
 def classify_equilibrium(eigenvalues):
-    """根据雅可比矩阵特征值分类平衡点的稳定性类型 (李雅普诺夫第一方法)。"""
+    """Classify equilibrium stability type from Jacobian eigenvalues (Lyapunov first method)."""
     lam1, lam2 = eigenvalues
     re1, re2 = lam1.real, lam2.real
     im1, im2 = lam1.imag, lam2.imag
-    # 使用特征值幅值的相对容差
+    # Use relative tolerance based on eigenvalue magnitudes
     mag = max(abs(lam1), abs(lam2), 1e-12)
     tol = mag * 1e-6
 
@@ -1133,25 +1132,25 @@ def classify_equilibrium(eigenvalues):
 
 def compute_jacobian_at_equilibrium(segment_id, step, x_var, y_var, x_eq, y_eq):
     """
-    在平衡点 (x_eq, y_eq) 处用中心差分法计算二维约化系统的雅可比矩阵，
-    并求特征值进行李雅普诺夫第一方法稳定性分析。
+    Compute the 2×2 Jacobian of the reduced system at equilibrium (x_eq, y_eq) using central differences,
+    then compute eigenvalues for stability classification (Lyapunov first method).
 
-    系统方程由 HH 方程、GHK 方程和 Ca 一阶衰减方程组成，
-    非相图轴的变量锁定为该时间步的历史值。
+    The reduced system includes HH equations, GHK current, and first-order Ca decay; non-axis variables
+    are held at their historical values for the given timestep.
 
-    返回:
-        J:              2×2 雅可比矩阵 (numpy array)
-        eigenvalues:    特征值数组 (complex)
-        classification: 稳定性分类字符串
-        color:          对应的显示颜色
+    Returns:
+        J:              2x2 Jacobian matrix (numpy array)
+        eigenvalues:    eigenvalues array (complex)
+        classification: stability classification string
+        color:          associated display color
     """
-    # 根据变量范围自适应中心差分步长
+    # Adapt central difference step sizes based on variable ranges
     x_lo, x_hi = _get_var_range(x_var)
     y_lo, y_hi = _get_var_range(y_var)
     eps_x = max((x_hi - x_lo) * 1e-6, 1e-12)
     eps_y = max((y_hi - y_lo) * 1e-6, 1e-12)
 
-    # 中心差分: J[i,j] = ∂f_i / ∂x_j
+    # Central difference: J[i,j] = ∂f_i / ∂x_j
     # f = (d(x_var)/dt, d(y_var)/dt),  x = (x_var, y_var)
     fx_p = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq + eps_x, y_eq)
     fx_m = _phase_derivatives_scalar(segment_id, step, x_var, y_var, x_eq - eps_x, y_eq)
@@ -1171,14 +1170,15 @@ def compute_jacobian_at_equilibrium(segment_id, step, x_var, y_var, x_eq, y_eq):
 
 def get_biophysical_info(segment_id, step):
     """
-    获取指定区室在给定时间步的生物物理参数摘要。
+    Get a biophysical summary for the specified segment at the given timestep.
     """
     seg = SEGMENT[segment_id]
     seg_list = list(SEGMENT.values())
     seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
     idx = seg_id_to_idx[segment_id]
     t_ms = step * DT
-
+    if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
+        raise RuntimeError("Please call set_env before using this function.")
     V_val = float(HISTORY_V[step, idx])
     m_val = float(HISTORY_M[step, idx])
     h_val = float(HISTORY_H[step, idx])
@@ -1205,12 +1205,12 @@ def get_biophysical_info(segment_id, step):
 
 def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: int = 20):
     """
-    分离式的相图渲染数据接口。
-    依赖：必须在 start_simulation() 执行完毕后调用，直接访问常驻内存的 HISTORY_V 等数据。
+    Standalone phase-portrait mesh data provider.
+    Depends on in-memory HISTORY_* data; must be called after start_simulation().
     """
     global HISTORY_V
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
-        raise RuntimeError("请先调用 set_env")
+        raise RuntimeError("Please call set_env before generating phase portrait mesh.")
 
     v_space = np.linspace(-80, 40, Nx)
     n_space = np.linspace(0, 1, Ny)
@@ -1228,11 +1228,11 @@ def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: i
 
 def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx: int = 25, Ny: int = 25):
     """
-    预计算完整相图轨迹后，使用 tkinter 播放器显示，支持进度条拖动。
-    包含零倾线、平衡点及生物物理参数信息面板。
+    Display a precomputed phase portrait trajectory using a Tkinter player with a seek bar.
+    Includes nullclines, equilibrium points, and a biophysical info panel.
 
-    probe_id: 探针 ID（int，与 insert_probe 的 probe_id 一致）。
-    x_var, y_var: 可选值为 'V', 'm', 'h', 'n', 'Ca', 'mT', 'hT'，不可相同。
+    probe_id: probe ID (int), same as used in insert_probe().
+    x_var, y_var: selectable variables among 'V', 'm', 'h', 'n', 'Ca', 'mT', 'hT' (must differ).
     """
     import tkinter as tk
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -1241,29 +1241,29 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     global HISTORY_CA, HISTORY_MT, HISTORY_HT, DT, STEPS
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
-        raise RuntimeError("请先调用 set_env")
+        raise RuntimeError("Please call set_env before starting the simulation.")
 
     valid_vars = ['V', 'm', 'h', 'n', 'Ca', 'mT', 'hT']
     if x_var not in valid_vars or y_var not in valid_vars:
-        raise ValueError(f"轴变量必须在 {valid_vars} 中选择。")
+        raise ValueError(f"Axis variable must be one of {valid_vars}.")
     if x_var == y_var:
-        raise ValueError(f"x_var 和 y_var 不可相同: '{x_var}'。")
+        raise ValueError(f"x_var and y_var must be different: '{x_var}'")
 
-    # ── 1. 探针解析 ──
+    # -- 1. Probe parsing --
     target_probe = None
     for p in PROBE_LIST:
         if p[0] == probe_id:
             target_probe = p
             break
     if target_probe is None:
-        raise ValueError(f"探针解析失败: '{probe_id}'。")
+        raise ValueError(f"Probe parsing failed: '{probe_id}'")
 
     _, segment_id, start_ms, duration_ms = target_probe
     start_step = max(0, int(start_ms / DT))
     end_step = min(STEPS, int((start_ms + duration_ms) / DT))
     N_frames = end_step - start_step + 1
 
-    # 如果帧数过多，进行降采样
+    # Downsample if frame count is too high
     max_display_frames = 2000
     if N_frames > max_display_frames:
         subsample = max(1, N_frames // max_display_frames)
@@ -1276,7 +1276,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
     idx = seg_id_to_idx[segment_id]
 
-    # ── 2. 历史轨迹 ──
+    # -- 2. Historical trajectory --
     history_map = {
         'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N,
         'Ca': HISTORY_CA, 'mT': HISTORY_MT, 'hT': HISTORY_HT
@@ -1284,14 +1284,14 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     traj_x_full = history_map[x_var][start_step:end_step + 1, idx]
     traj_y_full = history_map[y_var][start_step:end_step + 1, idx]
 
-    # ── 3. 网格空间 ──
+    # -- 3. Grid space --
     x_lo, x_hi = _get_var_range(x_var)
     y_lo, y_hi = _get_var_range(y_var)
     x_space = np.linspace(x_lo, x_hi, Nx)
     y_space = np.linspace(y_lo, y_hi, Ny)
     X_grid, Y_grid = np.meshgrid(x_space, y_space)
 
-    # ── 4. 预计算所有帧的向量场 ──
+    # -- 4. Precompute vector fields for all frames --
     all_dX = np.zeros((N_display, Ny, Nx))
     all_dY = np.zeros((N_display, Ny, Nx))
     for fi, step in enumerate(frame_steps):
@@ -1299,13 +1299,13 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         all_dX[fi] = dX
         all_dY[fi] = dY
 
-    # ── 5. 构建 tkinter 窗口 ──
+    # -- 5. Build Tkinter window --
     root = tk.Tk()
     root.title(f"Phase Portrait [{y_var} vs {x_var}] — Probe #{probe_id}")
     root.configure(bg='#1e1e1e')
     root.geometry("1050x820")
 
-    # 主绘图区
+    # Main plotting area
     fig, ax = plt.subplots(figsize=(9, 6.2))
     fig.patch.set_facecolor('#1e1e1e')
     ax.set_facecolor('#252526')
@@ -1321,9 +1321,9 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     ax.set_xlim(x_lo - x_margin, x_hi + x_margin)
     ax.set_ylim(y_lo - y_margin, y_hi + y_margin)
 
-    # 初始图元
-    # angles='xy'  : 箭头角度按数据坐标轴方向渲染，保证视觉方向与轨迹方向一致
-    # scale_units='xy', scale=1 : 箭头长度直接使用数据单位，由 set_UVC 精确控制
+    # Initial artists
+    # angles='xy': arrows rendered in data coordinates so visual direction matches trajectories
+    # scale_units='xy', scale=1: arrow length is in data units, controlled via set_UVC
     Q = ax.quiver(X_grid, Y_grid, np.zeros_like(X_grid), np.zeros_like(Y_grid),
                   color='#888888', alpha=0.6,
                   angles='xy', scale_units='xy', scale=1, width=0.002)
@@ -1339,7 +1339,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     toolbar = NavigationToolbar2Tk(canvas, root)
     toolbar.update()
 
-    # ── 6. 信息面板 ──
+    # -- 6. Info panel --
     info_frame = tk.Frame(root, bg='#1e1e1e')
     info_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 2))
     info_var = tk.StringVar(value="")
@@ -1347,7 +1347,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                           font=('Consolas', 9), justify=tk.LEFT, anchor='w', wraplength=1020)
     info_label.pack(fill=tk.X)
 
-    # ── 7. 控制栏 ──
+    # -- 7. Control bar --
     ctrl_frame = tk.Frame(root, bg='#2d2d30')
     ctrl_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=4, pady=4)
 
@@ -1360,46 +1360,46 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         dX = all_dX[fi]
         dY = all_dY[fi]
 
-        # ── 修复方向场箭头方向与长度 ──
-        # 问题1: 不同轴量纲 (V: ~160 mV, n: ~1) 导致归一化方向偏斜
-        # 修复: 先将导数按各轴跨度归一化到无量纲空间再求方向
-        # 问题2: 原始代码将所有箭头归一化为等长，丢失幅值信息
-        # 修复: 以95百分位幅值为满幅基准，按相对幅值缩放箭头长度
+        # -- Fix arrow directions and lengths for the vector field --
+        # Issue 1: different axis scales (V ~160 mV vs n ~1) bias normalized directions
+        # Fix: normalize derivatives by each axis range before computing directions
+        # Issue 2: original code normalized all arrows to equal length, losing magnitude info
+        # Fix: use the 95th percentile of magnitudes as a reference and scale arrows by relative magnitude
         x_span = x_hi - x_lo
         y_span = y_hi - y_lo
         grid_spacing_x = x_span / max(Nx - 1, 1)
         grid_spacing_y = y_span / max(Ny - 1, 1)
 
-        # 将导数折算为无量纲归一化坐标（消除量纲差异）
+        # Convert derivatives to dimensionless normalized coordinates (remove unit differences)
         dX_n = dX / x_span
         dY_n = dY / y_span
         mag_n = np.sqrt(dX_n**2 + dY_n**2)
 
-        # 相对幅值：以有效点的95百分位为满幅基准，抑制离群值
+        # Relative magnitude: use 95th percentile of valid points as full-scale reference to suppress outliers
         valid = mag_n > 1e-30
         mag_ref = float(np.percentile(mag_n[valid], 95)) if valid.any() else 1.0
         mag_ref = max(mag_ref, 1e-30)
-        rel_mag = np.clip(mag_n / mag_ref, 0.05, 1.0)  # 保留最小5%可见长度
+        rel_mag = np.clip(mag_n / mag_ref, 0.05, 1.0)  # Enforce a minimum visible length of 5%
 
-        # 归一化方向单位向量（归一化坐标系）
+        # Normalize direction unit vectors (in normalized coordinate system)
         mag_safe = np.where(valid, mag_n, 1.0)
         dX_dir = dX_n / mag_safe
         dY_dir = dY_n / mag_safe
 
-        # 换算回数据坐标：箭头长度 = 相对幅值 × 格点间距 × 比例因子
-        # angles='xy' 保证 (U, V) 在数据坐标系中正确渲染角度
+        # Convert back to data coordinates: arrow length = rel_mag * grid spacing * scale factor
+        # angles='xy' ensures (U, V) angles are rendered correctly in data coordinates
         arrow_factor = 0.45
         U_arrow = dX_dir * rel_mag * grid_spacing_x * arrow_factor
         V_arrow = dY_dir * rel_mag * grid_spacing_y * arrow_factor
         Q.set_UVC(U_arrow, V_arrow)
 
-        # 轨迹（映射到全帧索引）
+        # Trajectory (mapped to full-frame indices)
         traj_end = fi * subsample + 1
         traj_line.set_data(traj_x_full[:traj_end], traj_y_full[:traj_end])
         curr_point.set_data([traj_x_full[min(fi * subsample, len(traj_x_full) - 1)]],
                             [traj_y_full[min(fi * subsample, len(traj_y_full) - 1)]])
 
-        # 清理旧零倾线
+        # Clear old nullclines
         if nullcline_x_artist[0] is not None:
             for coll in nullcline_x_artist[0].collections:
                 coll.remove()
@@ -1413,7 +1413,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
             t.remove()
         eq_text_artists[0] = []
 
-        # 绘制零倾线 (d{x_var}/dt = 0 和 d{y_var}/dt = 0)
+        # Draw nullclines (d{x_var}/dt = 0 and d{y_var}/dt = 0)
         try:
             cs_x = ax.contour(X_grid, Y_grid, dX, levels=[0], colors=['#66bb6a'], linewidths=1.5, linestyles='--')
             nullcline_x_artist[0] = cs_x
@@ -1425,7 +1425,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         except Exception:
             nullcline_y_artist[0] = None
 
-        # 计算平衡点及其稳定性 (李雅普诺夫第一方法)
+        # Compute equilibria and their stability (Lyapunov first method)
         step = frame_steps[fi]
         eqs = find_equilibria(segment_id, step, x_var, y_var, Nx=30, Ny=30)
         eq_stability = []
@@ -1443,7 +1443,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                                 linewidths=0.8, zorder=10)
                 eq_text_artists[0].append(sc)
 
-        # 信息文本
+        # Info text
         bio = get_biophysical_info(segment_id, step)
         t_ms = bio['t_ms']
         lines = [f"t = {t_ms:.1f} ms  |  Frame {fi+1}/{N_display}"]
@@ -1462,8 +1462,8 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                         f"\u03bb=[{lam_str}] \u2192 {classif}")
                 else:
                     eq_info_lines.append(
-                        f"Eq#{i_eq} ({x_var}={x_eq:.4f}, {y_var}={y_eq:.4f}): 计算失败")
-                # 在图上标注稳定性类型
+                        f"Eq#{i_eq} ({x_var}={x_eq:.4f}, {y_var}={y_eq:.4f}): Computation failed")
+                # Annotate stability type on the plot
                 ann_text = f"({x_eq:.3f}, {y_eq:.3f})\n{classif}" if eigvals is not None \
                     else f"({x_eq:.3f}, {y_eq:.3f})"
                 eq_text_artists[0].append(
@@ -1481,7 +1481,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
 
         canvas.draw_idle()
 
-    # 按钮与进度条
+    # Buttons and progress bar
     def on_play_pause():
         is_playing[0] = not is_playing[0]
         btn_play.config(text="⏸" if is_playing[0] else "▶")
@@ -1516,7 +1516,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                          bg='#3c3c3c', fg='white', relief=tk.FLAT, font=('Arial', 12))
     btn_play.pack(side=tk.LEFT, padx=2)
 
-    # 图例说明
+    # Legend description
     legend_lbl = tk.Label(ctrl_frame, text=f"  ── {x_var}-nullcline (green)  ── {y_var}-nullcline (red)  ★ equilibrium",
                           bg='#2d2d30', fg='#aaaaaa', font=('Arial', 9))
     legend_lbl.pack(side=tk.LEFT, padx=8)
@@ -1530,7 +1530,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     frame_lbl = tk.Label(ctrl_frame, textvariable=frame_lbl_var, bg='#2d2d30', fg='white', font=('Arial', 10))
     frame_lbl.pack(side=tk.LEFT, padx=4)
 
-    # 更新帧标签
+    # Update frame label
     orig_update = update_display
     def update_display_wrapped(fi):
         orig_update(fi)
@@ -1538,10 +1538,10 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     # patch
     update_display = update_display_wrapped
 
-    # 重新绑定 slider 回调
+    # Rebind slider callback
     slider.config(command=lambda val: update_display(int(float(val))))
 
-    # 显示第一帧
+    # Show first frame
     update_display(0)
 
     root.protocol("WM_DELETE_WINDOW", root.destroy)
@@ -1551,27 +1551,27 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
 
 def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: float, end_time_ms: float):
     """
-    绘制指定区室的指定状态变量在给定时间区间内随时间的变化曲线。
-    必须在 start_simulation() 执行完毕后调用。
+    Plot a state variable for a given segment over a specified time interval.
+    Must be called after start_simulation() has completed.
 
     Parameters:
-        segment_id:    区室 ID（对应 init_segment 的 id 参数）
-        var_label:     变量标签，可选 'V', 'm', 'h', 'n'
-        start_time_ms: 起始时间 (ms)
-        end_time_ms:   终止时间 (ms)
+        segment_id:    segment ID (as used in init_segment)
+        var_label:     variable label; options: 'V', 'm', 'h', 'n', 'Ca', 'mT', 'hT'
+        start_time_ms: start time (ms)
+        end_time_ms:   end time (ms)
     """
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, DT, STEPS, SEGMENT
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_H is None or HISTORY_N is None:
-        raise RuntimeError("请先调用 set_env 并执行仿真。")
+        raise RuntimeError("Please call set_env and run the simulation first.")
 
     valid_labels = ['V', 'm', 'h', 'n', 'Ca', 'mT', 'hT']
     if var_label not in valid_labels:
-        raise ValueError(f"变量标签必须在 {valid_labels} 中选择，当前: '{var_label}'")
+        raise ValueError(f"Variable label must be one of {valid_labels}, current: '{var_label}'")
 
     if segment_id not in SEGMENT:
-        raise ValueError(f"区室 ID {segment_id} 不存在。")
+        raise ValueError(f"Segment ID {segment_id} does not exist.")
 
     seg_list = list(SEGMENT.values())
     seg_id_to_idx = {s.id: i for i, s in enumerate(seg_list)}
@@ -1581,7 +1581,7 @@ def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: floa
     end_step = min(STEPS, int(end_time_ms / DT))
 
     if start_step >= end_step:
-        raise ValueError(f"时间范围无效: start={start_time_ms}ms, end={end_time_ms}ms")
+        raise ValueError(f"Invalid time range: start={start_time_ms}ms, end={end_time_ms}ms")
 
     history_map = {
         'V': HISTORY_V, 'm': HISTORY_M, 'h': HISTORY_H, 'n': HISTORY_N,

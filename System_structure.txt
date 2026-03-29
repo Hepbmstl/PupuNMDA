@@ -1,48 +1,48 @@
 NeuronCAD (Root)
-├── App.xaml                // 程序的启动与资源入口
+├── App.xaml                // Application startup and resource entry
 ├── App.xaml.cs
 │
 ├── Backward                // [Namespace: NeuronCAD.Backward]
-│   ├── IOService.cs        // 负责 C++ DLL Import 或 Python 进程通信
-│   ├── DataManager.cs      // 内存中数据的持有者
-│   ├── ExportUtils.cs      // 数据转换逻辑
-│   └── Entities.cs         // 纯数据类，供 UI 和后端共享
+│   ├── IOService.cs        // Handles C++ DLL imports or Python process communication
+│   ├── DataManager.cs      // Holds in-memory data
+│   ├── ExportUtils.cs      // Data conversion logic
+│   └── Entities.cs         // Plain data classes shared between UI and backend
 │
 └── Visuals                         // [Namespace: NeuronCAD.Visuals]
-    ├── Windows                     // 独立的顶级窗口
-    │   ├── MainWindow.xaml        // 主程序外壳
+    ├── Windows                     // Top-level standalone windows
+    │   ├── MainWindow.xaml        // Main application shell
     │   ├── MainWindow.xaml.cs
-    │   ├── SplashWindow.xaml      // 启动页
+    │   ├── SplashWindow.xaml      // Splash screen
     │   └── SplashWindow.xaml.cs
     │
-    ├── Shell                       // 依附于 MainWindow 的全局组件
+    ├── Shell                       // Global components attached to MainWindow
     │   └── MainMenu               // [Namespace: NeuronCAD.Visuals.Shell.MainMenu]
-    │       ├── MenuBarView.xaml   // 顶部菜单的视图
+    │       ├── MenuBarView.xaml   // Top menu view
     │       ├── MenuBarView.xaml.cs
-    │       ├── MenuFile.cs      // 处理文件的“打开”、“保存”等逻辑
+    │       ├── MenuFile.cs      // Handles file 'Open'/'Save' logic
     │       ├── MenuFile.xaml    
-    │       └── ...                 // 其他全局组件，如工具栏、状态栏等
+    │       └── ...                 // Other global components, e.g., toolbars, status bar
     │
-    └── Tabs                               // 所有的标签页，互不干扰
+    └── Tabs                               // All tabs, isolated from each other
         ├── Modeling                       // [Namespace: NeuronCAD.Visuals.Tabs.Modeling]
-        │    ├── ModelingPage.xaml        // 聚合 Viewport 和 Panels 的总容器
-        │    ├── ModelingPage.xaml.cs     // 负责初始化 SceneContext
-        │    ├── Viewport.cs              // 负责网格，吸附，空间位置计算，视角移动转换
+        │    ├── ModelingPage.xaml        // Container aggregating Viewport and Panels
+        │    ├── ModelingPage.xaml.cs     // Responsible for initializing SceneContext
+        │    ├── Viewport.cs              // Handles grid, snapping, spatial position calculation, and viewport navigation
         │    ├── Visuals                  // [Namespace: NeuronCAD.Visuals.Tabs.Modeling.Visuals]
-        │    │   ├── IVisualEntity.cs    // 接口：定义所有可视化组件的公有行为
-        │    │   ├── VisualEntityBase.cs // 基类：持有 Backward.Entities 的引用 + Helix 模型
-        │    │   ├── SomaVisual.cs       // 具体的细胞体可视化类
-        │    │   ├── AxonVisual.cs       // 具体的轴突可视化类
-        │    │   └── Connection.cs       // 负责连接的实现
-        │    ├── Interaction.cs           // 负责鼠标操作，提供面板内的操作选项。
-        │    ├── Panels.cs                // 负责左侧面板
-        │    └── Biophy.cs                // 负责生物物理的相关属性
+        │    │   ├── IVisualEntity.cs    // Interface: defines public behavior for all visual components
+        │    │   ├── VisualEntityBase.cs // Base class: holds Backward.Entities reference and Helix model
+        │    │   ├── SomaVisual.cs       // Concrete soma visualization class
+        │    │   ├── AxonVisual.cs       // Concrete axon visualization class
+        │    │   └── Connection.cs       // Implements connections
+        │    ├── Interaction.cs           // Handles mouse interactions and provides in-panel action options
+        │    ├── Panels.cs                // Left-side panels controller
+        │    └── Biophy.cs                // Responsible for biophysical properties
         │
         │
         ├── Simulation                   // [Namespace: Namespace: NeuronCAD.Visuals.Tabs.Modeling]
-        │   ├── SimulationPage.xaml     // 仿真页主视图
+        │   ├── SimulationPage.xaml     // Main simulation view
         │   ├── SimulationPage.xaml.cs
-        │   └── ConfigPanel.xaml        // 仿真参数配置面板
+        │   └── ConfigPanel.xaml        // Simulation parameter configuration panel
         │
         └── Reporting                    // [Namespace: NeuronCAD.UI.Tabs.Reporting]
             ├── ReportPage.xaml
