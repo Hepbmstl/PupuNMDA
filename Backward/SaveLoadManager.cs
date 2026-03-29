@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -401,6 +402,9 @@ namespace NeuronCAD.Backward
             ApplyHHParams(project.HH_PARAMS);
             ApplyCaParams(project.CA_PARAMS);
 
+            // ── 4b. 诊断输出：显示所有加载的全局参数 ──
+            TraceLoadedParams(project);
+
             // ── 5. 重建实体 ──
             var entityMap = new Dictionary<string, IVisualEntity>();
 
@@ -637,6 +641,81 @@ namespace NeuronCAD.Backward
             if (p.TryGetValue("tau_hT_k2", out v)) IonChannelParams.TauHT_k2 = v;
             if (p.TryGetValue("tau_hT_Q10", out v)) IonChannelParams.TauHT_Q10 = v;
             if (p.TryGetValue("tau_hT_Tref", out v)) IonChannelParams.TauHT_Tref = v;
+        }
+
+        /// <summary>
+        /// 诊断输出：将加载的项目全局参数打印到 Debug Output 窗口，
+        /// 供开发者确认 JSON → IonChannelParams 覆写是否正确。
+        /// </summary>
+        private static void TraceLoadedParams(ProjectData project)
+        {
+            var ci = CultureInfo.InvariantCulture;
+            var env = project.GlobalEnvironment;
+
+            Debug.WriteLine("╔══════════════════════════════════════════════════════════╗");
+            Debug.WriteLine("║         NeuronCAD: Loaded Project Parameters             ║");
+            Debug.WriteLine("╠══════════════════════════════════════════════════════════╣");
+
+            Debug.WriteLine("║ [GlobalEnvironment]");
+            Debug.WriteLine($"║   V_init   = {env.V_init.ToString(ci)} mV");
+            Debug.WriteLine($"║   dt       = {env.dt.ToString(ci)} ms");
+            Debug.WriteLine($"║   STEPS    = {env.STEPS}");
+            Debug.WriteLine($"║   celsius  = {env.celsius.ToString(ci)} °C");
+            Debug.WriteLine($"║   CA_OUT   = {env.CA_OUT.ToString(ci)} mM");
+            Debug.WriteLine($"║   CA_INF   = {env.CA_INF.ToString(ci)} mM");
+            Debug.WriteLine($"║   TAU_CA   = {env.TAU_CA.ToString(ci)} ms");
+
+            Debug.WriteLine("║ [E_TABLE]");
+            foreach (var kvp in project.E_TABLE)
+                Debug.WriteLine($"║   E_{kvp.Key} = {kvp.Value.E.ToString(ci)} mV");
+
+            Debug.WriteLine("║ [HH_PARAMS] (IonChannelParams after overwrite)");
+            Debug.WriteLine($"║   vtraub   = {IonChannelParams.Vtraub.ToString(ci)}");
+            Debug.WriteLine($"║   αm: A={IonChannelParams.AlphaM_A.ToString(ci)}, V={IonChannelParams.AlphaM_V.ToString(ci)}, k={IonChannelParams.AlphaM_k.ToString(ci)}");
+            Debug.WriteLine($"║   βm: A={IonChannelParams.BetaM_A.ToString(ci)}, V={IonChannelParams.BetaM_V.ToString(ci)}, k={IonChannelParams.BetaM_k.ToString(ci)}");
+            Debug.WriteLine($"║   αh: A={IonChannelParams.AlphaH_A.ToString(ci)}, V={IonChannelParams.AlphaH_V.ToString(ci)}, k={IonChannelParams.AlphaH_k.ToString(ci)}");
+            Debug.WriteLine($"║   βh: A={IonChannelParams.BetaH_A.ToString(ci)}, V={IonChannelParams.BetaH_V.ToString(ci)}, k={IonChannelParams.BetaH_k.ToString(ci)}");
+            Debug.WriteLine($"║   αn: A={IonChannelParams.AlphaN_A.ToString(ci)}, V={IonChannelParams.AlphaN_V.ToString(ci)}, k={IonChannelParams.AlphaN_k.ToString(ci)}");
+            Debug.WriteLine($"║   βn: A={IonChannelParams.BetaN_A.ToString(ci)}, V={IonChannelParams.BetaN_V.ToString(ci)}, k={IonChannelParams.BetaN_k.ToString(ci)}");
+
+            Debug.WriteLine("║ [CA_PARAMS] (IonChannelParams after overwrite)");
+            Debug.WriteLine($"║   shift={IonChannelParams.Shift.ToString(ci)}, actshift={IonChannelParams.ActShift.ToString(ci)}");
+            Debug.WriteLine($"║   m∞: Vh={IonChannelParams.InfMT_Vh.ToString(ci)}, k={IonChannelParams.InfMT_k.ToString(ci)}");
+            Debug.WriteLine($"║   h∞: Vh={IonChannelParams.InfHT_Vh.ToString(ci)}, k={IonChannelParams.InfHT_k.ToString(ci)}");
+            Debug.WriteLine($"║   τm: base={IonChannelParams.TauMT_base.ToString(ci)}, V1={IonChannelParams.TauMT_V1.ToString(ci)}, k1={IonChannelParams.TauMT_k1.ToString(ci)}, V2={IonChannelParams.TauMT_V2.ToString(ci)}, k2={IonChannelParams.TauMT_k2.ToString(ci)}, Q10={IonChannelParams.TauMT_Q10.ToString(ci)}, Tref={IonChannelParams.TauMT_Tref.ToString(ci)}");
+            Debug.WriteLine($"║   τh: Vth={IonChannelParams.TauHT_Vthresh.ToString(ci)}, V1={IonChannelParams.TauHT_V1.ToString(ci)}, k1={IonChannelParams.TauHT_k1.ToString(ci)}, base={IonChannelParams.TauHT_base.ToString(ci)}, V2={IonChannelParams.TauHT_V2.ToString(ci)}, k2={IonChannelParams.TauHT_k2.ToString(ci)}, Q10={IonChannelParams.TauHT_Q10.ToString(ci)}, Tref={IonChannelParams.TauHT_Tref.ToString(ci)}");
+
+            Debug.WriteLine("╚══════════════════════════════════════════════════════════╝");
+        }
+
+        /// <summary>
+        /// 供外部 UI 调用：生成加载参数的可读摘要字符串。
+        /// </summary>
+        public static string GetLoadedParamsSummary(ProjectData project)
+        {
+            var ci = CultureInfo.InvariantCulture;
+            var env = project.GlobalEnvironment;
+            var lines = new List<string>
+            {
+                "── Global Environment ──",
+                $"  V_init={env.V_init.ToString(ci)} mV, dt={env.dt.ToString(ci)} ms, STEPS={env.STEPS}",
+                $"  celsius={env.celsius.ToString(ci)}°C, CA_OUT={env.CA_OUT.ToString(ci)} mM, CA_INF={env.CA_INF.ToString(ci)} mM, TAU_CA={env.TAU_CA.ToString(ci)} ms",
+                "── E_TABLE ──",
+            };
+            foreach (var kvp in project.E_TABLE)
+                lines.Add($"  E_{kvp.Key} = {kvp.Value.E.ToString(ci)} mV");
+
+            lines.Add("── HH_PARAMS ──");
+            lines.Add($"  vtraub = {IonChannelParams.Vtraub.ToString(ci)}");
+            foreach (var kvp in project.HH_PARAMS)
+                lines.Add($"  {kvp.Key} = {kvp.Value.ToString(ci)}");
+
+            lines.Add("── CA_PARAMS ──");
+            foreach (var kvp in project.CA_PARAMS)
+                lines.Add($"  {kvp.Key} = {kvp.Value.ToString(ci)}");
+
+            lines.Add($"── Entities: {project.Entities.Count}, Connections: {project.Connections.Count}, Devices: {project.Devices.Count} ──");
+            return string.Join("\n", lines);
         }
 
         #endregion

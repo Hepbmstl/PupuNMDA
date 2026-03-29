@@ -685,6 +685,12 @@ namespace NeuronCAD.Visuals.Windows
                 _currentProjectPath = dlg.FileName;
                 Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
 
+                // 显示加载参数概要
+                var summary = SaveLoadManager.GetLoadedParamsSummary(project);
+                MessageBox.Show(
+                    $"项目加载成功：{System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
+                    "Project Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+
                 // 切换到建模模式查看加载结果
                 if (_activeTab != ActiveTab.Modeling)
                 {
