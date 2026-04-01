@@ -1465,7 +1465,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                 except Exception:
                     eq_stability.append((x_eq, y_eq, None, None, "Unknown", "#9e9e9e"))
             for x_eq, y_eq, J, eigvals, classif, color in eq_stability:
-                sc = ax.scatter([x_eq], [y_eq], marker='*', s=220,
+                sc = ax.scatter([x_eq], [y_eq], marker='·', s=220,
                                 c=color, edgecolors='black',
                                 linewidths=0.8, zorder=10)
                 eq_text_artists[0].append(sc)
