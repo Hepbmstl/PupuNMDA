@@ -56,6 +56,9 @@ namespace NeuronCAD.Backward
         /// <summary>Probe JSON data after the simulation completes.</summary>
         public string? ProbeResultJson { get; private set; }
 
+        /// <summary>Full simulation state JSON (HISTORY arrays + metadata) for export.</summary>
+        public string? FullSimulationJson { get; private set; }
+
         /// <summary>Whether an abort of the simulation has been requested (for external abort checks).</summary>
         public bool WasAborted => _abortRequested;
 
@@ -98,6 +101,7 @@ namespace NeuronCAD.Backward
             _abortRequested = false;
             Volatile.Write(ref _currentStep, 0);
             ProbeResultJson = null;
+            FullSimulationJson = null;
 
             await PythonWorker.EnsureStartedAsync();
             string scriptDir = FindScriptDir();
@@ -221,6 +225,9 @@ namespace NeuronCAD.Backward
 
                     // ── 9. Export probe data ──
                     ProbeResultJson = (string)sim.export_probe_data_json();
+
+                    // ── 10. Export full simulation state for later import ──
+                    FullSimulationJson = (string)sim.export_full_simulation_json();
                 });
             }
             finally

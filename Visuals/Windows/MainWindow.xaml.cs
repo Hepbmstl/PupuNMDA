@@ -18,6 +18,8 @@
  */
 
 using System.Globalization;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -25,6 +27,7 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using Python.Runtime;
 using NeuronCAD.Backward;
 using NeuronCAD.Visuals.Tabs.Shared;
 using NeuronCAD.Visuals.Tabs.Modeling;
@@ -83,6 +86,15 @@ namespace NeuronCAD.Visuals.Windows
 
         /// <summary>Current project file path. Overwritten on Save; when null triggers Save As flow.</summary>
         private string? _currentProjectPath;
+
+        /// <summary>Current project unique identifier. Set on Load/New, persisted in Save.</summary>
+        private string _currentProjectId = Guid.NewGuid().ToString();
+
+        /// <summary>Current project display name. Shown in the simulation panel header.</summary>
+        private string _currentProjectName = "Untitled";
+
+        /// <summary>Last full simulation JSON from simulation, used for export/import.</summary>
+        private string? _lastFullSimulationJson;
 
         /// <summary>
         /// Constructor: initializes XAML components and initializes controllers after the window is loaded.
@@ -351,6 +363,9 @@ namespace NeuronCAD.Visuals.Windows
 
                 // Store simulation data for use by the Reporting panel
                 _scene.LastSimulationData = simData;
+
+                // Store probe result JSON for export
+                _lastFullSimulationJson = _simulationRunner?.FullSimulationJson;
 
                 MessageBox.Show(
                     $"Simulation complete:\n" +
@@ -647,6 +662,169 @@ namespace NeuronCAD.Visuals.Windows
 
         #endregion
 
+        #region Data Menu
+
+        private void OnExportSimulationDataClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+
+            if (_scene.LastSimulationData == null || _lastFullSimulationJson == null)
+            {
+                MessageBox.Show("No simulation results to export. Please run a simulation first.",
+                    "Export Simulation Data", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var dlg = new SaveFileDialog
+            {
+                Filter = "Simulation Data (*.simjson)|*.simjson|All Files (*.*)|*.*",
+                Title = "Export Simulation Data",
+                FileName = $"{_currentProjectName}_sim"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var resultData = new SimulationResultData
+                {
+                    ProjectId = _currentProjectId,
+                    ProjectName = _currentProjectName,
+                    FullSimulationJson = _lastFullSimulationJson
+                };
+
+                var opts = new JsonSerializerOptions { WriteIndented = true };
+                string json = JsonSerializer.Serialize(resultData, opts);
+                File.WriteAllText(dlg.FileName, json);
+
+                MessageBox.Show($"Simulation data exported to:\n{dlg.FileName}",
+                    "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed:\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OnImportSimulationDataClick(object sender, RoutedEventArgs e)
+        {
+            if (_isSimulating) return;
+
+            if (_scene.Entities.Count == 0)
+            {
+                MessageBox.Show("Please load a project model first before importing simulation data.",
+                    "Import Simulation Data", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Simulation Data (*.simjson)|*.simjson|All Files (*.*)|*.*",
+                Title = "Import Simulation Data"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                string json = File.ReadAllText(dlg.FileName);
+                var resultData = JsonSerializer.Deserialize<SimulationResultData>(json)
+                    ?? throw new InvalidOperationException("Failed to parse simulation data file.");
+
+                // Validate project identifier
+                if (resultData.ProjectId != _currentProjectId)
+                {
+                    MessageBox.Show(
+                        $"Simulation data mismatch!\n\n" +
+                        $"Current model: {_currentProjectName} ({_currentProjectId[..8]}...)\n" +
+                        $"Simulation data: {resultData.ProjectName} ({resultData.ProjectId[..8]}...)\n\n" +
+                        $"The simulation results do not belong to the currently loaded model.",
+                        "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // Build simulation data (compartmentalization) so Reporting has the structure
+                var registry = _scene.SimulationRegistry;
+                if (RbNSeg.IsChecked == true)
+                {
+                    registry.Mode = SegmentationMode.NSeg;
+                    if (int.TryParse(TbNSeg.Text, out int n) && n > 0) registry.NSeg = n;
+                }
+                else
+                {
+                    registry.Mode = SegmentationMode.LSeg;
+                    if (double.TryParse(TbLSeg.Text, out double l) && l > 0) registry.LSeg = l;
+                }
+
+                var simData = registry.BuildSimulationData(
+                    _scene.ConnectionController.ConnectionsById,
+                    _scene.Devices);
+
+                _scene.LastSimulationData = simData;
+                _lastFullSimulationJson = resultData.FullSimulationJson;
+
+                // Inject full simulation state into Hines_method so analysis functions can read it
+                InjectSimulationDataToPython(resultData.FullSimulationJson);
+
+                MessageBox.Show(
+                    $"Simulation data loaded successfully!\n\n" +
+                    $"Project: {resultData.ProjectName}\n" +
+                    $"You can now use the Reporting tab to analyze the data.",
+                    "Data Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Switch to Reporting tab
+                SwitchTab(ActiveTab.Reporting);
+                SyncTabButtons();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Import failed:\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Inject full simulation state JSON into the Python Hines_method module so that
+        /// plot_variable_over_time and show_dynamic_phase_portrait can access the data
+        /// without re-running the simulation.
+        /// </summary>
+        private async void InjectSimulationDataToPython(string fullSimJson)
+        {
+            try
+            {
+                await PythonWorker.EnsureStartedAsync();
+                await PythonWorker.RunAsync(() =>
+                {
+                    dynamic sys = Py.Import("sys");
+                    string scriptDir = FindScriptDir();
+                    if (!sys.path.__contains__(scriptDir))
+                        sys.path.append(scriptDir);
+
+                    dynamic sim = Py.Import("Hines_method");
+
+                    // Call import_full_simulation_json to restore all simulation state
+                    sim.import_full_simulation_json(fullSimJson);
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"InjectSimulationDataToPython error: {ex.Message}");
+            }
+        }
+
+        private static string FindScriptDir()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string scriptDir = Path.Combine(baseDir, "Backward");
+            if (!File.Exists(Path.Combine(scriptDir, "Hines_method.py")))
+            {
+                string projectDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", ".."));
+                scriptDir = Path.Combine(projectDir, "Backward");
+            }
+            return scriptDir;
+        }
+
+        #endregion
+
         #region File Menu
 
         private void OnNewProjectClick(object sender, RoutedEventArgs e)
@@ -658,6 +836,9 @@ namespace NeuronCAD.Visuals.Windows
 
             ClearScene();
             _currentProjectPath = null;
+            _currentProjectId = Guid.NewGuid().ToString();
+            _currentProjectName = "Untitled";
+            ProjectNameLabel.Text = "Project: (none)";
             Title = "NeuronCAD 2026";
         }
 
@@ -695,7 +876,15 @@ namespace NeuronCAD.Visuals.Windows
                     isNSeg => { RbNSeg.IsChecked = isNSeg; RbLSeg.IsChecked = !isNSeg; });
 
                 _currentProjectPath = dlg.FileName;
-                Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+                // Handle legacy files without ProjectId
+                _currentProjectId = string.IsNullOrEmpty(project.ProjectId)
+                    ? Guid.NewGuid().ToString()
+                    : project.ProjectId;
+                _currentProjectName = string.IsNullOrEmpty(project.ProjectName)
+                    ? System.IO.Path.GetFileNameWithoutExtension(dlg.FileName)
+                    : project.ProjectName;
+                ProjectNameLabel.Text = $"Project: {_currentProjectName}";
+                Title = $"NeuronCAD 2026 — {_currentProjectName}";
 
                 // Show loaded parameters summary
                 var summary = SaveLoadManager.GetLoadedParamsSummary(project);
@@ -738,9 +927,13 @@ namespace NeuronCAD.Visuals.Windows
             };
             if (dlg.ShowDialog() != true) return;
 
+            // Derive project name from file name (without extension)
+            _currentProjectName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
+
             SaveToFile(dlg.FileName);
             _currentProjectPath = dlg.FileName;
-            Title = $"NeuronCAD 2026 — {System.IO.Path.GetFileName(dlg.FileName)}";
+            ProjectNameLabel.Text = $"Project: {_currentProjectName}";
+            Title = $"NeuronCAD 2026 — {_currentProjectName}";
         }
 
         private void OnExitClick(object sender, RoutedEventArgs e)
@@ -770,7 +963,8 @@ namespace NeuronCAD.Visuals.Windows
                 SaveLoadManager.Save(filePath, _scene,
                     vInit, dt, steps, eNa, eK, eLeak,
                     celsius, caOut, caInf, tauCa,
-                    segMode, nSeg, lSeg);
+                    segMode, nSeg, lSeg,
+                    _currentProjectId, _currentProjectName);
             }
             catch (Exception ex)
             {
@@ -798,6 +992,9 @@ namespace NeuronCAD.Visuals.Windows
                 _modelingInteraction.NotifyEntityRemoved(entity);
             }
             _scene.Entities.Clear();
+
+            _scene.LastSimulationData = null;
+            _lastFullSimulationJson = null;
 
             IonChannelParams.ResetToDefault();
         }

@@ -42,6 +42,8 @@ namespace NeuronCAD.Backward
     /// </summary>
     public class ProjectData
     {
+        public string ProjectId { get; set; } = "";
+        public string ProjectName { get; set; } = "Untitled";
         public GlobalEnvironmentData GlobalEnvironment { get; set; } = new();
         public Dictionary<string, ETableEntry> E_TABLE { get; set; } = new();
         public Dictionary<string, double> HH_PARAMS { get; set; } = new();
@@ -50,6 +52,17 @@ namespace NeuronCAD.Backward
         public List<EntityData> Entities { get; set; } = new();
         public List<ConnectionData> Connections { get; set; } = new();
         public List<DeviceData> Devices { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Data model for exported simulation results. Contains the project identifier for validation
+    /// and the raw probe JSON data returned by Hines_method.py.
+    /// </summary>
+    public class SimulationResultData
+    {
+        public string ProjectId { get; set; } = "";
+        public string ProjectName { get; set; } = "";
+        public string FullSimulationJson { get; set; } = "";
     }
 
     public class GlobalEnvironmentData
@@ -163,9 +176,12 @@ namespace NeuronCAD.Backward
             double vInit, double dt, int steps,
             double eNa, double eK, double eLeak,
             double celsius, double caOut, double caInf, double tauCa,
-            string segMode, int nSeg, double lSeg)
+            string segMode, int nSeg, double lSeg,
+            string? projectId = null, string? projectName = null)
         {
             var project = new ProjectData();
+            project.ProjectId = projectId ?? Guid.NewGuid().ToString();
+            if (projectName != null) project.ProjectName = projectName;
 
             // ── GlobalEnvironment ──
             project.GlobalEnvironment = new GlobalEnvironmentData

@@ -72,7 +72,14 @@
                                         <MenuItem Header="Ion Channel Setting"
                                                   Click="OnIonChannelSettingClick"/>
                                 </MenuItem>
-                                <MenuItem Header="View"/>
+                                <MenuItem Header="Data">
+                                        <MenuItem Header="Export Simulation Data..."
+                                                  x:Name="MenuExportSimData"
+                                                  Click="OnExportSimulationDataClick"/>
+                                        <MenuItem Header="Import Simulation Data..."
+                                                  x:Name="MenuImportSimData"
+                                                  Click="OnImportSimulationDataClick"/>
+                                </MenuItem>
                                 <MenuItem Header="Help"/>
                         </Menu>
                 </Border>
@@ -185,6 +192,14 @@
                                                               VerticalScrollBarVisibility="Auto"
                                                               Visibility="Collapsed">
                                                         <StackPanel Margin="10">
+                                                                <TextBlock x:Name="ProjectNameLabel"
+                                                                           Text="Project: (none)"
+                                                                           Foreground="#FFD700"
+                                                                           FontWeight="Bold"
+                                                                           FontSize="13"
+                                                                           Margin="0,0,0,12"
+                                                                           TextWrapping="Wrap"/>
+
                                                                 <TextBlock Text="Simulation Parameters"
                                                                            Foreground="White"
                                                                            FontWeight="Bold"

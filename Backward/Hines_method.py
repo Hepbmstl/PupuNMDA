@@ -791,6 +791,143 @@ def export_probe_data_json() -> str:
     """
     return json.dumps(PROBE_SAVE_DATA)
 
+
+def export_full_simulation_json() -> str:
+    """
+    Export the complete simulation state (HISTORY arrays + PROBE_SAVE_DATA + metadata)
+    as a JSON string. Used for saving simulation results that can be re-imported
+    for analysis without re-running the simulation.
+    """
+    global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
+    global PROBE_SAVE_DATA, PROBE_LIST, DT, STEPS, N_NODE, CELSIUS
+    global SEGMENT, V, E_TABLE, CA_OUT, CA_INF, TAU_CA
+
+    data = {
+        "metadata": {
+            "DT": DT,
+            "STEPS": STEPS,
+            "N_NODE": N_NODE,
+            "V": V,
+            "CELSIUS": CELSIUS,
+            "CA_OUT": CA_OUT,
+            "CA_INF": CA_INF,
+            "TAU_CA": TAU_CA,
+            "E_TABLE": E_TABLE,
+        },
+        "probe_list": PROBE_LIST,
+        "probe_save_data": PROBE_SAVE_DATA,
+        "segments": {},
+    }
+
+    # Save segment info needed for analysis
+    for sid, seg in SEGMENT.items():
+        data["segments"][str(sid)] = {
+            "id": seg.id,
+            "uid": seg.uid,
+            "Ra": seg.Ra,
+            "D": seg.D,
+            "L": seg.L,
+            "Cm": seg.Cm,
+            "channels": {k: v for k, v in seg.channels.items()},
+            "connected_segments": list(seg.connected_segments),
+        }
+
+    # Save HISTORY arrays as lists
+    if HISTORY_V is not None:
+        data["HISTORY_V"] = HISTORY_V.tolist()
+    if HISTORY_M is not None:
+        data["HISTORY_M"] = HISTORY_M.tolist()
+    if HISTORY_H is not None:
+        data["HISTORY_H"] = HISTORY_H.tolist()
+    if HISTORY_N is not None:
+        data["HISTORY_N"] = HISTORY_N.tolist()
+    if HISTORY_CA is not None:
+        data["HISTORY_CA"] = HISTORY_CA.tolist()
+    if HISTORY_MT is not None:
+        data["HISTORY_MT"] = HISTORY_MT.tolist()
+    if HISTORY_HT is not None:
+        data["HISTORY_HT"] = HISTORY_HT.tolist()
+
+    return json.dumps(data)
+
+
+def import_full_simulation_json(json_str: str):
+    """
+    Import a complete simulation state from a JSON string previously exported
+    by export_full_simulation_json(). Restores all HISTORY arrays, PROBE data,
+    SEGMENT definitions, and environment parameters so that analysis functions
+    (plot_variable_over_time, show_dynamic_phase_portrait) work correctly.
+    """
+    global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
+    global HISTORY_CA, HISTORY_MT, HISTORY_HT
+    global PROBE_SAVE_DATA, PROBE_LIST, DT, DEL, STEPS, N_NODE
+    global SEGMENT, V, CELSIUS, TEMP_K, E_TABLE, CA_OUT, CA_INF, TAU_CA
+    global CURRENT_STEP, SIMULATION_RUNNING, STIMULATION, VOLTAGE_CLAMP
+
+    data = json.loads(json_str)
+    meta = data["metadata"]
+
+    # Restore environment
+    DT = meta["DT"]
+    DEL = DT / 2
+    STEPS = meta["STEPS"]
+    N_NODE = meta["N_NODE"]
+    V = meta["V"]
+    CELSIUS = meta["CELSIUS"]
+    TEMP_K = CELSIUS + 273.15
+    CA_OUT = meta["CA_OUT"]
+    CA_INF = meta["CA_INF"]
+    TAU_CA = meta["TAU_CA"]
+    E_TABLE = meta["E_TABLE"]
+
+    CURRENT_STEP = STEPS
+    SIMULATION_RUNNING = False
+    STIMULATION = []
+    VOLTAGE_CLAMP = []
+
+    # Restore probe data
+    # JSON keys are strings, convert back to int keys
+    raw_probe_data = data.get("probe_save_data", {})
+    PROBE_SAVE_DATA = {}
+    for k, v in raw_probe_data.items():
+        PROBE_SAVE_DATA[int(k)] = v
+
+    PROBE_LIST = [tuple(p) for p in data.get("probe_list", [])]
+
+    # Restore segments
+    SEGMENT.clear()
+    for sid_str, sinfo in data.get("segments", {}).items():
+        sid = int(sid_str)
+        seg = Segment(
+            uid=sinfo["uid"],
+            Ra=sinfo["Ra"],
+            D=sinfo["D"],
+            L=sinfo["L"],
+            Cm=sinfo["Cm"],
+            id=sid
+        )
+        for ch_name, ch_val in sinfo.get("channels", {}).items():
+            seg.channels[ch_name] = ch_val
+        seg.connected_segments = list(sinfo.get("connected_segments", []))
+        SEGMENT[sid] = seg
+
+    # Restore HISTORY arrays
+    if "HISTORY_V" in data:
+        HISTORY_V = np.array(data["HISTORY_V"], dtype=np.float64)
+    if "HISTORY_M" in data:
+        HISTORY_M = np.array(data["HISTORY_M"], dtype=np.float64)
+    if "HISTORY_H" in data:
+        HISTORY_H = np.array(data["HISTORY_H"], dtype=np.float64)
+    if "HISTORY_N" in data:
+        HISTORY_N = np.array(data["HISTORY_N"], dtype=np.float64)
+    if "HISTORY_CA" in data:
+        HISTORY_CA = np.array(data["HISTORY_CA"], dtype=np.float64)
+    if "HISTORY_MT" in data:
+        HISTORY_MT = np.array(data["HISTORY_MT"], dtype=np.float64)
+    if "HISTORY_HT" in data:
+        HISTORY_HT = np.array(data["HISTORY_HT"], dtype=np.float64)
+
 # -----------------------------------------------------------------------------------
 
 '''
@@ -1465,7 +1602,7 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                 except Exception:
                     eq_stability.append((x_eq, y_eq, None, None, "Unknown", "#9e9e9e"))
             for x_eq, y_eq, J, eigvals, classif, color in eq_stability:
-                sc = ax.scatter([x_eq], [y_eq], marker='·', s=220,
+                sc = ax.scatter([x_eq], [y_eq], marker='*', s=220,
                                 c=color, edgecolors='black',
                                 linewidths=0.8, zorder=10)
                 eq_text_artists[0].append(sc)
