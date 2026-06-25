@@ -2,7 +2,7 @@
  * Copyright 2026 [Hepbmstl Hepupu]
  *
  * Pupu NMDA / NeuronCAD
- * A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+ * A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Scientific and Algorithmic Foundations:
+ * This software's biophysical organization and core numerical methods are 
+ * fundamentally informed by the following works:
+ * * 1. Destexhe, A., Neubig, M., Ulrich, D., & Huguenard, J. (1998). 
+ * Dendritic Low-Threshold Calcium Currents in Thalamic Relay Cells. 
+ * The Journal of Neuroscience, 18(10), 3574-3588.
+ * * 2. Hines, M. (1984). Efficient computation of branched nerve equations. 
+ * International Journal of Bio-Medical Computing, 15(1), 69-76.
+ *
  */
 
 using System;
@@ -39,6 +49,9 @@ namespace NeuronCAD.Backward
     /// </summary>
     public class SimulationRunner
     {
+        private static readonly object PhasePortraitLock = new();
+        private static bool _isPhasePortraitOpen;
+
         private int _currentStep = -1;
         private volatile bool _isRunning;
         private int _totalSteps;
@@ -56,7 +69,7 @@ namespace NeuronCAD.Backward
         /// <summary>Probe JSON data after the simulation completes.</summary>
         public string? ProbeResultJson { get; private set; }
 
-        /// <summary>Full simulation state JSON (HISTORY arrays + metadata) for export.</summary>
+        /// <summary>Full simulation state JSON (HISTORY arrays + metadata) for export/import.</summary>
         public string? FullSimulationJson { get; private set; }
 
         /// <summary>Whether an abort of the simulation has been requested (for external abort checks).</summary>
@@ -104,16 +117,11 @@ namespace NeuronCAD.Backward
             FullSimulationJson = null;
 
             await PythonWorker.EnsureStartedAsync();
-            string scriptDir = FindScriptDir();
 
             try
             {
                 await PythonWorker.RunAsync(() =>
                 {
-                    dynamic sys = Py.Import("sys");
-                    if (!sys.path.__contains__(scriptDir))
-                        sys.path.append(scriptDir);
-
                     dynamic sim = Py.Import("Hines_method");
 
                     // ── 1. Clear previous simulation state ──
@@ -225,8 +233,6 @@ namespace NeuronCAD.Backward
 
                     // ── 9. Export probe data ──
                     ProbeResultJson = (string)sim.export_probe_data_json();
-
-                    // ── 10. Export full simulation state for later import ──
                     FullSimulationJson = (string)sim.export_full_simulation_json();
                 });
             }
@@ -261,13 +267,9 @@ namespace NeuronCAD.Backward
         public static async Task CallPlotVariableOverTime(int segmentId, string varLabel, double startMs, double endMs)
         {
             await PythonWorker.EnsureStartedAsync();
-            string scriptDir = FindScriptDir();
 
             await PythonWorker.RunAsync(() =>
             {
-                dynamic sys = Py.Import("sys");
-                if (!sys.path.__contains__(scriptDir))
-                    sys.path.append(scriptDir);
                 dynamic sim = Py.Import("Hines_method");
                 sim.plot_variable_over_time(segmentId, varLabel, startMs, endMs);
             });
@@ -279,16 +281,51 @@ namespace NeuronCAD.Backward
         /// </summary>
         public static async Task CallShowPhasePortrait(int probeId, string xVar, string yVar)
         {
+            lock (PhasePortraitLock)
+            {
+                if (_isPhasePortraitOpen)
+                    return;
+                _isPhasePortraitOpen = true;
+            }
+
             await PythonWorker.EnsureStartedAsync();
-            string scriptDir = FindScriptDir();
+
+            try
+            {
+                await PythonWorker.RunAsync(() =>
+                {
+                    dynamic sim = Py.Import("Hines_method");
+                    sim.show_dynamic_phase_portrait(probeId, xVar, yVar);
+                });
+            }
+            finally
+            {
+                lock (PhasePortraitLock)
+                {
+                    _isPhasePortraitOpen = false;
+                }
+            }
+        }
+
+        public static async Task CallSaveSimulationDataNpz(string path, string projectId, string projectName)
+        {
+            await PythonWorker.EnsureStartedAsync();
 
             await PythonWorker.RunAsync(() =>
             {
-                dynamic sys = Py.Import("sys");
-                if (!sys.path.__contains__(scriptDir))
-                    sys.path.append(scriptDir);
                 dynamic sim = Py.Import("Hines_method");
-                sim.show_dynamic_phase_portrait(probeId, xVar, yVar);
+                sim.save_full_simulation_npz(path, projectId, projectName);
+            });
+        }
+
+        public static async Task CallLoadSimulationDataNpz(string path)
+        {
+            await PythonWorker.EnsureStartedAsync();
+
+            await PythonWorker.RunAsync(() =>
+            {
+                dynamic sim = Py.Import("Hines_method");
+                sim.load_full_simulation_npz(path);
             });
         }
 

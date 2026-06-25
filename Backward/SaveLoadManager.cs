@@ -2,7 +2,7 @@
  * Copyright 2026 [Hepbmstl Hepupu]
  *
  * Pupu NMDA / NeuronCAD
- * A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+ * A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ namespace NeuronCAD.Backward
 
     /// <summary>
     /// Data model for exported simulation results. Contains the project identifier for validation
-    /// and the raw probe JSON data returned by Hines_method.py.
+    /// and the raw full simulation JSON returned by Hines_method.py.
     /// </summary>
     public class SimulationResultData
     {
@@ -356,6 +356,16 @@ namespace NeuronCAD.Backward
         }
 
         /// <summary>
+        /// Write a ProjectData instance back to disk. Used to migrate legacy project
+        /// files that predate stable ProjectId/ProjectName fields.
+        /// </summary>
+        public static void SaveProjectData(string filePath, ProjectData project)
+        {
+            string json = JsonSerializer.Serialize(project, JsonOpts);
+            File.WriteAllText(filePath, json);
+        }
+
+        /// <summary>
         /// Apply ProjectData to the scene: clear current state → rebuild entities → rebuild connections → rebuild devices → restore global parameters.
         /// </summary>
         public static void ApplyToScene(
@@ -387,6 +397,8 @@ namespace NeuronCAD.Backward
                 scene.HelixViewport.Children.Remove(device.Visual3D);
             }
             scene.Devices.Clear();
+            scene.LastSimulationData = null;
+            scene.HasCompletedSimulation = false;
 
             // Remove all connections
             foreach (var connId in scene.ConnectionController.ConnectionsById.Keys.ToList())

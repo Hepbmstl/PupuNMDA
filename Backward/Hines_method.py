@@ -1,7 +1,7 @@
 # Copyright 2026 [Hepbmstl Hepupu]
 #
 # Pupu NMDA / NeuronCAD
-# A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+# A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 # fundamentally informed by the following works:
 # * 1. Destexhe, A., Neubig, M., Ulrich, D., & Huguenard, J. (1998). 
 # Dendritic Low-Threshold Calcium Currents in Thalamic Relay Cells. 
-# The Journal of Neuroscience, 18(10), 3574–3588.
+# The Journal of Neuroscience, 18(10), 3574-3588.
 # * 2. Hines, M. (1984). Efficient computation of branched nerve equations. 
 # International Journal of Bio-Medical Computing, 15(1), 69-76.
 #
@@ -29,7 +29,9 @@ import numpy as np
 from scipy import linalg
 import math
 from dataclasses import dataclass, field
+import io
 import json
+import zipfile
 import matplotlib
 try:
     matplotlib.use('TkAgg')
@@ -89,6 +91,10 @@ PROBE_SAVE_DATA = {}
 CURRENT_STEP = -1
 SIMULATION_RUNNING = False
 
+_PHASE_TK_MASTER = None
+_PHASE_WINDOW = None
+_PHASE_WINDOW_OPEN = False
+
 # HH gating parameters — Traub-modified (hh2.mod)
 # v2 = V - vtraub;  rate functions use v2 instead of V directly.
 HH_PARAMS = {
@@ -128,6 +134,14 @@ def save_data_HH(prob_id, data: dict):
     if prob_id not in PROBE_SAVE_DATA:
         PROBE_SAVE_DATA[prob_id] = []
     PROBE_SAVE_DATA[prob_id].append(data)
+
+
+def _restore_json_dict_key(key):
+    """JSON object keys are strings; recover numeric ids when possible."""
+    try:
+        return int(key)
+    except (TypeError, ValueError):
+        return key
 
 # -----------------------------------------------------------------------------------
 # init：
@@ -197,6 +211,10 @@ def insert_stimulation(stimulation_id, segment_id, stimulation_uA, stim_start, s
     global STIMULATION
     STIMULATION.append((stimulation_id, segment_id, stimulation_uA, stim_start, stim_duration))
 
+def _normalize_voltage_clamp_protocol(protocol):
+    """Convert a Python/.NET iterable protocol to plain JSON-friendly floats."""
+    return [(float(duration), float(amplitude)) for duration, amplitude in protocol]
+
 def insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol):
         """
         Register a voltage clamp device, similar to NEURON's SEClamp.
@@ -214,7 +232,7 @@ def insert_voltage_clamp(vc_id, segment_id, rs_MOhm, protocol):
             b[i]   += g_vc * V_cmd
         """
         global VOLTAGE_CLAMP
-        VOLTAGE_CLAMP.append((vc_id, segment_id, rs_MOhm, protocol))
+        VOLTAGE_CLAMP.append((vc_id, segment_id, float(rs_MOhm), _normalize_voltage_clamp_protocol(protocol)))
 
 @dataclass
 class Segment:
@@ -296,6 +314,50 @@ def add_channel_to_segment(segment_id, channel_name, g_max):
     SEGMENT[segment_id].add_channels(channel_name, g_max)
 
 
+def _close_phase_window():
+    """Close any live phase portrait window before replacing global simulation state."""
+    global _PHASE_WINDOW, _PHASE_WINDOW_OPEN
+    if _PHASE_WINDOW is None:
+        _PHASE_WINDOW_OPEN = False
+        return
+
+    try:
+        if _PHASE_WINDOW.winfo_exists():
+            try:
+                _PHASE_WINDOW.quit()
+            except Exception:
+                pass
+            _PHASE_WINDOW.destroy()
+    except Exception:
+        pass
+    finally:
+        _PHASE_WINDOW = None
+        _PHASE_WINDOW_OPEN = False
+
+
+def _remove_matplotlib_artist(artist):
+    """Remove Matplotlib artists across old/new Matplotlib APIs."""
+    if artist is None:
+        return
+
+    remove = getattr(artist, "remove", None)
+    if callable(remove):
+        try:
+            remove()
+            return
+        except (AttributeError, ValueError, NotImplementedError):
+            pass
+
+    for attr_name in ("collections", "artists"):
+        for child in getattr(artist, attr_name, []) or []:
+            child_remove = getattr(child, "remove", None)
+            if callable(child_remove):
+                try:
+                    child_remove()
+                except (AttributeError, ValueError, NotImplementedError):
+                    pass
+
+
 def clear_environment():
     """Reset all global state to prepare for the next simulation run."""
     global SEGMENT, V, DT, DEL, STEPS, N_NODE
@@ -303,6 +365,9 @@ def clear_environment():
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
     global PROBE_LIST, STIMULATION, VOLTAGE_CLAMP, PROBE_SAVE_DATA
     global CURRENT_STEP, SIMULATION_RUNNING, E_TABLE
+    global _PHASE_WINDOW, _PHASE_WINDOW_OPEN
+
+    _close_phase_window()
 
     SEGMENT = {}
     V = -70.0
@@ -323,6 +388,8 @@ def clear_environment():
     PROBE_SAVE_DATA = {}
     CURRENT_STEP = -1
     SIMULATION_RUNNING = False
+    _PHASE_WINDOW = None
+    _PHASE_WINDOW_OPEN = False
     E_TABLE = {
         "Na": {"E": 50.0},
         "K":  {"E": -90.0},
@@ -547,6 +614,27 @@ def _compute_vc_current(segment_id, V_membrane, t_current):
             v_cmd = protocol[-1][1] if protocol else V
         g_vc = 1e-3 / rs_MOhm
         total_I += g_vc * (v_cmd - V_membrane)
+    return total_I
+
+
+def _compute_vc_current_grid(segment_id, V_membrane_grid, t_current):
+    """Vectorized voltage-clamp current for phase-plane derivatives."""
+    total_I = np.zeros_like(V_membrane_grid, dtype=float)
+    for vc in VOLTAGE_CLAMP:
+        vc_id, vc_seg_id, rs_MOhm, protocol = vc
+        if segment_id != vc_seg_id:
+            continue
+        t_acc = 0.0
+        v_cmd = None
+        for step_dur, step_amp in protocol:
+            if t_current < t_acc + step_dur:
+                v_cmd = step_amp
+                break
+            t_acc += step_dur
+        if v_cmd is None:
+            v_cmd = protocol[-1][1] if protocol else V
+        g_vc = 1e-3 / rs_MOhm
+        total_I += g_vc * (v_cmd - V_membrane_grid)
     return total_I
 
 
@@ -792,15 +880,11 @@ def export_probe_data_json() -> str:
     return json.dumps(PROBE_SAVE_DATA)
 
 
-def export_full_simulation_json() -> str:
-    """
-    Export the complete simulation state (HISTORY arrays + PROBE_SAVE_DATA + metadata)
-    as a JSON string. Used for saving simulation results that can be re-imported
-    for analysis without re-running the simulation.
-    """
+def _build_full_simulation_dict():
+    """Build the canonical full simulation payload used by JSON and NPZ exports."""
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
-    global PROBE_SAVE_DATA, PROBE_LIST, DT, STEPS, N_NODE, CELSIUS
+    global PROBE_SAVE_DATA, PROBE_LIST, STIMULATION, VOLTAGE_CLAMP, DT, STEPS, N_NODE, CELSIUS
     global SEGMENT, V, E_TABLE, CA_OUT, CA_INF, TAU_CA
 
     data = {
@@ -817,10 +901,11 @@ def export_full_simulation_json() -> str:
         },
         "probe_list": PROBE_LIST,
         "probe_save_data": PROBE_SAVE_DATA,
+        "stimulation": STIMULATION,
+        "voltage_clamp": VOLTAGE_CLAMP,
         "segments": {},
     }
 
-    # Save segment info needed for analysis
     for sid, seg in SEGMENT.items():
         data["segments"][str(sid)] = {
             "id": seg.id,
@@ -833,7 +918,6 @@ def export_full_simulation_json() -> str:
             "connected_segments": list(seg.connected_segments),
         }
 
-    # Save HISTORY arrays as lists
     if HISTORY_V is not None:
         data["HISTORY_V"] = HISTORY_V.tolist()
     if HISTORY_M is not None:
@@ -849,26 +933,21 @@ def export_full_simulation_json() -> str:
     if HISTORY_HT is not None:
         data["HISTORY_HT"] = HISTORY_HT.tolist()
 
-    return json.dumps(data)
+    return data
 
 
-def import_full_simulation_json(json_str: str):
-    """
-    Import a complete simulation state from a JSON string previously exported
-    by export_full_simulation_json(). Restores all HISTORY arrays, PROBE data,
-    SEGMENT definitions, and environment parameters so that analysis functions
-    (plot_variable_over_time, show_dynamic_phase_portrait) work correctly.
-    """
+def _restore_full_simulation_from_dict(data: dict):
+    """Restore global simulation state from the canonical full simulation payload."""
     global HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT
     global PROBE_SAVE_DATA, PROBE_LIST, DT, DEL, STEPS, N_NODE
     global SEGMENT, V, CELSIUS, TEMP_K, E_TABLE, CA_OUT, CA_INF, TAU_CA
     global CURRENT_STEP, SIMULATION_RUNNING, STIMULATION, VOLTAGE_CLAMP
 
-    data = json.loads(json_str)
+    _close_phase_window()
+
     meta = data["metadata"]
 
-    # Restore environment
     DT = meta["DT"]
     DEL = DT / 2
     STEPS = meta["STEPS"]
@@ -883,19 +962,19 @@ def import_full_simulation_json(json_str: str):
 
     CURRENT_STEP = STEPS
     SIMULATION_RUNNING = False
-    STIMULATION = []
-    VOLTAGE_CLAMP = []
+    STIMULATION = [tuple(s) for s in data.get("stimulation", [])]
+    VOLTAGE_CLAMP = [
+        (vc[0], vc[1], float(vc[2]), _normalize_voltage_clamp_protocol(vc[3]))
+        for vc in data.get("voltage_clamp", [])
+    ]
 
-    # Restore probe data
-    # JSON keys are strings, convert back to int keys
     raw_probe_data = data.get("probe_save_data", {})
     PROBE_SAVE_DATA = {}
     for k, v in raw_probe_data.items():
-        PROBE_SAVE_DATA[int(k)] = v
+        PROBE_SAVE_DATA[_restore_json_dict_key(k)] = v
 
     PROBE_LIST = [tuple(p) for p in data.get("probe_list", [])]
 
-    # Restore segments
     SEGMENT.clear()
     for sid_str, sinfo in data.get("segments", {}).items():
         sid = int(sid_str)
@@ -912,7 +991,6 @@ def import_full_simulation_json(json_str: str):
         seg.connected_segments = list(sinfo.get("connected_segments", []))
         SEGMENT[sid] = seg
 
-    # Restore HISTORY arrays
     if "HISTORY_V" in data:
         HISTORY_V = np.array(data["HISTORY_V"], dtype=np.float64)
     if "HISTORY_M" in data:
@@ -927,6 +1005,98 @@ def import_full_simulation_json(json_str: str):
         HISTORY_MT = np.array(data["HISTORY_MT"], dtype=np.float64)
     if "HISTORY_HT" in data:
         HISTORY_HT = np.array(data["HISTORY_HT"], dtype=np.float64)
+
+
+def export_full_simulation_json() -> str:
+    """
+    Export the complete simulation state (HISTORY arrays + probe data + metadata)
+    as a JSON string so analysis can be restored without rerunning the simulation.
+    """
+    return json.dumps(_build_full_simulation_dict())
+
+
+def import_full_simulation_json(json_str: str):
+    """
+    Restore a complete simulation state exported by export_full_simulation_json().
+    """
+    _restore_full_simulation_from_dict(json.loads(json_str))
+
+
+def save_full_simulation_npz(path: str, project_id, project_name):
+    """
+    Save the complete simulation state as an application-specific NPZ archive.
+    """
+    payload = _build_full_simulation_dict()
+    manifest = {
+        "format": "NeuronCADSimulationNPZ",
+        "version": 1,
+        "project_id": project_id,
+        "project_name": project_name,
+        "metadata": payload["metadata"],
+        "probe_list": payload["probe_list"],
+        "stimulation": payload["stimulation"],
+        "voltage_clamp": payload["voltage_clamp"],
+        "segments": payload["segments"],
+    }
+
+    array_names = (
+        "HISTORY_V",
+        "HISTORY_M",
+        "HISTORY_H",
+        "HISTORY_N",
+        "HISTORY_CA",
+        "HISTORY_MT",
+        "HISTORY_HT",
+    )
+
+    with zipfile.ZipFile(path, mode="w", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
+        archive.writestr("probe_save_data.json", json.dumps(payload["probe_save_data"], ensure_ascii=False))
+
+        for name in array_names:
+            if name not in payload:
+                continue
+            buffer = io.BytesIO()
+            np.save(buffer, np.asarray(payload[name], dtype=np.float64), allow_pickle=False)
+            archive.writestr(f"{name}.npy", buffer.getvalue())
+
+
+def load_full_simulation_npz(path: str):
+    """
+    Restore a complete simulation state from an application-specific NPZ archive.
+    """
+    with zipfile.ZipFile(path, mode="r") as archive:
+        manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        if manifest.get("format") != "NeuronCADSimulationNPZ":
+            raise ValueError(f"Unsupported simulation archive format: {manifest.get('format')!r}")
+        if int(manifest.get("version", 0)) != 1:
+            raise ValueError(f"Unsupported simulation archive version: {manifest.get('version')!r}")
+
+        payload = {
+            "metadata": manifest["metadata"],
+            "probe_list": manifest.get("probe_list", []),
+            "probe_save_data": json.loads(archive.read("probe_save_data.json").decode("utf-8")),
+            "stimulation": manifest.get("stimulation", []),
+            "voltage_clamp": manifest.get("voltage_clamp", []),
+            "segments": manifest.get("segments", {}),
+        }
+
+        for name in (
+            "HISTORY_V",
+            "HISTORY_M",
+            "HISTORY_H",
+            "HISTORY_N",
+            "HISTORY_CA",
+            "HISTORY_MT",
+            "HISTORY_HT",
+        ):
+            entry_name = f"{name}.npy"
+            if entry_name not in archive.namelist():
+                continue
+            with archive.open(entry_name, mode="r") as handle:
+                payload[name] = np.load(handle, allow_pickle=False)
+
+    _restore_full_simulation_from_dict(payload)
 
 # -----------------------------------------------------------------------------------
 
@@ -947,7 +1117,7 @@ def compute_continuous_derivatives(segment_id: int, step: int,
     State overrides: provide reduced-dimension values via override parameters;
     if not provided, historical values are used.
     """
-    global SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, STIMULATION, DT, E_TABLE
+    global SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N, STIMULATION, VOLTAGE_CLAMP, DT, E_TABLE
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
         raise RuntimeError("Please call set_env before using this function.")
@@ -1011,7 +1181,8 @@ def compute_continuous_derivatives(segment_id: int, step: int,
         if seg.id == s_id and (stim_start <= t_current <= stim_start + stim_duration):
             I_stim += stim_uA
 
-    dV_dt = (-I_ion + I_axial + I_stim) / seg.absolute_C
+    I_vc = _compute_vc_current(segment_id, V_i, t_current)
+    dV_dt = (-I_ion + I_axial + I_stim + I_vc) / seg.absolute_C
 
     # Must return all four derivative dimensions; external plotting functions will extract what they need
     return dV_dt, dm_dt, dh_dt, dn_dt
@@ -1191,14 +1362,15 @@ def _phase_derivatives_grid(segment_id, step, x_var, y_var, X_grid, Y_grid):
         K_ij = calculate_Kij(seg, target_seg)
         I_axial += K_ij * (V_t[target_idx] - V_s)
 
-    # External stimulation
+    # External stimulation/current clamp
     I_stim = 0.0
     for stim in STIMULATION:
         _, s_id, stim_uA, stim_start, stim_duration = stim
         if seg.id == s_id and stim_start <= t_current <= stim_start + stim_duration:
             I_stim += stim_uA
 
-    dV = (-I_ion + I_axial + I_stim) / seg.absolute_C
+    I_vc = _compute_vc_current_grid(segment_id, V_s, t_current)
+    dV = (-I_ion + I_axial + I_stim + I_vc) / seg.absolute_C
 
     # Ca decay
     drive_ca = np.maximum(-seg.gamma_Ca * I_T, 0.0) if P_Ca_abs > 0 else 0.0
@@ -1361,6 +1533,9 @@ def get_biophysical_info(segment_id, step):
     return {
         't_ms': t_ms, 'V': V_val, 'm': m_val, 'h': h_val, 'n': n_val,
         'Ca': Ca_val, 'mT': mT_val, 'hT': hT_val,
+        'g_Na_max_abs': seg.get_absolute_g_max("Na"),
+        'g_K_max_abs': seg.get_absolute_g_max("K"),
+        'g_L_abs': g_L,
         'g_Na': g_Na, 'g_K': g_K, 'g_L': g_L,
         'I_T': I_T, 'P_Ca_abs': P_Ca_abs,
         'E_Na': E_TABLE["Na"]["E"], 'E_K': E_TABLE["K"]["E"], 'E_L': E_TABLE["L"]["E"],
@@ -1390,6 +1565,15 @@ def generate_phase_portrait_mesh(segment_id: int, step: int, Nx: int = 20, Ny: i
     )
 
 
+def _get_phase_tk_master(tk_module):
+    """Create one hidden Tk owner so phase windows can be reopened cleanly."""
+    global _PHASE_TK_MASTER
+    if _PHASE_TK_MASTER is None or not _PHASE_TK_MASTER.winfo_exists():
+        _PHASE_TK_MASTER = tk_module.Tk()
+        _PHASE_TK_MASTER.withdraw()
+    return _PHASE_TK_MASTER
+
+
 def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx: int = 25, Ny: int = 25):
     """
     Display a precomputed phase portrait trajectory using a Tkinter player with a seek bar.
@@ -1403,6 +1587,18 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
 
     global PROBE_LIST, SEGMENT, HISTORY_V, HISTORY_M, HISTORY_H, HISTORY_N
     global HISTORY_CA, HISTORY_MT, HISTORY_HT, DT, STEPS
+    global _PHASE_WINDOW, _PHASE_WINDOW_OPEN
+
+    if _PHASE_WINDOW_OPEN and _PHASE_WINDOW is not None:
+        try:
+            if _PHASE_WINDOW.winfo_exists():
+                _PHASE_WINDOW.lift()
+                _PHASE_WINDOW.focus_force()
+                return
+        except Exception:
+            pass
+        _PHASE_WINDOW = None
+        _PHASE_WINDOW_OPEN = False
 
     if HISTORY_V is None or HISTORY_M is None or HISTORY_N is None or HISTORY_H is None:
         raise RuntimeError("Please call set_env before starting the simulation.")
@@ -1464,7 +1660,10 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         all_dY[fi] = dY
 
     # -- 5. Build Tkinter window --
-    root = tk.Tk()
+    master = _get_phase_tk_master(tk)
+    root = tk.Toplevel(master)
+    _PHASE_WINDOW = root
+    _PHASE_WINDOW_OPEN = True
     root.title(f"Phase Portrait [{y_var} vs {x_var}] — Probe #{probe_id}")
     root.configure(bg='#1e1e1e')
     root.geometry("1050x820")
@@ -1518,8 +1717,28 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     is_playing = [False]
     play_speed = [50]  # ms per frame
     current_frame = [0]
+    is_closed = [False]
+
+    def on_close():
+        global _PHASE_WINDOW, _PHASE_WINDOW_OPEN
+        if is_closed[0]:
+            return
+        is_closed[0] = True
+        is_playing[0] = False
+        _PHASE_WINDOW = None
+        _PHASE_WINDOW_OPEN = False
+        try:
+            root.quit()
+        except Exception:
+            pass
+        try:
+            root.destroy()
+        except Exception:
+            pass
 
     def update_display(fi):
+        if is_closed[0]:
+            return
         current_frame[0] = fi
         dX = all_dX[fi]
         dY = all_dY[fi]
@@ -1564,17 +1783,18 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
                             [traj_y_full[min(fi * subsample, len(traj_y_full) - 1)]])
 
         # Clear old nullclines
-        if nullcline_x_artist[0] is not None:
-            for coll in nullcline_x_artist[0].collections:
-                coll.remove()
-        if nullcline_y_artist[0] is not None:
-            for coll in nullcline_y_artist[0].collections:
-                coll.remove()
+        _remove_matplotlib_artist(nullcline_x_artist[0])
+        nullcline_x_artist[0] = None
+        _remove_matplotlib_artist(nullcline_y_artist[0])
+        nullcline_y_artist[0] = None
         if eq_scatter[0] is not None:
             eq_scatter[0].remove()
             eq_scatter[0] = None
         for t in eq_text_artists[0]:
-            t.remove()
+            try:
+                t.remove()
+            except ValueError:
+                pass
         eq_text_artists[0] = []
 
         # Draw nullclines (d{x_var}/dt = 0 and d{y_var}/dt = 0)
@@ -1614,6 +1834,12 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         lines.append(f"V={bio['V']:.2f} mV  m={bio['m']:.4f}  h={bio['h']:.4f}  n={bio['n']:.4f}")
         lines.append(f"Ca={bio['Ca']:.6f} mM  mT={bio['mT']:.4f}  hT={bio['hT']:.4f}")
         lines.append(f"g_Na={bio['g_Na']:.4e}  g_K={bio['g_K']:.4e}  g_L={bio['g_L']:.4e}  I_T={bio['I_T']:.4e}")
+        channel_lines = [
+            f"Channel max abs: Na={bio['g_Na_max_abs']:.4e} mS  "
+            f"K={bio['g_K_max_abs']:.4e} mS  L={bio['g_L_abs']:.4e} mS"
+        ]
+        if x_var == 'V' and y_var == 'n' and abs(bio['g_K_max_abs']) <= 1e-30:
+            channel_lines.append("V-nullcline vertical because K conductance is zero.")
         eq_info_lines = []
         if eq_stability:
             for i_eq, (x_eq, y_eq, J, eigvals, classif, color) in enumerate(eq_stability):
@@ -1639,6 +1865,8 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         info_line1 = "  |  ".join(lines[:2])
         info_line2 = "  |  ".join(lines[2:])
         info_text = info_line1 + "\n" + info_line2
+        if channel_lines:
+            info_text += "\n" + "\n".join(channel_lines)
         if eq_info_lines:
             info_text += "\n" + "\n".join(eq_info_lines)
         info_var.set(info_text)
@@ -1647,13 +1875,15 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
 
     # Buttons and progress bar
     def on_play_pause():
+        if is_closed[0]:
+            return
         is_playing[0] = not is_playing[0]
         btn_play.config(text="⏸" if is_playing[0] else "▶")
         if is_playing[0]:
             play_next()
 
     def play_next():
-        if not is_playing[0]:
+        if is_closed[0] or not is_playing[0]:
             return
         fi = current_frame[0] + 1
         if fi >= N_display:
@@ -1664,11 +1894,15 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
         root.after(play_speed[0], play_next)
 
     def on_reset():
+        if is_closed[0]:
+            return
         is_playing[0] = False
         btn_play.config(text="▶")
         slider.set(0)
 
     def on_slider(val):
+        if is_closed[0]:
+            return
         fi = int(float(val))
         update_display(fi)
 
@@ -1703,14 +1937,19 @@ def show_dynamic_phase_portrait(probe_id, x_var: str = 'V', y_var: str = 'n', Nx
     update_display = update_display_wrapped
 
     # Rebind slider callback
-    slider.config(command=lambda val: update_display(int(float(val))))
+    slider.config(command=on_slider)
 
     # Show first frame
     update_display(0)
 
-    root.protocol("WM_DELETE_WINDOW", root.destroy)
-    root.mainloop()
-    plt.close(fig)
+    root.protocol("WM_DELETE_WINDOW", on_close)
+    if matplotlib.get_backend().lower() == 'agg':
+        root.after(0, on_close)
+    try:
+        root.mainloop()
+    finally:
+        on_close()
+        plt.close(fig)
 
 
 def plot_variable_over_time(segment_id: int, var_label: str, start_time_ms: float, end_time_ms: float):

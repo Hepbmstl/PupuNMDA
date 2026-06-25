@@ -1,0 +1,142 @@
+{
+    "model_info": {
+        "name": "tc200_Reconstructed_TC_Cell",
+        "description": "206-compartment reconstructed thalamocortical relay cell model (Destexhe et al. 1998). Rat VB neuron, 11 primary neurites, 108 branches. Mechanisms: passive leak (all), hh2 Traub-modified Na/K (soma only), itGHK T-type Ca via GHK (all, spatially graded), cadecay submembrane Ca shell (all).",
+        "references": "Destexhe A, Neubig M, Ulrich D and Huguenard JR. J. Neurosci. 18: 3574-3588, 1998."
+    },
+    "global_environment": {
+        "celsius": 34.0,
+        "ca_out_mM": 2.0,
+        "ca_inf_mM": 2.4e-4,
+        "tau_ca_ms": 5.0,
+        "v_init_mV": -74.0,
+        "dt_ms": 0.1,
+        "STEPS": 10000
+    },
+    "e_table": {
+        "Na": 50.0,
+        "K": -100.0,
+        "L": -76.5
+    },
+    "hh2_kinetics": {
+        "_comment": "Traub-modified HH kinetics from hh2.mod. v2 = V - vtraub. Rate functions defined in terms of v2. tc200_cc.oc: vtraub=-52.",
+        "vtraub": -52.0,
+        "alpha_m_A": 0.32,
+        "alpha_m_V": 13.0,
+        "alpha_m_k": 4.0,
+        "beta_m_A": 0.28,
+        "beta_m_V": 40.0,
+        "beta_m_k": 5.0,
+        "alpha_h_A": 0.128,
+        "alpha_h_V": 17.0,
+        "alpha_h_k": 18.0,
+        "beta_h_A": 4.0,
+        "beta_h_V": 40.0,
+        "beta_h_k": 5.0,
+        "alpha_n_A": 0.032,
+        "alpha_n_V": 15.0,
+        "alpha_n_k": 5.0,
+        "beta_n_A": 0.5,
+        "beta_n_V": 10.0,
+        "beta_n_k": 40.0
+    },
+    "ca_kinetics": {
+        "_comment": "T-type Ca channel kinetics from ITGHK.mod. Raw Vh values; shift/actshift applied in kinetic functions. Q10 values from tc200_cc.oc (qm=2.5, qh=2.5).",
+        "shift": -1.0,
+        "actshift": 0.0,
+        "inf_mT_Vh": 57.0,
+        "inf_mT_k": 6.2,
+        "inf_hT_Vh": 81.0,
+        "inf_hT_k": 4.0,
+        "tau_mT_base": 0.612,
+        "tau_mT_V1": 132.0,
+        "tau_mT_k1": 16.7,
+        "tau_mT_V2": 16.8,
+        "tau_mT_k2": 18.2,
+        "tau_mT_Q10": 2.5,
+        "tau_mT_Tref": 24.0,
+        "tau_hT_Vthresh": -80.0,
+        "tau_hT_V1": 467.0,
+        "tau_hT_k1": 66.6,
+        "tau_hT_base": 28.0,
+        "tau_hT_V2": 22.0,
+        "tau_hT_k2": 10.5,
+        "tau_hT_Q10": 2.5,
+        "tau_hT_Tref": 24.0
+    },
+    "spatial_regions": {
+        "soma": {
+            "description": "Somatic compartment — HH + T-current (pcabar from $1)",
+            "segments": [
+                "soma"
+            ]
+        },
+        "proximal_dendrites": {
+            "description": "Proximal dendritic segments receiving somatic T-current density ($1). Defined in loc200.oc. Note: dend1[0] and dend5[0] are NOT proximal.",
+            "segments": [
+                "dend2[0]",
+                "dend3[0]",
+                "dend4[0]",
+                "dend6[0]",
+                "dend7[0]",
+                "dend8[0]",
+                "dend9[0]",
+                "dend10[0]",
+                "dend11[0]"
+            ]
+        },
+        "distal_dendrites": {
+            "description": "All remaining dendritic segments (includes medial and distal from loc200.oc). In cc mode both medial($2) and distal($3) receive the same pcabar=8.5e-5, so they are merged here.",
+            "segments": "_remainder"
+        }
+    },
+    "biophysical_assignments": {
+        "_comment_units": "g_pas: S/cm2, cm: uF/cm2, Ra: ohm*cm, gnabar/gkbar: S/cm2, pcabar: cm/s, depth: um",
+        "soma": {
+            "passive": {
+                "g_pas": 3.79e-5,
+                "e_pas": -76.5,
+                "cm": 0.88,
+                "Ra": 173.0
+            },
+            "hh2": {
+                "gnabar": 0.1,
+                "gkbar": 0.1
+            },
+            "itGHK": {
+                "pcabar": 1.7e-5
+            },
+            "cadecay": {
+                "depth": 0.1
+            }
+        },
+        "proximal_dendrites": {
+            "passive": {
+                "g_pas": 3.79e-5,
+                "e_pas": -76.5,
+                "cm": 0.88,
+                "Ra": 173.0
+            },
+            "itGHK": {
+                "pcabar": 1.7e-5
+            },
+            "cadecay": {
+                "depth": 0.1
+            }
+        },
+        "distal_dendrites": {
+            "passive": {
+                "g_pas": 3.79e-5,
+                "e_pas": -76.5,
+                "cm": 0.88,
+                "Ra": 173.0
+            },
+            "itGHK": {
+                "pcabar": 8.5e-5
+            },
+            "cadecay": {
+                "depth": 0.1
+            }
+        }
+    }
+}

@@ -1,8 +1,7 @@
-"""
 # Copyright 2026 [Hepbmstl Hepupu]
 #
 # Pupu NMDA / NeuronCAD
-# A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+# A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,11 +20,12 @@
 # fundamentally informed by the following works:
 # * 1. Destexhe, A., Neubig, M., Ulrich, D., & Huguenard, J. (1998). 
 # Dendritic Low-Threshold Calcium Currents in Thalamic Relay Cells. 
-# The Journal of Neuroscience, 18(10), 3574–3588.
+# The Journal of Neuroscience, 18(10), 3574-3588.
 # * 2. Hines, M. (1984). Efficient computation of branched nerve equations. 
 # International Journal of Bio-Medical Computing, 15(1), 69-76.
 #
 
+"""
 Full test suite for Hines_method.py
 Covers:
     - Environment setup and teardown (set_env, set_E, clear_environment)
@@ -58,6 +58,45 @@ import Hines_method as hm
 # Hines_method.py may call matplotlib.use('TkAgg') and override Agg,
 # Force Agg again here to avoid Tk errors during tests.
 matplotlib.use('Agg', force=True)
+
+
+def _first_v_nullcline_root(segment_id, step, n_value, v_min=-100.0, v_max=60.0, samples=321):
+    """Find the first dV/dt=0 crossing for a fixed n value on the V-n plane."""
+    v_grid = np.linspace(v_min, v_max, samples)
+
+    def d_v_dt(v_value):
+        X = np.array([[v_value]], dtype=float)
+        Y = np.array([[n_value]], dtype=float)
+        dV, _, _ = hm._phase_derivatives_grid(segment_id, step, 'V', 'n', X, Y)
+        return float(dV[0, 0])
+
+    previous_v = v_grid[0]
+    previous_f = d_v_dt(previous_v)
+    if abs(previous_f) < 1e-12:
+        return previous_v
+
+    for current_v in v_grid[1:]:
+        current_f = d_v_dt(current_v)
+        if abs(current_f) < 1e-12:
+            return current_v
+        if previous_f * current_f < 0:
+            lo, hi = previous_v, current_v
+            f_lo = previous_f
+            for _ in range(60):
+                mid = (lo + hi) / 2.0
+                mid_f = d_v_dt(mid)
+                if abs(mid_f) < 1e-12:
+                    return mid
+                if f_lo * mid_f <= 0:
+                    hi = mid
+                else:
+                    lo = mid
+                    f_lo = mid_f
+            return (lo + hi) / 2.0
+        previous_v = current_v
+        previous_f = current_f
+
+    raise AssertionError(f"No V-nullcline root found for n={n_value}")
 
 
 # ============================================================
@@ -276,6 +315,11 @@ class TestProbeAndStimulation:
         hm.insert_stimulation("stim_1", 0, 10.0, 0.5, 2.0)
         assert len(hm.STIMULATION) == 1
         assert hm.STIMULATION[0] == ("stim_1", 0, 10.0, 0.5, 2.0)
+
+    def test_insert_voltage_clamp_normalizes_protocol(self):
+        hm.insert_voltage_clamp("vc_1", 0, 5.0, [[1.0, -70.0], [2, -55]])
+        assert len(hm.VOLTAGE_CLAMP) == 1
+        assert hm.VOLTAGE_CLAMP[0] == ("vc_1", 0, 5.0, [(1.0, -70.0), (2.0, -55.0)])
 
     def test_save_data_HH_appends_correctly(self):
         hm.save_data_HH("p1", {"V": -65.0})
@@ -963,6 +1007,26 @@ class TestExport:
         for key in parsed:
             assert len(parsed[key]) == len(internal[key])
 
+    def test_full_simulation_json_preserves_external_inputs(self):
+        """Export/import should preserve current clamps and voltage clamps for phase analysis."""
+        dt = 0.025
+        steps = 100
+        seg_id = _build_single_compartment(dt=dt, steps=steps)
+        hm.insert_stimulation("stim_0", seg_id, 0.1, 0.0, 1.0)
+        hm.insert_voltage_clamp("vc_0", seg_id, 5.0, [[1.0, -55.0], [1.0, -65.0]])
+        hm.insert_probe("p0", seg_id, 0.0, dt * steps)
+        hm.start_simulation()
+
+        full_json = hm.export_full_simulation_json()
+        parsed = json.loads(full_json)
+        assert parsed["stimulation"] == [["stim_0", seg_id, 0.1, 0.0, 1.0]]
+        assert parsed["voltage_clamp"] == [["vc_0", seg_id, 5.0, [[1.0, -55.0], [1.0, -65.0]]]]
+
+        hm.clear_environment()
+        hm.import_full_simulation_json(full_json)
+        assert hm.STIMULATION == [("stim_0", seg_id, 0.1, 0.0, 1.0)]
+        assert hm.VOLTAGE_CLAMP == [("vc_0", seg_id, 5.0, [(1.0, -55.0), (1.0, -65.0)])]
+
 
 # ============================================================
 # 10. End-to-end integration tests (simulate SimulationRunner.cs call sequence)
@@ -1271,6 +1335,55 @@ class TestGeneratePhasePortraitMesh:
         V_flat, N_flat, dV_flat, dN_flat = hm.generate_phase_portrait_mesh(0, 0, Nx=5, Ny=5)
         for arr in [V_flat, N_flat, dV_flat, dN_flat]:
             assert all(np.isfinite(v) for v in arr)
+
+    def test_v_nullcline_vertical_when_k_conductance_is_zero(self):
+        """With no K conductance, dV/dt does not depend on n, so the V-nullcline is vertical."""
+        _build_single_compartment(steps=50, g_K=0.0)
+        hm.start_simulation()
+
+        roots = [
+            _first_v_nullcline_root(segment_id=0, step=0, n_value=n)
+            for n in (0.0, 0.5, 1.0)
+        ]
+
+        assert max(roots) - min(roots) == pytest.approx(0.0, abs=1e-9)
+
+    def test_v_nullcline_bends_when_k_conductance_is_present(self):
+        """With K conductance present, dV/dt depends on n and the V-nullcline changes with n."""
+        _build_single_compartment(steps=50, g_K=36.0)
+        hm.start_simulation()
+
+        root_low_n = _first_v_nullcline_root(segment_id=0, step=0, n_value=0.0)
+        root_high_n = _first_v_nullcline_root(segment_id=0, step=0, n_value=1.0)
+
+        assert abs(root_high_n - root_low_n) > 1.0
+
+    def test_phase_derivative_includes_voltage_clamp(self):
+        """Phase-plane dV/dt should use the same voltage-clamp input as the main simulation."""
+        seg_id = _build_single_compartment(v_init=-65.0, dt=0.025, steps=50)
+        hm.start_simulation()
+
+        X = np.array([[-65.0]], dtype=float)
+        Y = np.array([[0.3]], dtype=float)
+        dV_without_vc, _, _ = hm._phase_derivatives_grid(seg_id, 0, 'V', 'n', X, Y)
+
+        hm.insert_voltage_clamp("vc_0", seg_id, 5.0, [[10.0, -55.0]])
+        dV_with_vc, _, _ = hm._phase_derivatives_grid(seg_id, 0, 'V', 'n', X, Y)
+
+        expected_delta = (1e-3 / 5.0) * (-55.0 - -65.0) / hm.SEGMENT[seg_id].absolute_C
+        assert float(dV_with_vc[0, 0] - dV_without_vc[0, 0]) == pytest.approx(expected_delta, rel=1e-10)
+
+    def test_contour_artist_cleanup_supports_current_matplotlib(self):
+        """Repeated phase frame updates must remove old contour artists on current Matplotlib."""
+        X, Y = np.meshgrid(np.linspace(-1.0, 1.0, 5), np.linspace(-1.0, 1.0, 5))
+        fig, ax = plt.subplots()
+        try:
+            contour = ax.contour(X, Y, X * Y, levels=[0])
+            hm._remove_matplotlib_artist(contour)
+            # Repeated cleanup should be harmless when Tk slider callbacks advance frames.
+            hm._remove_matplotlib_artist(contour)
+        finally:
+            plt.close(fig)
 
 
 # ============================================================

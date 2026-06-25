@@ -31,6 +31,8 @@
                                  Color="#3F3F46"/>
                 <SolidColorBrush x:Key="TextForegroundBrush"
                                  Color="#F1F1F1"/>
+                <SolidColorBrush x:Key="PrimaryActionBrush"
+                                 Color="#008080"/>
 
                 <!-- Base control style overrides (to suit dark background) -->
                 <Style TargetType="Window">
