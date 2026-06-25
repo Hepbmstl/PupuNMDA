@@ -97,15 +97,18 @@ dotnet build .\NeuronCAD.csproj -c Debug
 dotnet run --project .\NeuronCAD.csproj
 ```
 
-运行时会按以下顺序寻找 Python 后端：
+如果运行仿真时提示缺少 bundled Python runtime，请确认生成目录中存在：
 
 ```text
-1. 构建或发布输出目录中的 runtime/python/python312.dll 和 runtime/python/app/Backward.zip
-2. 本地未提交的 runtime-payload/runtime/python/python312.dll 和 runtime-payload/runtime/python/app/Backward.zip
-3. 仓库中的 Backward/Hines_method.py
+bin/Debug/net8.0-windows/runtime/python/python312.dll
+bin/Debug/net8.0-windows/runtime/python/Lib/site-packages/
 ```
 
-`runtime-payload/` 是可选的本地载荷目录，不纳入仓库。缺少 payload 时，应用会回退到仓库 `Backward` 源码；此时仍需要系统 Python 3.8-3.12，或通过 `PYTHONNET_PYDLL` 指向兼容的 Python DLL。
+在本地已有 `runtime-payload` 的情况下，可以把其中的 `runtime` 目录复制到构建输出目录：
+
+```powershell
+Copy-Item -Recurse -Force .\runtime-payload\runtime .\bin\Debug\net8.0-windows\
+```
 
 ### 发布
 
@@ -117,8 +120,8 @@ dotnet publish .\NeuronCAD.csproj -c Release -r win-x64 --self-contained true
 
 ```text
 NeuronCAD.exe
+Backward/Hines_method.py
 runtime/python/python312.dll
-runtime/python/app/Backward.zip
 runtime/python/Lib/site-packages/numpy/
 runtime/python/Lib/site-packages/scipy/
 runtime/python/Lib/site-packages/matplotlib/
@@ -159,3 +162,5 @@ runtime/python/tcl/
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
+
+
