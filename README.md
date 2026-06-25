@@ -3,25 +3,6 @@
 Neuron Modeling and Dynamics Analysis XD
 
 
-
- Copyright 2026 [Hepbmstl Hepupu]
-
- Pupu NMDA / NeuronCAD
- A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
-=======
 # PupuNMDA / NeuronCAD
 
 PupuNMDA 是一个面向多区室神经元的桌面建模、仿真与动力学分析平台。它把 WPF/Helix Toolkit 三维形态编辑、conductance-based 离子通道模型、Python Hines 求解器和报告分析工具放在同一个工作流里。
@@ -168,7 +149,22 @@ runtime/python/tcl/
 
 ## License
 
-Copyright 2026 Hepbmstl Hepupu
+ Copyright 2026 [Hepbmstl Hepupu]
 
-Pupu NMDA / NeuronCAD is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+ Pupu NMDA / NeuronCAD
+ A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+=======
 
