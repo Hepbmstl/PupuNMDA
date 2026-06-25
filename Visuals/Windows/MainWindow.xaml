@@ -48,11 +48,23 @@
                                 <Menu.Resources>
                                         <Style TargetType="MenuItem">
                                                 <Setter Property="Foreground"
-                                                        Value="#F1F1F1"/>
+                                                        Value="Black"/>
                                                 <Setter Property="FontSize"
                                                         Value="12"/>
                                                 <Setter Property="Padding"
                                                         Value="10,5"/>
+                                                <Style.Triggers>
+                                                        <Trigger Property="Role"
+                                                                 Value="TopLevelHeader">
+                                                                <Setter Property="Foreground"
+                                                                        Value="#F1F1F1"/>
+                                                        </Trigger>
+                                                        <Trigger Property="Role"
+                                                                 Value="TopLevelItem">
+                                                                <Setter Property="Foreground"
+                                                                        Value="#F1F1F1"/>
+                                                        </Trigger>
+                                                </Style.Triggers>
                                         </Style>
                                 </Menu.Resources>
                                 <MenuItem Header="File">
@@ -72,7 +84,14 @@
                                         <MenuItem Header="Ion Channel Setting"
                                                   Click="OnIonChannelSettingClick"/>
                                 </MenuItem>
-                                <MenuItem Header="View"/>
+                                <MenuItem Header="Data">
+                                        <MenuItem Header="Export Simulation Data..."
+                                                  x:Name="MenuExportSimData"
+                                                  Click="OnExportSimulationDataClick"/>
+                                        <MenuItem Header="Import Simulation Data..."
+                                                  x:Name="MenuImportSimData"
+                                                  Click="OnImportSimulationDataClick"/>
+                                </MenuItem>
                                 <MenuItem Header="Help"/>
                         </Menu>
                 </Border>
@@ -185,6 +204,14 @@
                                                               VerticalScrollBarVisibility="Auto"
                                                               Visibility="Collapsed">
                                                         <StackPanel Margin="10">
+                                                                <TextBlock x:Name="ProjectNameLabel"
+                                                                           Text="Project: (none)"
+                                                                           Foreground="#FFD700"
+                                                                           FontWeight="Bold"
+                                                                           FontSize="13"
+                                                                           Margin="0,0,0,12"
+                                                                           TextWrapping="Wrap"/>
+
                                                                 <TextBlock Text="Simulation Parameters"
                                                                            Foreground="White"
                                                                            FontWeight="Bold"
@@ -358,7 +385,7 @@
                                                                 <Button x:Name="BtnBeginSimulation"
                                                                         Content="Begin"
                                                                         Click="OnBeginSimulationClick"
-                                                                        Background="#C42B1C"
+                                                                        Background="{StaticResource PrimaryActionBrush}"
                                                                         Foreground="White"
                                                                         FontWeight="Bold"
                                                                         FontSize="14"
@@ -588,7 +615,7 @@
                                                                 <Button Content="Apply"
                                                                         Click="OnApplyEdit"
                                                                         Width="60"
-                                                                        Background="#007ACC"
+                                                                        Background="{StaticResource PrimaryActionBrush}"
                                                                         Foreground="White"/>
                                                         </StackPanel>
                                                 </StackPanel>
@@ -607,14 +634,20 @@
                                         <StackPanel Orientation="Horizontal">
                                                 <Button Content="Add Soma"
                                                         Click="OnAddSomaClick"
+                                                        Background="{StaticResource PrimaryActionBrush}"
+                                                        Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
                                                 <Button Content="Add Axon"
                                                         Click="OnAddAxonClick"
+                                                        Background="{StaticResource PrimaryActionBrush}"
+                                                        Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
                                                 <Button Content="Add Dend"
                                                         Click="OnAddDendClick"
+                                                        Background="{StaticResource PrimaryActionBrush}"
+                                                        Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
                                         </StackPanel>
@@ -632,19 +665,19 @@
                                         <StackPanel Orientation="Horizontal">
                                                 <Button Content="Add CurrentClamp"
                                                         Click="OnAddStimulationClick"
-                                                        Background="DarkGoldenrod"
+                                                        Background="{StaticResource PrimaryActionBrush}"
                                                         Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
                                                 <Button Content="Add VoltageClamp"
                                                         Click="OnAddVoltageClampClick"
-                                                        Background="DarkRed"
+                                                        Background="{StaticResource PrimaryActionBrush}"
                                                         Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>
                                                 <Button Content="Add Probe"
                                                         Click="OnAddProbeClick"
-                                                        Background="DarkCyan"
+                                                        Background="{StaticResource PrimaryActionBrush}"
                                                         Foreground="White"
                                                         Padding="10,5"
                                                         Margin="5"/>

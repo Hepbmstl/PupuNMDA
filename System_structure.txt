@@ -18,78 +18,85 @@
  */
 
 NeuronCAD (Root)
-├── App.xaml                // Application startup and resource entry
-├── App.xaml.cs
+├── App.xaml / App.xaml.cs / AssemblyInfo.cs
+│   └── WPF application entry, theme resources, Python shutdown on exit
 │
-├── Backward                // [Namespace: NeuronCAD.Backward]
-│   // Description: Backend service layer responsible for Python simulation scripts, serialization/deserialization, persistence, and cross-language interfaces.
-│   ├── IOService.cs        // Handles native DLL (C/C++) calls and provides python process / pythonnet bridging
-│   ├── PythonWorker.cs     // Manages a single Python thread, GIL and Python.NET initialization (cross-language call entry)
-│   ├── SimulationRunner.cs // Simulation startup and monitoring: sends configurations/commands to Python and receives progress/results
-│   ├── SaveLoadManager.cs  // Project file save/load and model import/export (JSON/custom formats)
-│   ├── DataManager.cs      // Holds in-memory data: entity lists, connection topology, devices and parameter sets
-│   ├── ExportUtils.cs      // Export utilities: export to files / adapters (JSON, NEURON/OC adapters, etc.)
-│   ├── Entities.cs         // Plain data classes (POCOs) used for UI <-> backend data transfer
-│   └── *.py                // Python simulation scripts copied to output (Hines_method.py, etc.)
+├── NeuronCAD.csproj / NeuronCAD.slnx
+│   └── .NET 8 WPF project configuration, HelixToolkit.Wpf + pythonnet references,
+│       Backward/*.py copied to output directory
 │
-└── Visuals                         // [Namespace: NeuronCAD.Visuals]
-    // Description: WPF layer, views and interaction logic. Follows MVVM and modular design (tab isolation).
-    ├── Windows                     // Top-level standalone windows
-    │   ├── MainWindow.xaml         // Main window (container): menu, toolbar, tab container
-    │   ├── MainWindow.xaml.cs      // Window-level events and routing to Tabs/Controllers
-    │   ├── SplashWindow.xaml       // Splash screen (optional)
-    │   └── SplashWindow.xaml.cs
+├── Backward                        // Namespace: NeuronCAD.Backward
+│   ├── PythonWorker.cs
+│   │   └── Dedicated Python worker thread, GIL management, Python DLL discovery
+│   ├── SimulationRunner.cs
+│   │   └── C# → Python simulation orchestration and plotting bridge
+│   ├── SaveLoadManager.cs
+│   │   └── ProjectData JSON serialization/deserialization and scene rebuild
+│   ├── Hines_method.py
+│   │   └── Multi-compartment solver, HH/CaT/GHK kinetics, probe export, phase portrait tools
+│   ├── trans_geo_to_json tcD.py
+│   │   └── NEURON .geo → NeuronCAD JSON converter for tcD-style morphology/biophysics
+│   └── trans_geo_to_json tc200.py
+│       └── NEURON .geo → NeuronCAD JSON converter for tc200-style region mapping
+│
+└── Visuals                         // Namespace: NeuronCAD.Visuals
+    ├── Windows
+    │   ├── MainWindow.xaml / MainWindow.xaml.cs
+    │   │   └── Single shell for Modeling / Simulation / Reporting, menus, toolbars, progress UI
+    │   ├── IonChannelSettingWindow.xaml / IonChannelSettingWindow.xaml.cs
+    │   │   └── HH parameters, CaT parameters, global channel defaults
+    │   └── SplashWindow.xaml / SplashWindow.xaml.cs
+    │       └── Placeholder splash window
     │
-    ├── Shell                       // Global components mounted on MainWindow
-    │   └── MainMenu                // [Namespace: NeuronCAD.Visuals.Shell.MainMenu]
-    │       ├── MenuBarView.xaml    // Menu bar view
-    │       ├── MenuBarView.xaml.cs
-    │       ├── MenuFile.cs         // File command implementations (Open/Save/Export)
-    │       ├── MenuFile.xaml
-    │       └── ...                 // Other global views (toolbars, status bar, notifications)
-    │
-    └── Tabs                               // Functional tabs (isolated)
-        ├── Modeling                       // [Namespace: NeuronCAD.Visuals.Tabs.Modeling]
-        │    ├── ModelingPage.xaml         // Modeling tab container: viewport + panels
-        │    ├── ModelingPage.xaml.cs      // Initializes SceneContext and attaches controllers
-        │    ├── Viewport.cs               // Viewport rendering controller, coordinate transforms, zoom/pan/pick
-        │    ├── Panels.cs                 // Left/right panels (properties/hierarchy/channel selector) control
-        │    ├── Interaction.cs            // Mouse interactions: place/drag/connect operations
-        │    ├── Biophy.cs                 // Biophysics parameter definitions and UI-binding helpers (references Hines/ITGHK)
-        │    └── Visuals                   // Low-level visual entities
-        │         ├── IVisualEntity.cs     // Visual entity behavior interface
-        │         ├── VisualEntityBase.cs  // Base class: holds Entities and Helix model lifecycle
-        │         ├── SomaVisual.cs        // Soma rendering entity
-        │         ├── AxonVisual.cs        // Axon/dendrite shared rendering logic
-        │         └── Connection.cs        // Connection/edge rendering and selection
+    └── Tabs
+        ├── Shared
+        │   ├── SharedSceneState.cs
+        │   │   └── Shared viewport, entity list, connections, devices, simulation registry, last simulation data
+        │   └── IViewportInteractionHandler.cs
+        │       └── Common viewport interaction contract
         │
-        ├── Simulation                   // [Namespace: NeuronCAD.Visuals.Tabs.Simulation]
-        │   ├── SimulationPage.xaml      // Simulation panel: run/stop, progress, result preview
-        │   ├── SimulationPage.xaml.cs
-        │   ├── ConfigPanel.xaml         // Simulation parameter configuration (time step, temperature, channel mapping)
-        │   ├── SimulationPanels.cs
+        ├── Modeling
+        │   ├── Viewport.cs
+        │   │   └── Viewport environment, gestures, unprojection helpers
+        │   ├── Interaction.cs
+        │   │   └── Entity place / move / connect / select / delete interaction state machine
+        │   ├── Panels.cs
+        │   │   └── Entity property cards and per-entity ion-channel editing UI
+        │   ├── Biophy.cs
+        │   │   └── Global channel templates (Na, K, L, CaT)
+        │   ├── ModelingPage.xaml / ModelingPage.xaml.cs
+        │   │   └── Placeholder compatibility page, real functionality moved into MainWindow
+        │   └── Visuals
+        │       ├── IVisualEntity.cs
+        │       │   └── Common entity and anchored-entity interfaces
+        │       ├── VisualEntityBase.cs
+        │       │   └── Common geometry/material/wireframe/channel-particle behavior
+        │       ├── AxonVisual.cs
+        │       │   └── Frustum/cylinder geometry, anchor conversion, DendVisual subclass
+        │       ├── SomaVisual.cs
+        │       │   └── Soma wrapper built on AxonVisual logic
+        │       └── Connection.cs
+        │           └── Connection data, visual lines, endpoint spheres, controller
+        │
+        ├── Simulation
+        │   ├── SimulationRegistry.cs
+        │   │   └── NSeg/LSeg compartmentalization, entity connection mapping, device binding
         │   ├── SimulationInteraction.cs
-        │   └── SimulationRegistry.cs    // Registered simulations/protocols (experimental)
+        │   │   └── Device placement, dragging, deletion, selection
+        │   ├── SimulationPanels.cs
+        │   │   └── Current clamp / probe / voltage clamp parameter panels
+        │   └── attacheddevices.cs
+        │       └── Attached device abstraction and concrete device types
         │
-        └── Reporting                    // [Namespace: NeuronCAD.Visuals.Tabs.Reporting]
-            ├── ReportPage.xaml           // Result visualization/export (voltage, Ca history, probe data)
+        └── Reporting
             ├── ReportingInteraction.cs
+            │   └── Compartment overlays, entity selection, compartment picking
             └── ReportingPanels.cs
+                └── Components / Probes report panels and plot triggers
 
-Other files and folders:
-- App.xaml / App.xaml.cs             : WPF startup and resources (themes, styles)
-- NeuronCAD.csproj                   : Project file, includes Python scripts as Content to copy to output
-- README.md                          : Project README
-- License & Copyright head           : Unified license header template
-- bin/ obj/                          : Build artifacts (ignored)
-
-Data flow summary:
-- UI (Visuals) builds a simulation configuration via `SimulationRunner` and sends commands to `Backward/*.py` (e.g., `Hines_method.py`) through `PythonWorker` (Python.NET).
-- `IOService` / `PythonWorker` handle Python environment discovery, GIL management, and asynchronous callbacks for long-running tasks.
-- Simulation results are returned via JSON / numpy-serialized formats; `ExportUtils` and `DataManager` handle persistence and export.
-
-Development notes:
-- The biophysics and numerical core (`Backward/Hines_method.py`, `Visuals/Tabs/Modeling/Biophy.cs`) are informed by Destexhe (1998) and Hines (1984); these files include special scientific headers citing those works.
-- External dependencies: `HelixToolkit.Wpf` (3D rendering), `pythonnet` (cross-language interop).
-
-If you want, I can expand this document into a file-to-class/method mapping table or generate a Markdown version for code review documentation.
+Notes:
+- The current repository does not contain IOService.cs, DataManager.cs, Entities.cs, ExportUtils.cs,
+  Visuals/Shell/MainMenu, SimulationPage.xaml, or ReportPage.xaml.
+- Modeling, Simulation, and Reporting all live inside MainWindow rather than separate shell pages.
+- SplashWindow and ModelingPage are placeholders and should not be described as fully implemented modules.
+- Tests are intentionally omitted from this structure summary.

@@ -1,7 +1,7 @@
 # Copyright 2026 [Hepbmstl Hepupu]
 #
 # Pupu NMDA / NeuronCAD
-# A Multi-Compartment Neuron Modeling and Dynamics Analysis Platform
+# A Multi-Compartment Neuron Physiological Simulation and Dynamics Analysis Platform
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 # fundamentally informed by the following works:
 # * 1. Destexhe, A., Neubig, M., Ulrich, D., & Huguenard, J. (1998). 
 # Dendritic Low-Threshold Calcium Currents in Thalamic Relay Cells. 
-# The Journal of Neuroscience, 18(10), 3574–3588.
+# The Journal of Neuroscience, 18(10), 3574-3588.
 # * 2. Hines, M. (1984). Efficient computation of branched nerve equations. 
 # International Journal of Bio-Medical Computing, 15(1), 69-76.
 #

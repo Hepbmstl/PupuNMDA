@@ -62,6 +62,8 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
         private static readonly SolidColorBrush ItemBg = new(Color.FromRgb(0x2A, 0x2A, 0x2A));
         private static readonly SolidColorBrush SelectedBorder = new(Colors.Orange);
         private static readonly SolidColorBrush DefaultBorder = new(Color.FromRgb(0x3F, 0x3F, 0x46));
+        private static readonly Color PrimaryActionColor = Color.FromRgb(0x00, 0x80, 0x80);
+        private static readonly Style ComboItemStyle = BuildComboItemStyle();
 
         public ReportingPanelController(
             StackPanel componentsContainer,
@@ -172,6 +174,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
                 Foreground = Brushes.White,
+                ItemContainerStyle = ComboItemStyle,
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
@@ -206,7 +209,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             _entityCompartmentLabels[entity.Id] = compartmentLabel;
 
             // --- Plot button ---
-            var btnPlot = MakeButton("Plot Variable", Color.FromRgb(0x00, 0x7A, 0xCC), compCount > 0);
+            var btnPlot = MakeButton("Plot Variable", PrimaryActionColor, compCount > 0);
             string eid = entity.Id;
             btnPlot.Click += async (s, e) => await OnPlotVariableClick(eid, btnPlot);
             stack.Children.Add(btnPlot);
@@ -234,6 +237,13 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             string varLabel = _entityVarCombos[entityId].SelectedItem?.ToString() ?? "V";
             if (!double.TryParse(_entityStartTimeBoxes[entityId].Text, out double startMs)) startMs = 0;
             if (!double.TryParse(_entityEndTimeBoxes[entityId].Text, out double endMs)) endMs = 20;
+
+            if (!_scene.HasCompletedSimulation)
+            {
+                MessageBox.Show("Please run or import simulation results before plotting variables.", "Reporting",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             try
             {
@@ -311,6 +321,8 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             AddLabel(stack, $"Segment ID: {simProbe.SegmentId}");
             AddLabel(stack, $"Start: {simProbe.StartMs} ms");
             AddLabel(stack, $"Duration: {simProbe.DurationMs} ms");
+            if (!_scene.HasCompletedSimulation)
+                AddLabel(stack, "Status: probe mapping is available, but simulation history has not been loaded.", FontWeights.Bold);
 
             // X-axis variable
             AddLabel(stack, "X-axis variable:", topMargin: 8);
@@ -318,6 +330,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
                 Foreground = Brushes.White,
+                ItemContainerStyle = ComboItemStyle,
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
@@ -331,6 +344,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             {
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
                 Foreground = Brushes.White,
+                ItemContainerStyle = ComboItemStyle,
                 Margin = new Thickness(0, 2, 0, 4),
                 FontSize = 11
             };
@@ -339,7 +353,7 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
             stack.Children.Add(yCombo);
 
             // Plot button
-            var btnPlot = MakeButton("Plot Phase Portrait", Color.FromRgb(0x00, 0x80, 0x80), true);
+            var btnPlot = MakeButton("Plot Phase Portrait", PrimaryActionColor, _scene.HasCompletedSimulation);
             int probeId = simProbe.ProbeId;
             btnPlot.Click += async (s, e) =>
             {
@@ -439,6 +453,14 @@ namespace NeuronCAD.Visuals.Tabs.Reporting
                 Cursor = Cursors.Hand,
                 IsEnabled = enabled
             };
+        }
+
+        private static Style BuildComboItemStyle()
+        {
+            var style = new Style(typeof(ComboBoxItem));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White));
+            return style;
         }
 
         private static void AddLabel(StackPanel parent, string text, FontWeight? weight = null, double topMargin = 0)

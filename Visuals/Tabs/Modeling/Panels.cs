@@ -61,6 +61,9 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         /// <summary>Flag indicating whether expansion state is being set programmatically (prevents recursive selection triggers).</summary>
         private bool _suppressExpandEvent;
 
+        private static readonly SolidColorBrush PrimaryActionBrush =
+            new(Color.FromRgb(0x00, 0x80, 0x80));
+
         /// <summary>
         /// Constructor. Called by MainWindow.InitializeControllers; injects UI container and interaction controller, and subscribes to events.
         /// </summary>
@@ -96,7 +99,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 var btn = new Button
                 {
                     Content = kvp.Value.Name,
-                    Background = new SolidColorBrush(Color.FromArgb(255, 60, 60, 60)),
+                    Background = PrimaryActionBrush,
                     Foreground = Brushes.White,
                     Margin = new Thickness(0, 2, 0, 2),
                     Tag = kvp.Value
@@ -257,7 +260,13 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
             var channelListPanel = new StackPanel();
             panel.Children.Add(channelListPanel);
 
-            var btnAddChannel = new Button { Content = "+ Add Channel", Margin = new Thickness(0, 5, 0, 0), Background = Brushes.DarkSlateGray, Foreground = Brushes.White };
+            var btnAddChannel = new Button
+            {
+                Content = "+ Add Channel",
+                Margin = new Thickness(0, 5, 0, 0),
+                Background = PrimaryActionBrush,
+                Foreground = Brushes.White
+            };
             btnAddChannel.Click += (s, e) =>
             {
                 _currentOperatingEntity = entity;
@@ -313,7 +322,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 {
                     Content = "\u2699",
                     Width = 20,
-                    Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)),
+                    Background = PrimaryActionBrush,
                     Foreground = Brushes.White,
                     Margin = new Thickness(2, 0, 2, 0),
                     ToolTip = "Edit channel value for this entity"
@@ -391,7 +400,7 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
                 Width = 60,
                 Padding = new Thickness(0, 4, 0, 4),
                 Margin = new Thickness(0, 0, 8, 0),
-                Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)),
+                Background = PrimaryActionBrush,
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand

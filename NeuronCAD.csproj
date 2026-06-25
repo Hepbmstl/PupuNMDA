@@ -26,6 +26,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <DefaultItemExcludes>$(DefaultItemExcludes);diff\**;runtime-payload\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

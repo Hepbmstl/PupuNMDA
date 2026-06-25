@@ -84,7 +84,7 @@
                                 Click="OnApplyClick"
                                 Padding="12,6"
                                 Margin="0,0,8,0"
-                                Background="#007ACC"
+                                Background="{StaticResource PrimaryActionBrush}"
                                 Foreground="White"
                                 BorderThickness="0"
                                 Cursor="Hand"/>

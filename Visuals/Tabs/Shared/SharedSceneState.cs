@@ -64,6 +64,12 @@ namespace NeuronCAD.Visuals.Tabs.Shared
         public SimulationData? LastSimulationData { get; set; }
 
         /// <summary>
+        /// True only after Python simulation history is available for reporting analysis.
+        /// Loading a project can rebuild compartment mappings, but does not recreate HISTORY_* data.
+        /// </summary>
+        public bool HasCompletedSimulation { get; set; }
+
+        /// <summary>
         /// Constructor: creates viewport and connection controllers from the provided HelixViewport3D.
         /// Called by MainWindow.InitializeControllers.
         /// </summary>

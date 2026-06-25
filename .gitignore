@@ -11,6 +11,16 @@
 *.sln.docstates
 *.env
 
+# Optional local Python runtime payload; do not commit the bundled runtime tree.
+runtime-payload/
+
+# Local tooling state and generated workspace folders
+.pytest_cache/
+.continue/
+.agents/
+.vscode/
+[Bb]in/
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

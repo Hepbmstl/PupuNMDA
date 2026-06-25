@@ -2,9 +2,6 @@
 # PupuNMDA
 Neuron Modeling and Dynamics Analysis XD
 
-
-# PupuNMDA / NeuronCAD
-
 PupuNMDA 是一个面向多区室神经元的桌面建模、仿真与动力学分析平台。它把 WPF/Helix Toolkit 三维形态编辑、conductance-based 离子通道模型、Python Hines 求解器和报告分析工具放在同一个工作流里。
 
 <img width="1920" height="1180" alt="nmda-molecule-structure" src="https://github.com/user-attachments/assets/6f632899-48d3-4014-86d0-1cf54f590bdb" />
@@ -166,5 +163,4 @@ runtime/python/tcl/
  See the License for the specific language governing permissions and
  limitations under the License.
 
-=======
 
