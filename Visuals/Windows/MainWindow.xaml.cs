@@ -25,6 +25,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
@@ -36,6 +37,7 @@ using NeuronCAD.Visuals.Tabs.Modeling;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 using NeuronCAD.Visuals.Tabs.Simulation;
 using NeuronCAD.Visuals.Tabs.Reporting;
+using NeuronCAD.Visuals.Tabs.VTK;
 
 namespace NeuronCAD.Visuals.Windows
 {
@@ -70,7 +72,7 @@ namespace NeuronCAD.Visuals.Windows
         private IViewportInteractionHandler _activeHandler = null!;
 
         /// <summary>Top-level tab enum used to track the current active functional mode.</summary>
-        private enum ActiveTab { Modeling, Simulating, Reporting }
+        private enum ActiveTab { Modeling, Simulating, Reporting, VTK }
         /// <summary>Currently active tab, defaulting to Modeling mode.</summary>
         private ActiveTab _activeTab = ActiveTab.Modeling;
 
@@ -98,6 +100,9 @@ namespace NeuronCAD.Visuals.Windows
         /// <summary>Last full simulation JSON from simulation, used for export/import.</summary>
         private string? _lastFullSimulationJson;
 
+        private Process? _vtkViewerProcess;
+        private string? _vtkSelectedChannel;
+
         /// <summary>
         /// Constructor: initializes XAML components and initializes controllers after the window is loaded.
         /// </summary>
@@ -105,6 +110,7 @@ namespace NeuronCAD.Visuals.Windows
         {
             InitializeComponent();
             Loaded += (s, e) => InitializeControllers();
+            Closed += (s, e) => StopVtkViewerProcess();
         }
 
         /// <summary>
@@ -160,6 +166,8 @@ namespace NeuronCAD.Visuals.Windows
 
             // Update all connection line positions each frame to ensure connections follow entities after movement
             CompositionTarget.Rendering += (s, e) => _scene.ConnectionController.UpdateAll();
+
+            InitializeVtkPanel();
         }
 
         #region Top-level Tab Switching
@@ -185,6 +193,12 @@ namespace NeuronCAD.Visuals.Windows
             SyncTabButtons();
         }
 
+        private void OnTabVTKClick(object sender, RoutedEventArgs e)
+        {
+            if (_activeTab != ActiveTab.VTK) SwitchTab(ActiveTab.VTK);
+            SyncTabButtons();
+        }
+
         /// <summary>
         /// Synchronize the IsChecked state of the three top-level tab ToggleButtons to match _activeTab.
         /// Called by all OnTab*Click handlers.
@@ -194,6 +208,7 @@ namespace NeuronCAD.Visuals.Windows
             TabModeling.IsChecked = _activeTab == ActiveTab.Modeling;
             TabSimulation.IsChecked = _activeTab == ActiveTab.Simulating;
             TabReporting.IsChecked = _activeTab == ActiveTab.Reporting;
+            TabVTK.IsChecked = _activeTab == ActiveTab.VTK;
         }
 
         /// <summary>
@@ -218,8 +233,12 @@ namespace NeuronCAD.Visuals.Windows
             ModelingPanelScroll.Visibility = Visibility.Collapsed;
             SimulatingPanelRoot.Visibility = Visibility.Collapsed;
             ReportingPanelRoot.Visibility = Visibility.Collapsed;
+            VTKPanelRoot.Visibility = Visibility.Collapsed;
             ModelingToolbar.Visibility = Visibility.Collapsed;
             SimulationToolbar.Visibility = Visibility.Collapsed;
+            VTKViewportRoot.Visibility = Visibility.Collapsed;
+            MainViewport.Visibility = Visibility.Visible;
+            OverlayCanvas.Visibility = Visibility.Visible;
             EditPopup.Visibility = Visibility.Collapsed;
             ChannelSelectorPopup.IsOpen = false;
 
@@ -241,6 +260,13 @@ namespace NeuronCAD.Visuals.Windows
                     _activeHandler = _reportingInteraction;
                     _reportingInteraction.Activate();
                     _reportingPanelController.Rebuild();
+                    break;
+                case ActiveTab.VTK:
+                    VTKPanelRoot.Visibility = Visibility.Visible;
+                    VTKViewportRoot.Visibility = Visibility.Visible;
+                    MainViewport.Visibility = Visibility.Collapsed;
+                    OverlayCanvas.Visibility = Visibility.Collapsed;
+                    _activeHandler = _modelingInteraction;
                     break;
             }
         }
@@ -423,9 +449,307 @@ namespace NeuronCAD.Visuals.Windows
             TabModeling.IsEnabled = !locked;
             TabSimulation.IsEnabled = !locked;
             TabReporting.IsEnabled = !locked;
+            TabVTK.IsEnabled = !locked;
             ModelingToolbar.IsEnabled = !locked;
             SimulationToolbar.IsEnabled = !locked;
         }
+
+        private void OnLaunchVTKClick(object sender, RoutedEventArgs e)
+        {
+            LaunchVtkViewer(channel: null, restartRunningViewer: false);
+        }
+
+        private void OnRenderVTKJsonColorsClick(object sender, RoutedEventArgs e)
+        {
+            LaunchVtkViewer(channel: null, restartRunningViewer: true);
+        }
+
+        private void OnStopVTKClick(object sender, RoutedEventArgs e)
+        {
+            StopVtkViewerProcess();
+            VTKStatusText.Text = "VTK viewer stopped.";
+        }
+
+        private void OnReloadVTKChannelsClick(object sender, RoutedEventArgs e)
+        {
+            LoadVtkChannelButtons();
+        }
+
+        private void OnVTKSubTabControlsClick(object sender, RoutedEventArgs e)
+        {
+            VTKSubTabControls.IsChecked = true;
+            VTKSubTabChannels.IsChecked = false;
+            VTKControlsScroll.Visibility = Visibility.Visible;
+            VTKChannelsScroll.Visibility = Visibility.Collapsed;
+        }
+
+        private void OnVTKSubTabChannelsClick(object sender, RoutedEventArgs e)
+        {
+            VTKSubTabControls.IsChecked = false;
+            VTKSubTabChannels.IsChecked = true;
+            VTKControlsScroll.Visibility = Visibility.Collapsed;
+            VTKChannelsScroll.Visibility = Visibility.Visible;
+            LoadVtkChannelButtons();
+        }
+
+        private void OnVTKShadowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (VTKShadowValueText == null)
+                return;
+
+            VTKShadowValueText.Text = e.NewValue.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private void LaunchVtkViewer(string? channel, bool restartRunningViewer)
+        {
+            try
+            {
+                if (_vtkViewerProcess is { HasExited: false })
+                {
+                    if (!restartRunningViewer)
+                    {
+                        VTKStatusText.Text = "VTK viewer is already running.";
+                        return;
+                    }
+
+                    StopVtkViewerProcess();
+                }
+
+                IntPtr hwnd = VTKHostControl.HostHwnd;
+                if (hwnd == IntPtr.Zero)
+                    throw new InvalidOperationException("VTK host window handle is not ready.");
+
+                _vtkSelectedChannel = string.IsNullOrWhiteSpace(channel) ? null : channel;
+                var hostSize = GetVtkHostPixelSize();
+                _vtkViewerProcess = VtkViewerLauncher.LaunchEmbedded(
+                    hwnd,
+                    channel: _vtkSelectedChannel,
+                    renderJsonColors: _vtkSelectedChannel == null,
+                    showConnections: ChkVTKConnections.IsChecked == true,
+                    showDevices: ChkVTKDevices.IsChecked == true,
+                    shadowStrength: SliderVTKShadow.Value,
+                    width: hostSize.Width,
+                    height: hostSize.Height);
+                VTKStatusText.Text = "VTK viewer launched; waiting for render...";
+                AttachVtkProcessDiagnostics(_vtkViewerProcess);
+            }
+            catch (Exception ex)
+            {
+                VTKStatusText.Text = "VTK launch failed.";
+                MessageBox.Show($"Failed to launch VTK viewer:\n{ex.Message}", "VTK Viewer",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void InitializeVtkPanel()
+        {
+            try
+            {
+                string jsonPath = VtkViewerLauncher.GetDefaultJsonPath();
+                VTKJsonPathText.Text = jsonPath;
+                LoadVtkChannelButtons();
+            }
+            catch (Exception ex)
+            {
+                VTKJsonPathText.Text = "";
+                VTKStatusText.Text = $"VTK panel setup failed: {ex.Message}";
+            }
+        }
+
+        private void LoadVtkChannelButtons()
+        {
+            VTKChannelListContainer.Children.Clear();
+
+            try
+            {
+                string jsonPath = VtkViewerLauncher.GetDefaultJsonPath();
+                VTKJsonPathText.Text = jsonPath;
+                var channels = ReadVtkChannelInfo(jsonPath);
+
+                if (channels.Count == 0)
+                {
+                    VTKChannelListContainer.Children.Add(new TextBlock
+                    {
+                        Text = "No numeric channel G values found.",
+                        Foreground = new SolidColorBrush(Colors.Gray),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                    return;
+                }
+
+                foreach (var channel in channels)
+                {
+                    var button = new Button
+                    {
+                        Content = $"{channel.Name}    count {channel.Count}    missing {channel.Missing}",
+                        Tag = channel.Name,
+                        ToolTip = $"min {channel.MinG:g4}, max {channel.MaxG:g4}, unique {channel.UniqueCount}",
+                        Background = new SolidColorBrush(Color.FromRgb(62, 62, 66)),
+                        Foreground = Brushes.White,
+                        Padding = new Thickness(10, 7, 10, 7),
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        Margin = new Thickness(0, 0, 0, 6)
+                    };
+
+                    button.Click += OnVTKChannelButtonClick;
+                    VTKChannelListContainer.Children.Add(button);
+                }
+            }
+            catch (Exception ex)
+            {
+                VTKChannelListContainer.Children.Add(new TextBlock
+                {
+                    Text = $"Failed to load channels: {ex.Message}",
+                    Foreground = new SolidColorBrush(Colors.OrangeRed),
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+        }
+
+        private void OnVTKChannelButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: string channel })
+                LaunchVtkViewer(channel, restartRunningViewer: true);
+        }
+
+        private static IReadOnlyList<VtkChannelInfo> ReadVtkChannelInfo(string jsonPath)
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(jsonPath));
+            if (!doc.RootElement.TryGetProperty("Entities", out var entitiesElement) ||
+                entitiesElement.ValueKind != JsonValueKind.Array)
+                return Array.Empty<VtkChannelInfo>();
+
+            int entityCount = 0;
+            var valuesByChannel = new Dictionary<string, List<double>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entity in entitiesElement.EnumerateArray())
+            {
+                entityCount++;
+                if (!entity.TryGetProperty("Channels", out var channelsElement) ||
+                    channelsElement.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                foreach (var channel in channelsElement.EnumerateObject())
+                {
+                    if (channel.Value.ValueKind != JsonValueKind.Object ||
+                        !channel.Value.TryGetProperty("G", out var gElement) ||
+                        !TryGetJsonDouble(gElement, out double gValue))
+                        continue;
+
+                    if (!valuesByChannel.TryGetValue(channel.Name, out var values))
+                    {
+                        values = new List<double>();
+                        valuesByChannel[channel.Name] = values;
+                    }
+
+                    values.Add(gValue);
+                }
+            }
+
+            return valuesByChannel
+                .Where(pair => pair.Value.Count > 0)
+                .Select(pair => new VtkChannelInfo(
+                    pair.Key,
+                    pair.Value.Count,
+                    Math.Max(0, entityCount - pair.Value.Count),
+                    pair.Value.Min(),
+                    pair.Value.Max(),
+                    pair.Value.Distinct().Count()))
+                .OrderBy(channel => channel.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        private static bool TryGetJsonDouble(JsonElement element, out double value)
+        {
+            if (element.ValueKind == JsonValueKind.Number && element.TryGetDouble(out value))
+                return true;
+
+            if (element.ValueKind == JsonValueKind.String &&
+                double.TryParse(element.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                return true;
+
+            value = 0.0;
+            return false;
+        }
+
+        private (int Width, int Height) GetVtkHostPixelSize()
+        {
+            double width = Math.Max(1.0, VTKHostControl.ActualWidth);
+            double height = Math.Max(1.0, VTKHostControl.ActualHeight);
+            var source = PresentationSource.FromVisual(VTKHostControl);
+            if (source?.CompositionTarget != null)
+            {
+                width *= source.CompositionTarget.TransformToDevice.M11;
+                height *= source.CompositionTarget.TransformToDevice.M22;
+            }
+
+            return ((int)Math.Max(1, Math.Round(width)), (int)Math.Max(1, Math.Round(height)));
+        }
+
+        private void AttachVtkProcessDiagnostics(Process process)
+        {
+            process.EnableRaisingEvents = true;
+            process.OutputDataReceived += (_, args) => UpdateVtkStatus(args.Data);
+            process.ErrorDataReceived += (_, args) => UpdateVtkStatus(args.Data);
+            process.Exited += (_, _) =>
+            {
+                int exitCode;
+                try
+                {
+                    exitCode = process.ExitCode;
+                }
+                catch
+                {
+                    exitCode = -1;
+                }
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (ReferenceEquals(_vtkViewerProcess, process))
+                        VTKStatusText.Text = $"VTK viewer exited (code {exitCode}).";
+                });
+            };
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+
+        private void UpdateVtkStatus(string? message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            Dispatcher.Invoke(() => VTKStatusText.Text = message.Trim());
+        }
+
+        private void StopVtkViewerProcess()
+        {
+            try
+            {
+                if (_vtkViewerProcess is { HasExited: false })
+                {
+                    _vtkViewerProcess.Kill(entireProcessTree: true);
+                    _vtkViewerProcess.WaitForExit(1000);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup during app shutdown.
+            }
+            finally
+            {
+                _vtkViewerProcess?.Dispose();
+                _vtkViewerProcess = null;
+            }
+        }
+
+        private sealed record VtkChannelInfo(
+            string Name,
+            int Count,
+            int Missing,
+            double MinG,
+            double MaxG,
+            int UniqueCount);
 
         /// <summary>
         /// Forcefully abort the simulation when the "Abort" button is clicked.
