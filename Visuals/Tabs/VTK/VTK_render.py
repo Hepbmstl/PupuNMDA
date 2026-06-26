@@ -12,10 +12,6 @@ import numpy as np
 import vtk
 
 
-DEFAULT_JSON_FILE = Path("tc200") / "tc200_NeuronCAD.json"
-
-#DEFAULT_JSON_FILE = Path("tcD") / "tcD_geo.json"
-
 TYPE_COLORS = {
     "Soma": (1.0, 0.05, 0.05),
     "Axon": (0.1, 0.35, 1.0),
@@ -28,6 +24,16 @@ STIMULATION_COLOR = (1.0, 0.82, 0.0)
 PROBE_COLOR = (0.0, 0.78, 0.72)
 AXIS_COLOR = (0.0, 0.0, 0.0)
 DEFAULT_SHADOW_STRENGTH = 0.35
+
+HISTORY_ARRAY_NAMES = {
+    "V": "HISTORY_V",
+    "m": "HISTORY_M",
+    "h": "HISTORY_H",
+    "n": "HISTORY_N",
+    "Ca": "HISTORY_CA",
+    "mT": "HISTORY_MT",
+    "hT": "HISTORY_HT",
+}
 
 
 @dataclass(frozen=True)
@@ -51,23 +57,12 @@ class SceneCompartment:
     axial_end: float
 
 
-@dataclass(frozen=True)
-class ChannelStats:
-    name: str
-    count: int
-    missing: int
-    min_g: float
-    max_g: float
-    unique_count: int
-
-
 def parse_argb_color(value: str | None) -> tuple[float, float, float] | None:
     if not value or not value.startswith("#"):
         return None
 
     raw = value[1:]
     if len(raw) == 8:
-        # NeuronCAD/WPF stores colors as #AARRGGBB.
         raw = raw[2:]
     if len(raw) != 6:
         return None
@@ -86,11 +81,7 @@ def resolve_input_path(raw_path: str) -> Path:
     path = Path(raw_path)
     if path.is_absolute():
         return path
-
-    if path.exists():
-        return path
-
-    return Path(__file__).resolve().parent / path
+    return Path.cwd() / path
 
 
 def parse_window_size(raw_size: str) -> tuple[int, int]:
@@ -108,148 +99,35 @@ def parse_window_size(raw_size: str) -> tuple[int, int]:
     return (max(1, width), max(1, height))
 
 
-def get_parent_client_size(parent_hwnd: int | None) -> tuple[int, int] | None:
-    if parent_hwnd is None:
-        return None
-
-    try:
-        import ctypes
-        from ctypes import wintypes
-    except ImportError:
-        return None
-
-    rect = wintypes.RECT()
-    if not ctypes.windll.user32.GetClientRect(wintypes.HWND(parent_hwnd), ctypes.byref(rect)):
-        return None
-
-    width = max(1, int(rect.right - rect.left))
-    height = max(1, int(rect.bottom - rect.top))
-    return (width, height)
-
-
-def resize_embedded_child_windows(parent_hwnd: int | None, width: int, height: int) -> None:
-    if parent_hwnd is None:
-        return
-
-    try:
-        import ctypes
-        from ctypes import wintypes
-    except ImportError:
-        return
-
-    enum_proc_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    set_window_pos = ctypes.windll.user32.SetWindowPos
-    enum_child_windows = ctypes.windll.user32.EnumChildWindows
-    swp_nozorder = 0x0004
-    swp_noactivate = 0x0010
-    swp_showwindow = 0x0040
-
-    def resize_child(child_hwnd, _lparam):
-        set_window_pos(
-            child_hwnd,
-            None,
-            0,
-            0,
-            max(1, int(width)),
-            max(1, int(height)),
-            swp_nozorder | swp_noactivate | swp_showwindow,
-        )
-        return True
-
-    enum_child_windows(wintypes.HWND(parent_hwnd), enum_proc_type(resize_child), 0)
-
-
-def attach_parent_resize_sync(
-    interactor: vtk.vtkRenderWindowInteractor,
-    window: vtk.vtkRenderWindow,
-    parent_hwnd: int | None,
-) -> None:
-    if parent_hwnd is None:
-        return
-
-    last_size = {"value": None}
-
-    def sync_size(_obj, _event) -> None:
-        current_size = get_parent_client_size(parent_hwnd)
-        if current_size is None or current_size == last_size["value"]:
-            return
-
-        last_size["value"] = current_size
-        window.SetSize(*current_size)
-        resize_embedded_child_windows(parent_hwnd, *current_size)
-        window.Render()
-
-    sync_size(None, None)
-    interactor.AddObserver("TimerEvent", sync_size)
-    interactor.CreateRepeatingTimer(150)
-
-
-def read_neuroncad_json(path: Path) -> tuple[list[NeuronCadEntity], list[dict], list[dict]]:
-    with path.open("r", encoding="utf-8") as file:
-        data = json.load(file)
-
-    entities = []
-    for item in data.get("Entities", []):
-        entity_type = item.get("Type", "Unknown")
-        color = parse_argb_color(item.get("Color")) or TYPE_COLORS.get(entity_type, DEFAULT_COLOR)
-        transform = tuple(float(v) for v in item.get("Transform", []))
-        if len(transform) != 16:
-            continue
-
-        channels = {}
-        for channel_name, channel_data in (item.get("Channels") or {}).items():
-            if not isinstance(channel_data, dict) or "G" not in channel_data:
-                continue
-            try:
-                channels[str(channel_name)] = float(channel_data["G"])
-            except (TypeError, ValueError):
-                continue
-
-        entities.append(
-            NeuronCadEntity(
-                entity_id=str(item.get("Id", "")),
-                entity_type=entity_type,
-                base_radius=float(item.get("BaseRadius", 0.0)),
-                top_radius=float(item.get("TopRadius", 0.0)),
-                length=float(item.get("Length", 0.0)),
-                transform=transform,
-                color=color,
-                channels=channels,
-            )
-        )
-
-    return entities, data.get("Connections", []), data.get("Devices", [])
-
-
 def read_scene_payload(
     path: Path,
 ) -> tuple[list[NeuronCadEntity], list[SceneCompartment], list[dict], list[dict]]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Scene payload was not found: {path}")
+
     with path.open("r", encoding="utf-8") as file:
         data = json.load(file)
 
-    entities = []
+    entities: list[NeuronCadEntity] = []
     for item in data.get("Entities", data.get("entities", [])):
-        entity_type = item.get("Type", item.get("type", "Unknown"))
+        entity_type = str(item.get("Type", item.get("type", "Unknown")))
         color = parse_argb_color(item.get("Color", item.get("color"))) or TYPE_COLORS.get(entity_type, DEFAULT_COLOR)
         transform = tuple(float(v) for v in item.get("Transform", item.get("transform", [])))
         if len(transform) != 16:
             continue
 
-        channels = {}
+        channels: dict[str, float] = {}
         for channel_name, channel_data in (item.get("Channels", item.get("channels", {})) or {}).items():
-            if isinstance(channel_data, dict):
-                raw_g = channel_data.get("G", channel_data.get("g"))
-            else:
-                raw_g = channel_data
+            raw_g = channel_data.get("G", channel_data.get("g")) if isinstance(channel_data, dict) else channel_data
             try:
                 channels[str(channel_name)] = float(raw_g)
             except (TypeError, ValueError):
                 continue
 
-        entities.append(
-            NeuronCadEntity(
+        try:
+            entity = NeuronCadEntity(
                 entity_id=str(item.get("Id", item.get("id", ""))),
-                entity_type=str(entity_type),
+                entity_type=entity_type,
                 base_radius=float(item.get("BaseRadius", item.get("baseRadius", 0.0))),
                 top_radius=float(item.get("TopRadius", item.get("topRadius", 0.0))),
                 length=float(item.get("Length", item.get("length", 0.0))),
@@ -257,9 +135,13 @@ def read_scene_payload(
                 color=color,
                 channels=channels,
             )
-        )
+        except (TypeError, ValueError):
+            continue
 
-    compartments = []
+        if entity.length > 0.0 and (entity.base_radius > 0.0 or entity.top_radius > 0.0):
+            entities.append(entity)
+
+    compartments: list[SceneCompartment] = []
     for item in data.get("Compartments", data.get("compartments", [])):
         try:
             compartments.append(
@@ -274,76 +156,12 @@ def read_scene_payload(
         except (TypeError, ValueError):
             continue
 
-    connections = data.get("Connections", data.get("connections", []))
-    devices = data.get("Devices", data.get("devices", []))
+    connections = data.get("Connections", data.get("connections", [])) or []
+    devices = data.get("Devices", data.get("devices", [])) or []
     return entities, compartments, connections, devices
 
 
-def collect_channel_stats(entities: list[NeuronCadEntity]) -> list[ChannelStats]:
-    channel_names = sorted({name for entity in entities for name in entity.channels})
-    stats = []
-
-    for name in channel_names:
-        values = [entity.channels[name] for entity in entities if name in entity.channels]
-        if not values:
-            continue
-
-        stats.append(
-            ChannelStats(
-                name=name,
-                count=len(values),
-                missing=len(entities) - len(values),
-                min_g=min(values),
-                max_g=max(values),
-                unique_count=len(set(values)),
-            )
-        )
-
-    return stats
-
-
-def print_channel_menu(stats: list[ChannelStats]) -> None:
-    print("\nAvailable ion channels:")
-    print("  [Enter] Render by JSON Color")
-    for index, stat in enumerate(stats, start=1):
-        print(
-            f"  [{index}] {stat.name:<8} "
-            f"count={stat.count:<5} missing={stat.missing:<5} "
-            f"min={stat.min_g:.8g} max={stat.max_g:.8g} unique={stat.unique_count}"
-        )
-
-
-def select_channel_from_menu(stats: list[ChannelStats]) -> str | None:
-    if not stats:
-        print("No numeric channel G values were found in this JSON. Press Enter to render by JSON colors.")
-        return None
-
-    names_by_lower = {stat.name.lower(): stat.name for stat in stats}
-
-    while True:
-        print_channel_menu(stats)
-        choice = input("\nSelect a channel by number or name (Enter = JSON colors, q = quit): ").strip()
-
-        if choice == "":
-            return None
-
-        if choice.lower() in {"q", "quit"}:
-            raise SystemExit(0)
-
-        if choice.isdigit():
-            index = int(choice)
-            if 1 <= index <= len(stats):
-                return stats[index - 1].name
-
-        selected = names_by_lower.get(choice.lower())
-        if selected is not None:
-            return selected
-
-        print(f"Invalid channel selection: {choice!r}")
-
-
 def transform_point(matrix: tuple[float, ...], point: tuple[float, float, float]) -> tuple[float, float, float]:
-    """Apply a WPF Matrix3D stored in row-major order to a local point."""
     x, y, z = point
     return (
         x * matrix[0] + y * matrix[4] + z * matrix[8] + matrix[12],
@@ -370,6 +188,10 @@ def insert_triangle(
         cell_scalars.InsertNextValue(scalar_value)
 
 
+def entity_radius_at(entity: NeuronCadEntity, axial_t: float) -> float:
+    return entity.base_radius + (entity.top_radius - entity.base_radius) * axial_t
+
+
 def append_frustum(
     entity: NeuronCadEntity,
     points: vtk.vtkPoints,
@@ -378,41 +200,16 @@ def append_frustum(
     cell_scalars: vtk.vtkDoubleArray | None = None,
     scalar_value: float | None = None,
 ) -> None:
-    base_ids = []
-    top_ids = []
-
-    for i in range(sides):
-        angle = 2.0 * math.pi * i / sides
-        cos_a = math.cos(angle)
-        sin_a = math.sin(angle)
-
-        base_local = (entity.base_radius * cos_a, entity.base_radius * sin_a, 0.0)
-        top_local = (entity.top_radius * cos_a, entity.top_radius * sin_a, entity.length)
-
-        base_ids.append(points.InsertNextPoint(*transform_point(entity.transform, base_local)))
-        top_ids.append(points.InsertNextPoint(*transform_point(entity.transform, top_local)))
-
-    for i in range(sides):
-        next_i = (i + 1) % sides
-        b0 = base_ids[i]
-        b1 = base_ids[next_i]
-        t0 = top_ids[i]
-        t1 = top_ids[next_i]
-
-        insert_triangle(polys, b0, b1, t0, cell_scalars, scalar_value)
-        insert_triangle(polys, t0, b1, t1, cell_scalars, scalar_value)
-
-    if entity.base_radius > 1e-9:
-        center_id = points.InsertNextPoint(*transform_point(entity.transform, (0.0, 0.0, 0.0)))
-        for i in range(sides):
-            next_i = (i + 1) % sides
-            insert_triangle(polys, center_id, base_ids[next_i], base_ids[i], cell_scalars, scalar_value)
-
-    if entity.top_radius > 1e-9:
-        center_id = points.InsertNextPoint(*transform_point(entity.transform, (0.0, 0.0, entity.length)))
-        for i in range(sides):
-            next_i = (i + 1) % sides
-            insert_triangle(polys, center_id, top_ids[i], top_ids[next_i], cell_scalars, scalar_value)
+    append_frustum_range(
+        entity,
+        points,
+        polys,
+        sides,
+        0.0,
+        1.0,
+        cell_scalars,
+        scalar_value,
+    )
 
 
 def append_frustum_range(
@@ -436,8 +233,8 @@ def append_frustum_range(
     start_z = entity.length * axial_start
     end_z = entity.length * axial_end
 
-    base_ids = []
-    top_ids = []
+    base_ids: list[int] = []
+    top_ids: list[int] = []
 
     for i in range(sides):
         angle = 2.0 * math.pi * i / sides
@@ -481,8 +278,31 @@ def add_normals(polydata: vtk.vtkPolyData) -> vtk.vtkPolyData:
     normals.AutoOrientNormalsOn()
     normals.SplittingOff()
     normals.Update()
-
     return normals.GetOutput()
+
+
+def build_color_polydata_by_color(
+    entities: list[NeuronCadEntity],
+    sides: int,
+) -> dict[tuple[float, float, float], vtk.vtkPolyData]:
+    points_by_color: dict[tuple[float, float, float], vtk.vtkPoints] = {}
+    polys_by_color: dict[tuple[float, float, float], vtk.vtkCellArray] = {}
+
+    for entity in entities:
+        if entity.color not in points_by_color:
+            points_by_color[entity.color] = vtk.vtkPoints()
+            polys_by_color[entity.color] = vtk.vtkCellArray()
+
+        append_frustum(entity, points_by_color[entity.color], polys_by_color[entity.color], sides)
+
+    polydata_by_color = {}
+    for color, points in points_by_color.items():
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetPolys(polys_by_color[color])
+        polydata_by_color[color] = add_normals(polydata)
+
+    return polydata_by_color
 
 
 def build_channel_polydata(
@@ -497,8 +317,7 @@ def build_channel_polydata(
 
     missing_points = vtk.vtkPoints()
     missing_polys = vtk.vtkCellArray()
-
-    values = []
+    values: list[float] = []
 
     for entity in entities:
         if channel_name in entity.channels:
@@ -527,57 +346,30 @@ def build_channel_polydata(
     return channel_polydata, missing_polydata, scalar_range
 
 
-def build_color_polydata_by_color(
-    entities: list[NeuronCadEntity],
-    sides: int,
-) -> dict[tuple[float, float, float], vtk.vtkPolyData]:
-    points_by_color: dict[tuple[float, float, float], vtk.vtkPoints] = {}
-    polys_by_color: dict[tuple[float, float, float], vtk.vtkCellArray] = {}
-
-    for entity in entities:
-        if entity.color not in points_by_color:
-            points_by_color[entity.color] = vtk.vtkPoints()
-            polys_by_color[entity.color] = vtk.vtkCellArray()
-
-        append_frustum(entity, points_by_color[entity.color], polys_by_color[entity.color], sides)
-
-    polydata_by_color = {}
-    for color, points in points_by_color.items():
-        polydata = vtk.vtkPolyData()
-        polydata.SetPoints(points)
-        polydata.SetPolys(polys_by_color[color])
-        polydata_by_color[color] = add_normals(polydata)
-
-    return polydata_by_color
-
-
-HISTORY_ARRAY_NAMES = {
-    "V": "HISTORY_V",
-    "m": "HISTORY_M",
-    "h": "HISTORY_H",
-    "n": "HISTORY_N",
-    "Ca": "HISTORY_CA",
-    "mT": "HISTORY_MT",
-    "hT": "HISTORY_HT",
-}
-
-
 def read_history_npz(path: Path, variable: str) -> tuple[np.ndarray, dict]:
+    if not path.is_file():
+        raise FileNotFoundError(f"History NPZ was not found: {path}")
+
     array_name = HISTORY_ARRAY_NAMES.get(variable)
     if array_name is None:
         raise ValueError(f"Unsupported history variable {variable!r}. Choose one of {', '.join(HISTORY_ARRAY_NAMES)}.")
 
     with zipfile.ZipFile(path, mode="r") as archive:
-        manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
         entry_name = f"{array_name}.npy"
         if entry_name not in archive.namelist():
             raise ValueError(f"History archive does not contain {entry_name}.")
+
+        manifest = {}
+        if "manifest.json" in archive.namelist():
+            manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
 
         with archive.open(entry_name) as entry:
             matrix = np.load(io.BytesIO(entry.read()), allow_pickle=False)
 
     if matrix.ndim != 2:
         raise ValueError(f"{array_name} must be a 2D array, got shape {matrix.shape}.")
+    if matrix.shape[0] == 0 or matrix.shape[1] == 0:
+        raise ValueError(f"{array_name} must contain at least one frame and one node, got shape {matrix.shape}.")
 
     return np.asarray(matrix, dtype=float), manifest
 
@@ -587,14 +379,13 @@ def build_history_polydata(
     compartments: list[SceneCompartment],
     sides: int,
     initial_values: np.ndarray,
-) -> tuple[vtk.vtkPolyData, vtk.vtkDoubleArray, dict[int, tuple[int, int]], tuple[float, float]]:
+) -> tuple[vtk.vtkPolyData, vtk.vtkDoubleArray, dict[int, tuple[int, int]]]:
     entities_by_id = {entity.entity_id: entity for entity in entities}
     points = vtk.vtkPoints()
     polys = vtk.vtkCellArray()
     scalars = vtk.vtkDoubleArray()
     scalars.SetName("History")
     cell_ranges_by_gid: dict[int, tuple[int, int]] = {}
-    values = []
 
     for compartment in sorted(compartments, key=lambda item: item.global_id):
         entity = entities_by_id.get(compartment.parent_entity_id)
@@ -615,7 +406,6 @@ def build_history_polydata(
             value,
         )
         cell_ranges_by_gid[compartment.global_id] = (first_cell, next_cell)
-        values.append(value)
 
     if points.GetNumberOfPoints() == 0:
         raise ValueError("No history compartments could be mapped to drawable entities.")
@@ -625,10 +415,12 @@ def build_history_polydata(
     polydata.SetPolys(polys)
     polydata.GetCellData().SetScalars(scalars)
     polydata = add_normals(polydata)
-    output_scalars = polydata.GetCellData().GetScalars()
 
-    scalar_range = (min(values), max(values)) if values else (0.0, 1.0)
-    return polydata, output_scalars, cell_ranges_by_gid, scalar_range
+    output_scalars = polydata.GetCellData().GetScalars()
+    if output_scalars is None:
+        raise ValueError("History mesh did not preserve cell scalars.")
+
+    return polydata, output_scalars, cell_ranges_by_gid
 
 
 def update_history_scalars(
@@ -637,12 +429,27 @@ def update_history_scalars(
     frame_values: np.ndarray,
 ) -> None:
     for global_id, (first_cell, next_cell) in cell_ranges_by_gid.items():
-        if global_id < 0 or global_id >= len(frame_values):
-            continue
         value = float(frame_values[global_id])
         for cell_id in range(first_cell, next_cell):
             scalars.SetValue(cell_id, value)
     scalars.Modified()
+
+
+def scalar_display_range(values: np.ndarray | tuple[float, float]) -> tuple[float, float]:
+    if isinstance(values, tuple):
+        min_value, max_value = values
+    else:
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            return (0.0, 1.0)
+        min_value = float(np.min(finite))
+        max_value = float(np.max(finite))
+
+    if min_value == max_value:
+        epsilon = max(abs(min_value) * 0.01, 1e-12)
+        return (min_value - epsilon, max_value + epsilon)
+
+    return (float(min_value), float(max_value))
 
 
 def make_heat_lut() -> vtk.vtkLookupTable:
@@ -693,13 +500,12 @@ def make_mesh_actor(
     actor.SetMapper(mapper)
     actor.GetProperty().SetColor(*color)
     apply_lighting(actor, shadow_strength)
-
     return actor
 
 
-def make_channel_actor(
+def make_scalar_actor(
     polydata: vtk.vtkPolyData,
-    scalar_range: tuple[float, float],
+    value_range: tuple[float, float],
     lut: vtk.vtkLookupTable,
     shadow_strength: float,
 ) -> vtk.vtkActor:
@@ -708,74 +514,30 @@ def make_channel_actor(
     mapper.SetScalarModeToUseCellData()
     mapper.ScalarVisibilityOn()
     mapper.SetLookupTable(lut)
+    mapper.SetScalarRange(*value_range)
 
-    min_g, max_g = scalar_range
-    if min_g == max_g:
-        epsilon = max(abs(min_g) * 0.01, 1e-12)
-        display_range = (min_g - epsilon, max_g + epsilon)
-    else:
-        display_range = (min_g, max_g)
-
-    lut.SetRange(*display_range)
-    mapper.SetScalarRange(*display_range)
+    lut.SetRange(*value_range)
 
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
     apply_lighting(actor, shadow_strength)
-
     return actor
 
 
 def make_scalar_bar(
     lut: vtk.vtkLookupTable,
-    channel_name: str,
-    scalar_range: tuple[float, float],
+    title: str,
+    value_range: tuple[float, float],
 ) -> vtk.vtkScalarBarActor:
     scalar_bar = vtk.vtkScalarBarActor()
     scalar_bar.SetLookupTable(lut)
-    scalar_bar.SetTitle(f"{channel_name} G\n{scalar_range[0]:.4g} - {scalar_range[1]:.4g}")
+    scalar_bar.SetTitle(f"{title}\n{value_range[0]:.4g} - {value_range[1]:.4g}")
     scalar_bar.SetNumberOfLabels(5)
     scalar_bar.SetMaximumWidthInPixels(90)
     scalar_bar.SetMaximumHeightInPixels(320)
     scalar_bar.GetTitleTextProperty().SetColor(0.0, 0.0, 0.0)
     scalar_bar.GetLabelTextProperty().SetColor(0.0, 0.0, 0.0)
-
     return scalar_bar
-
-
-def make_history_actor(
-    polydata: vtk.vtkPolyData,
-    scalar_range: tuple[float, float],
-    lut: vtk.vtkLookupTable,
-    shadow_strength: float,
-) -> vtk.vtkActor:
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(polydata)
-    mapper.SetScalarModeToUseCellData()
-    mapper.ScalarVisibilityOn()
-    mapper.SetLookupTable(lut)
-
-    min_value, max_value = scalar_range
-    if min_value == max_value:
-        epsilon = max(abs(min_value) * 0.01, 1e-12)
-        display_range = (min_value - epsilon, max_value + epsilon)
-    else:
-        display_range = (min_value, max_value)
-
-    lut.SetRange(*display_range)
-    mapper.SetScalarRange(*display_range)
-
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
-    apply_lighting(actor, shadow_strength)
-    return actor
-
-
-def finalize_camera(renderer: vtk.vtkRenderer, bounds: tuple[float, float, float, float, float, float]) -> None:
-    renderer.ResetCamera(bounds)
-    camera = renderer.GetActiveCamera()
-    camera.SetViewUp(0.0, 1.0, 0.0)
-    renderer.ResetCameraClippingRange(bounds)
 
 
 def anchor_to_world_point(entity: NeuronCadEntity, anchor: dict) -> tuple[float, float, float]:
@@ -788,7 +550,7 @@ def anchor_to_world_point(entity: NeuronCadEntity, anchor: dict) -> tuple[float,
     else:
         t = min(1.0, max(0.0, float(anchor.get("AxialT", anchor.get("axialT", 0.5)))))
         angle = float(anchor.get("Angle", anchor.get("angle", 0.0)))
-        radius = entity.base_radius + (entity.top_radius - entity.base_radius) * t
+        radius = entity_radius_at(entity, t)
         local = (radius * math.cos(angle), radius * math.sin(angle), entity.length * t)
 
     return transform_point(entity.transform, local)
@@ -801,10 +563,6 @@ def device_axial_t(anchor: dict) -> float:
         return 0.5
 
 
-def entity_radius_at(entity: NeuronCadEntity, axial_t: float) -> float:
-    return entity.base_radius + (entity.top_radius - entity.base_radius) * axial_t
-
-
 def make_device_ring_actor(
     entity: NeuronCadEntity,
     device: dict,
@@ -814,7 +572,7 @@ def make_device_ring_actor(
     ring_segments: int = 96,
     tube_segments: int = 12,
 ) -> vtk.vtkActor:
-    anchor = device.get("Anchor", {})
+    anchor = device.get("Anchor", device.get("anchor", {}))
     axial_t = device_axial_t(anchor)
     z = axial_t * entity.length
     entity_radius = max(0.0, entity_radius_at(entity, axial_t))
@@ -822,8 +580,8 @@ def make_device_ring_actor(
 
     points = vtk.vtkPoints()
     polys = vtk.vtkCellArray()
+    point_ids: list[list[int]] = []
 
-    point_ids = []
     for i in range(ring_segments):
         theta = 2.0 * math.pi * i / ring_segments
         cos_theta = math.cos(theta)
@@ -863,12 +621,9 @@ def make_device_ring_actor(
 
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
-    if device.get("Type") == "Probe":
-        actor.GetProperty().SetColor(*PROBE_COLOR)
-    else:
-        actor.GetProperty().SetColor(*STIMULATION_COLOR)
+    device_type = str(device.get("Type", device.get("type", "")))
+    actor.GetProperty().SetColor(*(PROBE_COLOR if device_type == "Probe" else STIMULATION_COLOR))
     apply_lighting(actor, shadow_strength)
-
     return actor
 
 
@@ -880,8 +635,8 @@ def make_connection_actor(
     lines = vtk.vtkCellArray()
 
     for connection in connections:
-        entity_a = entities_by_id.get(str(connection.get("EntityA_Id", connection.get("EntityAId", connection.get("entityAId", "")))))
-        entity_b = entities_by_id.get(str(connection.get("EntityB_Id", connection.get("EntityBId", connection.get("entityBId", "")))))
+        entity_a = entities_by_id.get(str(connection.get("EntityAId", connection.get("entityAId", ""))))
+        entity_b = entities_by_id.get(str(connection.get("EntityBId", connection.get("entityBId", ""))))
         if entity_a is None or entity_b is None:
             continue
 
@@ -910,7 +665,6 @@ def make_connection_actor(
     actor.SetMapper(mapper)
     actor.GetProperty().SetColor(*CONNECTION_COLOR)
     actor.GetProperty().SetLineWidth(1.0)
-
     return actor
 
 
@@ -920,14 +674,10 @@ def make_device_actors(
     shadow_strength: float,
 ) -> list[vtk.vtkActor]:
     actors = []
-
     for device in devices:
         entity = entities_by_id.get(str(device.get("TargetEntityId", device.get("targetEntityId", ""))))
-        if entity is None:
-            continue
-
-        actors.append(make_device_ring_actor(entity, device, shadow_strength))
-
+        if entity is not None:
+            actors.append(make_device_ring_actor(entity, device, shadow_strength))
     return actors
 
 
@@ -955,7 +705,6 @@ def make_axes_actor(bounds: tuple[float, float, float, float, float, float], cam
     axes.GetXAxesGridlinesProperty().SetColor(0.85, 0.85, 0.85)
     axes.GetYAxesGridlinesProperty().SetColor(0.85, 0.85, 0.85)
     axes.GetZAxesGridlinesProperty().SetColor(0.85, 0.85, 0.85)
-
     return axes
 
 
@@ -963,6 +712,9 @@ def expand_bounds(
     combined_bounds: list[float],
     bounds: tuple[float, float, float, float, float, float],
 ) -> None:
+    if not all(math.isfinite(value) for value in bounds):
+        return
+
     combined_bounds[0] = min(combined_bounds[0], bounds[0])
     combined_bounds[1] = max(combined_bounds[1], bounds[1])
     combined_bounds[2] = min(combined_bounds[2], bounds[2])
@@ -971,47 +723,29 @@ def expand_bounds(
     combined_bounds[5] = max(combined_bounds[5], bounds[5])
 
 
-def show_neuroncad_scene(
+def finalize_camera(renderer: vtk.vtkRenderer, bounds: tuple[float, float, float, float, float, float]) -> None:
+    renderer.ResetCamera(bounds)
+    camera = renderer.GetActiveCamera()
+    camera.SetViewUp(0.0, 1.0, 0.0)
+    renderer.ResetCameraClippingRange(bounds)
+
+
+def checked_bounds(combined_bounds: list[float]) -> tuple[float, float, float, float, float, float]:
+    if not all(math.isfinite(value) for value in combined_bounds):
+        raise ValueError("Scene did not produce valid render bounds.")
+    return tuple(combined_bounds)  # type: ignore[return-value]
+
+
+def add_scene_overlays(
+    renderer: vtk.vtkRenderer,
     entities: list[NeuronCadEntity],
     connections: list[dict],
     devices: list[dict],
-    source_name: str,
-    sides: int,
     show_connections: bool,
     show_devices: bool,
     shadow_strength: float,
-    selected_channel: str | None = None,
-    force_json_colors: bool = False,
-    parent_hwnd: int | None = None,
-    window_size: tuple[int, int] = (1100, 850),
+    combined_bounds: list[float],
 ) -> None:
-    if not entities:
-        raise ValueError(f"No drawable entities found in {source_name}")
-
-    if not force_json_colors and selected_channel is None:
-        selected_channel = select_channel_from_menu(collect_channel_stats(entities))
-
-    renderer = vtk.vtkRenderer()
-    renderer.SetBackground(1.0, 1.0, 1.0)
-
-    combined_bounds = [float("inf"), float("-inf"), float("inf"), float("-inf"), float("inf"), float("-inf")]
-
-    if selected_channel is None:
-        for color, polydata in build_color_polydata_by_color(entities, sides).items():
-            renderer.AddActor(make_mesh_actor(polydata, color, shadow_strength))
-            expand_bounds(combined_bounds, polydata.GetBounds())
-    else:
-        channel_polydata, missing_polydata, scalar_range = build_channel_polydata(entities, sides, selected_channel)
-        if channel_polydata is not None and scalar_range is not None:
-            heat_lut = make_heat_lut()
-            renderer.AddActor(make_channel_actor(channel_polydata, scalar_range, heat_lut, shadow_strength))
-            renderer.AddActor2D(make_scalar_bar(heat_lut, selected_channel, scalar_range))
-            expand_bounds(combined_bounds, channel_polydata.GetBounds())
-
-        if missing_polydata is not None:
-            renderer.AddActor(make_mesh_actor(missing_polydata, MISSING_CHANNEL_COLOR, shadow_strength))
-            expand_bounds(combined_bounds, missing_polydata.GetBounds())
-
     entities_by_id = {entity.entity_id: entity for entity in entities}
 
     if show_connections:
@@ -1024,54 +758,83 @@ def show_neuroncad_scene(
             renderer.AddActor(actor)
             expand_bounds(combined_bounds, actor.GetBounds())
 
+
+def configure_window(
+    renderer: vtk.vtkRenderer,
+    window_name: str,
+    window_size: tuple[int, int],
+) -> tuple[vtk.vtkRenderWindow, vtk.vtkRenderWindowInteractor]:
     window = vtk.vtkRenderWindow()
-    if parent_hwnd is not None:
-        print(f"Embedding VTK render window in HWND {parent_hwnd}.", flush=True)
-        window.SetParentInfo(str(parent_hwnd))
     window.AddRenderer(renderer)
-    parent_size = get_parent_client_size(parent_hwnd)
-    window.SetSize(*(parent_size or window_size))
-    window.SetWindowName(f"NeuronCAD VTK Viewer - {source_name}")
+    window.SetSize(*window_size)
+    window.SetWindowName(window_name)
 
     interactor = vtk.vtkRenderWindowInteractor()
     interactor.SetRenderWindow(window)
     interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
-
-    renderer.AddActor(make_axes_actor(tuple(combined_bounds), renderer.GetActiveCamera()))
-    finalize_camera(renderer, tuple(combined_bounds))
-    window.Render()
-    interactor.Initialize()
-    attach_parent_resize_sync(interactor, window, parent_hwnd)
-    print(f"VTK viewer ready: {source_name}", flush=True)
-    interactor.Start()
+    return window, interactor
 
 
-def show_neuroncad_json(
-    json_path: Path,
+def show_scene(
+    scene_payload_path: Path,
     sides: int,
     show_connections: bool,
     show_devices: bool,
     shadow_strength: float,
-    selected_channel: str | None = None,
-    force_json_colors: bool = False,
-    parent_hwnd: int | None = None,
-    window_size: tuple[int, int] = (1100, 850),
+    selected_channel: str | None,
+    window_size: tuple[int, int],
 ) -> None:
-    entities, connections, devices = read_neuroncad_json(json_path)
-    show_neuroncad_scene(
-        entities=entities,
-        connections=connections,
-        devices=devices,
-        source_name=str(json_path),
-        sides=sides,
-        show_connections=show_connections,
-        show_devices=show_devices,
-        shadow_strength=shadow_strength,
-        selected_channel=selected_channel,
-        force_json_colors=force_json_colors,
-        parent_hwnd=parent_hwnd,
-        window_size=window_size,
+    entities, _compartments, connections, devices = read_scene_payload(scene_payload_path)
+    if not entities:
+        raise ValueError(f"No drawable entities found in scene payload: {scene_payload_path}")
+
+    renderer = vtk.vtkRenderer()
+    renderer.SetBackground(1.0, 1.0, 1.0)
+    combined_bounds = [float("inf"), float("-inf"), float("inf"), float("-inf"), float("inf"), float("-inf")]
+
+    if selected_channel:
+        channel_polydata, missing_polydata, scalar_range = build_channel_polydata(entities, sides, selected_channel)
+        if channel_polydata is not None and scalar_range is not None:
+            display_range = scalar_display_range(scalar_range)
+            heat_lut = make_heat_lut()
+            renderer.AddActor(make_scalar_actor(channel_polydata, display_range, heat_lut, shadow_strength))
+            renderer.AddActor2D(make_scalar_bar(heat_lut, f"{selected_channel} G", display_range))
+            expand_bounds(combined_bounds, channel_polydata.GetBounds())
+        else:
+            print(f"VTK warning: channel {selected_channel!r} was not found in any drawable entity.", flush=True)
+
+        if missing_polydata is not None:
+            renderer.AddActor(make_mesh_actor(missing_polydata, MISSING_CHANNEL_COLOR, shadow_strength))
+            expand_bounds(combined_bounds, missing_polydata.GetBounds())
+    else:
+        for color, polydata in build_color_polydata_by_color(entities, sides).items():
+            renderer.AddActor(make_mesh_actor(polydata, color, shadow_strength))
+            expand_bounds(combined_bounds, polydata.GetBounds())
+
+    add_scene_overlays(
+        renderer,
+        entities,
+        connections,
+        devices,
+        show_connections,
+        show_devices,
+        shadow_strength,
+        combined_bounds,
     )
+
+    bounds = checked_bounds(combined_bounds)
+    renderer.AddActor(make_axes_actor(bounds, renderer.GetActiveCamera()))
+    finalize_camera(renderer, bounds)
+
+    window, interactor = configure_window(renderer, "NeuronCAD VTK - Live Scene", window_size)
+    interactor.Initialize()
+    window.Render()
+    print(
+        f"VTK viewer ready: payload={scene_payload_path}, entities={len(entities)}, "
+        f"channel={selected_channel or 'entity-colors'}",
+        flush=True,
+    )
+    interactor.Start()
 
 
 def show_history_playback(
@@ -1082,86 +845,67 @@ def show_history_playback(
     show_connections: bool,
     show_devices: bool,
     shadow_strength: float,
-    parent_hwnd: int | None = None,
-    window_size: tuple[int, int] = (1100, 850),
-    fps: float = 20.0,
+    window_size: tuple[int, int],
+    fps: float,
 ) -> None:
     entities, compartments, connections, devices = read_scene_payload(scene_payload_path)
     if not entities:
-        raise ValueError(f"No drawable entities found in {scene_payload_path}")
+        raise ValueError(f"No drawable entities found in scene payload: {scene_payload_path}")
     if not compartments:
-        raise ValueError(f"No simulation compartments found in {scene_payload_path}")
+        raise ValueError(f"No simulation compartments found in scene payload: {scene_payload_path}")
 
     history_matrix, manifest = read_history_npz(history_npz_path, history_variable)
-    if history_matrix.shape[1] <= max(compartment.global_id for compartment in compartments):
+    max_global_id = max(compartment.global_id for compartment in compartments)
+    if history_matrix.shape[1] <= max_global_id:
         raise ValueError(
-            f"History node count {history_matrix.shape[1]} does not cover scene compartment ids."
+            f"History node count {history_matrix.shape[1]} does not cover max scene compartment id {max_global_id}."
         )
 
     renderer = vtk.vtkRenderer()
     renderer.SetBackground(1.0, 1.0, 1.0)
+    combined_bounds = [float("inf"), float("-inf"), float("inf"), float("-inf"), float("inf"), float("-inf")]
 
-    scalar_range = (float(np.nanmin(history_matrix)), float(np.nanmax(history_matrix)))
-    polydata, scalars, cell_ranges_by_gid, _ = build_history_polydata(
-        entities,
-        compartments,
-        sides,
-        history_matrix[0],
-    )
+    display_range = scalar_display_range(history_matrix)
+    polydata, scalars, cell_ranges_by_gid = build_history_polydata(entities, compartments, sides, history_matrix[0])
+    expand_bounds(combined_bounds, polydata.GetBounds())
+
     print(
         f"VTK history data loaded: var={history_variable}, frames={history_matrix.shape[0]}, "
         f"nodes={history_matrix.shape[1]}, mapped={len(cell_ranges_by_gid)}, "
         f"points={polydata.GetNumberOfPoints()}, cells={polydata.GetNumberOfCells()}, "
-        f"bounds={tuple(round(v, 4) for v in polydata.GetBounds())}, "
-        f"range={scalar_range[0]:.4g}..{scalar_range[1]:.4g}.",
+        f"range={display_range[0]:.4g}..{display_range[1]:.4g}.",
         flush=True,
     )
 
     heat_lut = make_heat_lut()
-    actor = make_history_actor(polydata, scalar_range, heat_lut, shadow_strength)
-    renderer.AddActor(actor)
+    renderer.AddActor(make_scalar_actor(polydata, display_range, heat_lut, shadow_strength))
 
-    dt = float(manifest.get("metadata", {}).get("DT", 0.0))
-    scalar_bar = make_scalar_bar(heat_lut, f"{history_variable} step 0", scalar_range)
+    dt = float((manifest.get("metadata") or {}).get("DT", 0.0))
+    scalar_bar = make_scalar_bar(heat_lut, history_variable, display_range)
     scalar_bar.SetTitle(
         f"{history_variable}\n"
-        f"{scalar_range[0]:.4g} - {scalar_range[1]:.4g}\n"
+        f"{display_range[0]:.4g} - {display_range[1]:.4g}\n"
         f"step 0  t={0.0:.4g} ms"
     )
     renderer.AddActor2D(scalar_bar)
 
-    combined_bounds = [float("inf"), float("-inf"), float("inf"), float("-inf"), float("inf"), float("-inf")]
-    expand_bounds(combined_bounds, polydata.GetBounds())
+    add_scene_overlays(
+        renderer,
+        entities,
+        connections,
+        devices,
+        show_connections,
+        show_devices,
+        shadow_strength,
+        combined_bounds,
+    )
 
-    entities_by_id = {entity.entity_id: entity for entity in entities}
+    bounds = checked_bounds(combined_bounds)
+    renderer.AddActor(make_axes_actor(bounds, renderer.GetActiveCamera()))
+    finalize_camera(renderer, bounds)
 
-    if show_connections:
-        connection_actor = make_connection_actor(entities_by_id, connections)
-        if connection_actor is not None:
-            renderer.AddActor(connection_actor)
-
-    if show_devices:
-        for device_actor in make_device_actors(entities_by_id, devices, shadow_strength):
-            renderer.AddActor(device_actor)
-            expand_bounds(combined_bounds, device_actor.GetBounds())
-
-    window = vtk.vtkRenderWindow()
-    if parent_hwnd is not None:
-        print(f"Embedding VTK history render window in HWND {parent_hwnd}.", flush=True)
-        window.SetParentInfo(str(parent_hwnd))
-    window.AddRenderer(renderer)
-    parent_size = get_parent_client_size(parent_hwnd)
-    window.SetSize(*(parent_size or window_size))
-    window.SetWindowName(f"NeuronCAD History - {history_variable}")
-
-    interactor = vtk.vtkRenderWindowInteractor()
-    interactor.SetRenderWindow(window)
-    interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
-
-    renderer.AddActor(make_axes_actor(tuple(combined_bounds), renderer.GetActiveCamera()))
-    finalize_camera(renderer, tuple(combined_bounds))
+    window, interactor = configure_window(renderer, f"NeuronCAD VTK History - {history_variable}", window_size)
     interactor.Initialize()
-    attach_parent_resize_sync(interactor, window, parent_hwnd)
     window.Render()
 
     frame_count = history_matrix.shape[0]
@@ -1175,33 +919,47 @@ def show_history_playback(
         polydata.Modified()
         scalar_bar.SetTitle(
             f"{history_variable}\n"
-            f"{scalar_range[0]:.4g} - {scalar_range[1]:.4g}\n"
+            f"{display_range[0]:.4g} - {display_range[1]:.4g}\n"
             f"step {next_step}  t={next_step * dt:.4g} ms"
         )
         window.Render()
 
     interactor.AddObserver("TimerEvent", on_timer)
     timer_id = interactor.CreateRepeatingTimer(interval_ms)
-    update_history_scalars(scalars, cell_ranges_by_gid, history_matrix[min(1, frame_count - 1)])
-    polydata.Modified()
-    window.Render()
-
     print(
         f"VTK history ready: {history_variable}, frames={frame_count}, compartments={len(cell_ranges_by_gid)}, "
-        f"points={polydata.GetNumberOfPoints()}, cells={polydata.GetNumberOfCells()}, "
-        f"range={scalar_range[0]:.4g}..{scalar_range[1]:.4g}, timer={timer_id}.",
+        f"timer={timer_id}, fps={fps:.4g}.",
         flush=True,
     )
     interactor.Start()
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Draw NeuronCAD JSON geometry with VTK.")
+    parser = argparse.ArgumentParser(description="Render a NeuronCAD scene payload with VTK.")
     parser.add_argument(
-        "json_file",
-        nargs="?",
-        default=str(DEFAULT_JSON_FILE),
-        help=f"Path to a NeuronCAD JSON file. Default: {DEFAULT_JSON_FILE}",
+        "--scene-payload",
+        required=True,
+        help="Path to the temporary scene payload exported by the C# host.",
+    )
+    parser.add_argument(
+        "--channel",
+        help="Render this ion channel using cell scalar colors. Omit to render entity colors.",
+    )
+    parser.add_argument(
+        "--history-npz",
+        help="Path to the temporary NeuronCAD simulation NPZ archive used for history playback.",
+    )
+    parser.add_argument(
+        "--history-var",
+        default="V",
+        choices=sorted(HISTORY_ARRAY_NAMES.keys()),
+        help="History variable to animate. Default: V",
+    )
+    parser.add_argument(
+        "--history-fps",
+        type=float,
+        default=20.0,
+        help="Playback frames per second for history animation. Default: 20",
     )
     parser.add_argument(
         "--sides",
@@ -1223,21 +981,7 @@ def parse_args() -> argparse.Namespace:
         "--shadow-strength",
         type=float,
         default=DEFAULT_SHADOW_STRENGTH,
-        help="Surface lighting strength from 0 to 1. 0 disables shading, 1 is strongest. Default: 0.35",
-    )
-    parser.add_argument(
-        "--channel",
-        help="Render by this channel without showing the interactive channel menu.",
-    )
-    parser.add_argument(
-        "--json-colors",
-        action="store_true",
-        help="Render directly by JSON entity colors and skip the channel menu.",
-    )
-    parser.add_argument(
-        "--parent-hwnd",
-        type=lambda value: int(value, 0),
-        help="Embed the VTK render window in the provided Win32 parent HWND.",
+        help="Surface lighting strength from 0 to 1. Default: 0.35",
     )
     parser.add_argument(
         "--window-size",
@@ -1245,72 +989,37 @@ def parse_args() -> argparse.Namespace:
         default=(1100, 850),
         help="Initial render window size as WIDTHxHEIGHT. Default: 1100x850",
     )
-    parser.add_argument(
-        "--scene-payload",
-        help="Path to a VTK scene payload exported from the live Helix scene.",
-    )
-    parser.add_argument(
-        "--history-npz",
-        help="Path to a NeuronCAD simulation NPZ archive used for history playback.",
-    )
-    parser.add_argument(
-        "--history-var",
-        default="V",
-        choices=sorted(HISTORY_ARRAY_NAMES.keys()),
-        help="History variable to animate. Default: V",
-    )
-    parser.add_argument(
-        "--history-fps",
-        type=float,
-        default=20.0,
-        help="Playback frames per second for history animation. Default: 20",
-    )
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main() -> None:
     args = parse_args()
+    scene_payload_path = resolve_input_path(args.scene_payload)
+    sides = max(6, args.sides)
+
     if args.history_npz:
-        if not args.scene_payload:
-            raise SystemExit("--scene-payload must be provided with --history-npz.")
         show_history_playback(
-            scene_payload_path=resolve_input_path(args.scene_payload),
+            scene_payload_path=scene_payload_path,
             history_npz_path=resolve_input_path(args.history_npz),
             history_variable=args.history_var,
-            sides=max(6, args.sides),
+            sides=sides,
             show_connections=args.connections,
             show_devices=not args.hide_devices,
             shadow_strength=args.shadow_strength,
-            parent_hwnd=args.parent_hwnd,
             window_size=args.window_size,
             fps=args.history_fps,
         )
-    elif args.scene_payload:
-        entities, _compartments, connections, devices = read_scene_payload(resolve_input_path(args.scene_payload))
-        show_neuroncad_scene(
-            entities=entities,
-            connections=connections,
-            devices=devices,
-            source_name=str(resolve_input_path(args.scene_payload)),
-            sides=max(6, args.sides),
-            show_connections=args.connections,
-            show_devices=not args.hide_devices,
-            shadow_strength=args.shadow_strength,
-            selected_channel=args.channel,
-            force_json_colors=args.json_colors,
-            parent_hwnd=args.parent_hwnd,
-            window_size=args.window_size,
-        )
     else:
-        input_path = resolve_input_path(args.json_file)
-        show_neuroncad_json(
-            json_path=input_path,
-            sides=max(6, args.sides),
+        show_scene(
+            scene_payload_path=scene_payload_path,
+            sides=sides,
             show_connections=args.connections,
             show_devices=not args.hide_devices,
             shadow_strength=args.shadow_strength,
             selected_channel=args.channel,
-            force_json_colors=args.json_colors,
-            parent_hwnd=args.parent_hwnd,
             window_size=args.window_size,
         )
+
+
+if __name__ == "__main__":
+    main()
