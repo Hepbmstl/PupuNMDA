@@ -34,8 +34,12 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
     /// </summary>
     public class ViewportController
     {
+        private const double RollFallbackDegreesPerPixel = 0.35;
+
         /// <summary>Reference to the HelixViewport3D instance, injected via the constructor.</summary>
         private readonly HelixViewport3D _viewport;
+        private bool _isRollingCamera;
+        private Point _lastRollPoint;
 
         /// <summary>
         /// Constructor that initializes the viewport environment and gesture configuration.
@@ -79,14 +83,117 @@ namespace NeuronCAD.Visuals.Tabs.Modeling
         }
 
         /// <summary>
-        /// Configure viewport gestures: right-click rotate, left-click pan, and auto-zoom to extents when loaded.
+        /// Configure viewport gestures: left-click pan, right-click rotate, wheel zoom, and middle-drag camera roll.
         /// Called by the constructor.
         /// </summary>
         private void ConfigureGestures()
         {
             _viewport.RotateGesture = new MouseGesture(MouseAction.RightClick);
+            _viewport.RotateGesture2 = new MouseGesture(MouseAction.None);
             _viewport.PanGesture = new MouseGesture(MouseAction.LeftClick);
+            _viewport.PanGesture2 = new MouseGesture(MouseAction.None);
+            _viewport.ZoomGesture = new MouseGesture(MouseAction.None);
+            _viewport.ZoomGesture2 = new MouseGesture(MouseAction.None);
+            _viewport.CameraRotationMode = CameraRotationMode.Trackball;
+            _viewport.FixedRotationPointEnabled = true;
+            _viewport.FixedRotationPoint = new Point3D(0, 0, 0);
+            _viewport.ModelUpDirection = new Vector3D(0, 1, 0);
             _viewport.ZoomExtentsWhenLoaded = true;
+            _viewport.PreviewMouseDown += OnViewportPreviewMouseDown;
+            _viewport.PreviewMouseMove += OnViewportPreviewMouseMove;
+            _viewport.PreviewMouseUp += OnViewportPreviewMouseUp;
+            _viewport.LostMouseCapture += (_, _) => _isRollingCamera = false;
+        }
+
+        private void OnViewportPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle)
+                return;
+
+            _isRollingCamera = true;
+            _lastRollPoint = e.GetPosition(_viewport);
+            _viewport.CaptureMouse();
+            e.Handled = true;
+        }
+
+        private void OnViewportPreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isRollingCamera)
+                return;
+
+            if (e.MiddleButton != MouseButtonState.Pressed)
+            {
+                EndCameraRoll();
+                return;
+            }
+
+            Point current = e.GetPosition(_viewport);
+            RollCamera(_lastRollPoint, current);
+            _lastRollPoint = current;
+            e.Handled = true;
+        }
+
+        private void OnViewportPreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle)
+                return;
+
+            EndCameraRoll();
+            e.Handled = true;
+        }
+
+        private void EndCameraRoll()
+        {
+            _isRollingCamera = false;
+            if (_viewport.IsMouseCaptured)
+                _viewport.ReleaseMouseCapture();
+        }
+
+        private void RollCamera(Point previous, Point current)
+        {
+            if (_viewport.Camera is not ProjectionCamera camera)
+                return;
+
+            Vector3D lookDirection = camera.LookDirection;
+            if (lookDirection.LengthSquared < 1e-12)
+                return;
+
+            double angle = CalculateRollAngle(previous, current);
+            if (Math.Abs(angle) < 1e-6)
+                return;
+
+            var rotation = new AxisAngleRotation3D(lookDirection, angle);
+            var transform = new RotateTransform3D(rotation);
+            Vector3D up = transform.Transform(camera.UpDirection);
+            if (up.LengthSquared < 1e-12)
+                return;
+
+            up.Normalize();
+            camera.UpDirection = up;
+        }
+
+        private double CalculateRollAngle(Point previous, Point current)
+        {
+            Point center = new(_viewport.ActualWidth * 0.5, _viewport.ActualHeight * 0.5);
+            Vector previousVector = previous - center;
+            Vector currentVector = current - center;
+
+            double angle;
+            if (previousVector.Length > 8.0 && currentVector.Length > 8.0)
+            {
+                double previousAngle = Math.Atan2(previousVector.Y, previousVector.X);
+                double currentAngle = Math.Atan2(currentVector.Y, currentVector.X);
+                double delta = currentAngle - previousAngle;
+                if (delta > Math.PI) delta -= 2.0 * Math.PI;
+                else if (delta < -Math.PI) delta += 2.0 * Math.PI;
+                angle = delta * 180.0 / Math.PI;
+            }
+            else
+            {
+                angle = (current.X - previous.X) * RollFallbackDegreesPerPixel;
+            }
+
+            return Math.Max(-30.0, Math.Min(30.0, angle));
         }
 
         /// <summary>

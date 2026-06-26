@@ -540,6 +540,77 @@ def make_scalar_bar(
     return scalar_bar
 
 
+def make_playback_slider(
+    interactor: vtk.vtkRenderWindowInteractor,
+    title: str,
+    value_range: tuple[float, float],
+    initial_value: float,
+    point1: tuple[float, float],
+    point2: tuple[float, float],
+    width: float = 0.018,
+) -> tuple[vtk.vtkSliderWidget, vtk.vtkSliderRepresentation2D]:
+    representation = vtk.vtkSliderRepresentation2D()
+    representation.SetMinimumValue(value_range[0])
+    representation.SetMaximumValue(value_range[1])
+    representation.SetValue(initial_value)
+    representation.SetTitleText(title)
+    representation.SetLabelFormat("%.0f")
+    representation.SetSliderWidth(width)
+    representation.SetTubeWidth(width * 0.45)
+    representation.SetEndCapWidth(width * 0.7)
+    representation.SetEndCapLength(width * 0.7)
+    representation.GetPoint1Coordinate().SetCoordinateSystemToNormalizedDisplay()
+    representation.GetPoint1Coordinate().SetValue(point1[0], point1[1])
+    representation.GetPoint2Coordinate().SetCoordinateSystemToNormalizedDisplay()
+    representation.GetPoint2Coordinate().SetValue(point2[0], point2[1])
+    representation.GetTitleProperty().SetColor(0.0, 0.0, 0.0)
+    representation.GetLabelProperty().SetColor(0.0, 0.0, 0.0)
+    representation.GetTubeProperty().SetColor(0.74, 0.74, 0.74)
+    representation.GetSliderProperty().SetColor(0.08, 0.36, 0.9)
+    representation.GetSelectedProperty().SetColor(0.0, 0.58, 1.0)
+
+    widget = vtk.vtkSliderWidget()
+    widget.SetInteractor(interactor)
+    widget.SetRepresentation(representation)
+    widget.SetAnimationModeToAnimate()
+    widget.EnabledOn()
+    return widget, representation
+
+
+def make_speed_slider(
+    interactor: vtk.vtkRenderWindowInteractor,
+    initial_speed: float,
+) -> tuple[vtk.vtkSliderWidget, vtk.vtkSliderRepresentation2D]:
+    widget, representation = make_playback_slider(
+        interactor=interactor,
+        title="Speed",
+        value_range=(0.25, 4.0),
+        initial_value=initial_speed,
+        point1=(0.76, 0.055),
+        point2=(0.95, 0.055),
+        width=0.016,
+    )
+    representation.SetLabelFormat("%.2fx")
+    representation.GetSliderProperty().SetColor(0.0, 0.56, 0.42)
+    representation.GetSelectedProperty().SetColor(0.0, 0.72, 0.54)
+    return widget, representation
+
+
+def make_play_pause_actor() -> vtk.vtkTextActor:
+    actor = vtk.vtkTextActor()
+    actor.GetPositionCoordinate().SetCoordinateSystemToNormalizedViewport()
+    actor.SetPosition(0.035, 0.028)
+    actor.GetTextProperty().SetFontSize(22)
+    actor.GetTextProperty().SetBold(True)
+    actor.GetTextProperty().SetColor(0.0, 0.0, 0.0)
+    actor.GetTextProperty().SetBackgroundColor(0.9, 0.9, 0.9)
+    actor.GetTextProperty().SetBackgroundOpacity(0.85)
+    actor.GetTextProperty().SetFrame(True)
+    actor.GetTextProperty().SetFrameColor(0.2, 0.2, 0.2)
+    actor.SetInput("Pause")
+    return actor
+
+
 def anchor_to_world_point(entity: NeuronCadEntity, anchor: dict) -> tuple[float, float, float]:
     mode = anchor.get("Mode", anchor.get("mode", "AxonCylinder"))
 
@@ -730,6 +801,136 @@ def finalize_camera(renderer: vtk.vtkRenderer, bounds: tuple[float, float, float
     renderer.ResetCameraClippingRange(bounds)
 
 
+class NeuronCadInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
+    """Match the Helix viewport controls: left pan, right rotate, wheel zoom, middle roll."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._mode: str | None = None
+        self._last_roll_pos: tuple[int, int] | None = None
+        self.AddObserver("LeftButtonPressEvent", self._on_left_press)
+        self.AddObserver("LeftButtonReleaseEvent", self._on_left_release)
+        self.AddObserver("RightButtonPressEvent", self._on_right_press)
+        self.AddObserver("RightButtonReleaseEvent", self._on_right_release)
+        self.AddObserver("MiddleButtonPressEvent", self._on_middle_press)
+        self.AddObserver("MiddleButtonReleaseEvent", self._on_middle_release)
+        self.AddObserver("MouseMoveEvent", self._on_mouse_move)
+
+    def _current_renderer(self) -> vtk.vtkRenderer | None:
+        interactor = self.GetInteractor()
+        if interactor is None:
+            return None
+
+        x, y = interactor.GetEventPosition()
+        self.FindPokedRenderer(x, y)
+        return self.GetCurrentRenderer()
+
+    def _is_playback_control_area(self) -> bool:
+        interactor = self.GetInteractor()
+        if interactor is None:
+            return False
+
+        render_window = interactor.GetRenderWindow()
+        if render_window is None:
+            return False
+
+        _width, height = render_window.GetSize()
+        if height <= 0:
+            return False
+
+        _x, y = interactor.GetEventPosition()
+        return y / height <= 0.12
+
+    def _on_left_press(self, _obj, _event) -> None:
+        if self._is_playback_control_area():
+            return
+        if self._current_renderer() is None:
+            return
+
+        self._mode = "pan"
+        self.StartPan()
+
+    def _on_left_release(self, _obj, _event) -> None:
+        if self._mode == "pan":
+            self.EndPan()
+        self._mode = None
+
+    def _on_right_press(self, _obj, _event) -> None:
+        if self._current_renderer() is None:
+            return
+
+        self._mode = "rotate"
+        self.StartRotate()
+
+    def _on_right_release(self, _obj, _event) -> None:
+        if self._mode == "rotate":
+            self.EndRotate()
+        self._mode = None
+
+    def _on_middle_press(self, _obj, _event) -> None:
+        if self._current_renderer() is None:
+            return
+
+        interactor = self.GetInteractor()
+        self._mode = "roll"
+        self._last_roll_pos = interactor.GetEventPosition()
+
+    def _on_middle_release(self, _obj, _event) -> None:
+        self._mode = None
+        self._last_roll_pos = None
+
+    def _on_mouse_move(self, _obj, _event) -> None:
+        if self._mode == "pan":
+            self.Pan()
+        elif self._mode == "rotate":
+            self.Rotate()
+        elif self._mode == "roll":
+            self._roll_camera()
+
+    def _roll_camera(self) -> None:
+        interactor = self.GetInteractor()
+        renderer = self.GetCurrentRenderer()
+        if interactor is None or renderer is None or self._last_roll_pos is None:
+            return
+
+        current = interactor.GetEventPosition()
+        width, height = interactor.GetRenderWindow().GetSize()
+        center = (width * 0.5, height * 0.5)
+
+        previous_vector = (
+            self._last_roll_pos[0] - center[0],
+            self._last_roll_pos[1] - center[1],
+        )
+        current_vector = (
+            current[0] - center[0],
+            current[1] - center[1],
+        )
+
+        previous_length = math.hypot(*previous_vector)
+        current_length = math.hypot(*current_vector)
+        if previous_length > 8.0 and current_length > 8.0:
+            previous_angle = math.atan2(previous_vector[1], previous_vector[0])
+            current_angle = math.atan2(current_vector[1], current_vector[0])
+            delta = current_angle - previous_angle
+            if delta > math.pi:
+                delta -= 2.0 * math.pi
+            elif delta < -math.pi:
+                delta += 2.0 * math.pi
+            angle_degrees = math.degrees(delta)
+        else:
+            angle_degrees = (current[0] - self._last_roll_pos[0]) * 0.35
+
+        angle_degrees = max(-30.0, min(30.0, angle_degrees))
+        if abs(angle_degrees) > 1e-6:
+            camera = renderer.GetActiveCamera()
+            camera.Roll(angle_degrees)
+            camera.OrthogonalizeViewUp()
+            renderer.ResetCameraClippingRange()
+            interactor.Render()
+
+        self._last_roll_pos = current
+
+
 def checked_bounds(combined_bounds: list[float]) -> tuple[float, float, float, float, float, float]:
     if not all(math.isfinite(value) for value in combined_bounds):
         raise ValueError("Scene did not produce valid render bounds.")
@@ -771,7 +972,10 @@ def configure_window(
 
     interactor = vtk.vtkRenderWindowInteractor()
     interactor.SetRenderWindow(window)
-    interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+    style = NeuronCadInteractorStyle()
+    style.SetDefaultRenderer(renderer)
+    interactor.SetInteractorStyle(style)
+    interactor._neuroncad_style = style
     return window, interactor
 
 
@@ -909,27 +1113,116 @@ def show_history_playback(
     window.Render()
 
     frame_count = history_matrix.shape[0]
-    frame_state = {"step": 0}
-    interval_ms = max(1, int(1000.0 / max(0.1, fps)))
+    frame_state = {
+        "step": 0,
+        "playing": True,
+        "speed": 1.0,
+        "timer_id": -1,
+        "updating_slider": False,
+    }
 
-    def on_timer(_obj, _event) -> None:
-        next_step = (frame_state["step"] + 1) % frame_count
-        frame_state["step"] = next_step
-        update_history_scalars(scalars, cell_ranges_by_gid, history_matrix[next_step])
+    play_pause_actor = make_play_pause_actor()
+    renderer.AddActor2D(play_pause_actor)
+
+    progress_widget, progress_representation = make_playback_slider(
+        interactor=interactor,
+        title="Frame",
+        value_range=(0.0, float(max(0, frame_count - 1))),
+        initial_value=0.0,
+        point1=(0.15, 0.055),
+        point2=(0.70, 0.055),
+    )
+    speed_widget, speed_representation = make_speed_slider(interactor, 1.0)
+
+    def effective_interval_ms() -> int:
+        base_fps = max(0.1, fps)
+        speed = max(0.05, float(frame_state["speed"]))
+        return max(1, int(1000.0 / (base_fps * speed)))
+
+    def set_frame(step: int, update_progress: bool = True) -> None:
+        step = int(max(0, min(frame_count - 1, step)))
+        frame_state["step"] = step
+        update_history_scalars(scalars, cell_ranges_by_gid, history_matrix[step])
         polydata.Modified()
         scalar_bar.SetTitle(
             f"{history_variable}\n"
             f"{display_range[0]:.4g} - {display_range[1]:.4g}\n"
-            f"step {next_step}  t={next_step * dt:.4g} ms"
+            f"step {step}  t={step * dt:.4g} ms"
         )
+        if update_progress:
+            frame_state["updating_slider"] = True
+            progress_representation.SetValue(float(step))
+            frame_state["updating_slider"] = False
         window.Render()
 
+    def set_playing(playing: bool) -> None:
+        frame_state["playing"] = playing
+        play_pause_actor.SetInput("Pause" if playing else "Play")
+        window.Render()
+
+    def reset_timer() -> None:
+        timer_id = int(frame_state["timer_id"])
+        if timer_id >= 0:
+            interactor.DestroyTimer(timer_id)
+        frame_state["timer_id"] = interactor.CreateRepeatingTimer(effective_interval_ms())
+
+    def on_timer(_obj, _event) -> None:
+        if not frame_state["playing"]:
+            return
+        next_step = (frame_state["step"] + 1) % frame_count
+        set_frame(next_step)
+
+    def on_progress_changed(_obj, _event) -> None:
+        if frame_state["updating_slider"]:
+            return
+        set_frame(int(round(progress_representation.GetValue())), update_progress=False)
+
+    def on_speed_changed(_obj, _event) -> None:
+        frame_state["speed"] = float(speed_representation.GetValue())
+        reset_timer()
+        window.Render()
+
+    def on_left_button_press(_obj, _event) -> None:
+        click_x, click_y = interactor.GetEventPosition()
+        width, height = window.GetSize()
+        if width <= 0 or height <= 0:
+            return
+
+        normalized_x = click_x / width
+        normalized_y = click_y / height
+        if 0.025 <= normalized_x <= 0.105 and 0.02 <= normalized_y <= 0.085:
+            set_playing(not frame_state["playing"])
+
+    def on_key_press(_obj, _event) -> None:
+        key = interactor.GetKeySym()
+        if key == "space":
+            set_playing(not frame_state["playing"])
+        elif key in {"Left", "Down"}:
+            set_playing(False)
+            set_frame(frame_state["step"] - 1)
+        elif key in {"Right", "Up"}:
+            set_playing(False)
+            set_frame(frame_state["step"] + 1)
+
     interactor.AddObserver("TimerEvent", on_timer)
-    timer_id = interactor.CreateRepeatingTimer(interval_ms)
+    progress_widget.AddObserver("InteractionEvent", on_progress_changed)
+    progress_widget.AddObserver("EndInteractionEvent", on_progress_changed)
+    speed_widget.AddObserver("InteractionEvent", on_speed_changed)
+    interactor.AddObserver("LeftButtonPressEvent", on_left_button_press, 2.0)
+    interactor.AddObserver("KeyPressEvent", on_key_press)
+    reset_timer()
+    timer_id = int(frame_state["timer_id"])
     print(
         f"VTK history ready: {history_variable}, frames={frame_count}, compartments={len(cell_ranges_by_gid)}, "
-        f"timer={timer_id}, fps={fps:.4g}.",
+        f"timer={timer_id}, fps={fps:.4g}, controls=slider/speed/pause.",
         flush=True,
+    )
+    interactor._neuroncad_history_controls = (
+        progress_widget,
+        progress_representation,
+        speed_widget,
+        speed_representation,
+        play_pause_actor,
     )
     interactor.Start()
 
