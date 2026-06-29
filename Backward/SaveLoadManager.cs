@@ -395,6 +395,7 @@ namespace NeuronCAD.Backward
             foreach (var device in scene.Devices.ToList())
             {
                 scene.HelixViewport.Children.Remove(device.Visual3D);
+                simulationInteraction.NotifyDeviceRemoved(device);
             }
             scene.Devices.Clear();
             scene.LastSimulationData = null;
@@ -411,6 +412,7 @@ namespace NeuronCAD.Backward
             {
                 scene.HelixViewport.Children.Remove(entity.Visual3D);
                 scene.SimulationRegistry.Unregister(entity.Id);
+                modelingInteraction.NotifyEntityRemoved(entity);
             }
             scene.Entities.Clear();
 

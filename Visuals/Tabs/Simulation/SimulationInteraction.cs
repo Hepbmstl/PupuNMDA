@@ -134,6 +134,15 @@ namespace NeuronCAD.Visuals.Tabs.Simulation
         }
 
         /// <summary>
+        /// Notify external listeners that a loaded device was removed during scene replacement.
+        /// Called by SaveLoadManager.ApplyToScene and MainWindow.ClearScene.
+        /// </summary>
+        public void NotifyDeviceRemoved(IAttachedDevice device)
+        {
+            OnDeviceRemoved?.Invoke(device);
+        }
+
+        /// <summary>
         /// Deactivate simulation interaction: cancel current operation and remove any uncommitted device visuals.
         /// Called by MainWindow.SwitchTab when switching tabs.
         /// </summary>

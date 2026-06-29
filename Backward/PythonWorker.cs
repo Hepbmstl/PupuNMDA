@@ -278,7 +278,7 @@ namespace NeuronCAD.Backward
                     GetExternalScriptDir(),
                 };
 
-            return archiveCandidates.Concat(sourceCandidates)
+            return sourceCandidates.Concat(archiveCandidates)
                 .Select(Path.GetFullPath)
                 .Where(path => File.Exists(path) || Directory.Exists(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -341,10 +341,11 @@ namespace NeuronCAD.Backward
                         sys.path.append(sitePackagesDir);
                 }
 
-                foreach (string importPath in backendImportPaths)
+                foreach (string importPath in backendImportPaths.Reverse())
                 {
-                    if (!sys.path.__contains__(importPath))
-                        sys.path.append(importPath);
+                    if (sys.path.__contains__(importPath))
+                        sys.path.remove(importPath);
+                    sys.path.insert(0, importPath);
                 }
             }
         }

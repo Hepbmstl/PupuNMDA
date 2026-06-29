@@ -21,10 +21,12 @@ using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
@@ -36,6 +38,7 @@ using NeuronCAD.Visuals.Tabs.Modeling;
 using NeuronCAD.Visuals.Tabs.Modeling.Visuals;
 using NeuronCAD.Visuals.Tabs.Simulation;
 using NeuronCAD.Visuals.Tabs.Reporting;
+using NeuronCAD.Visuals.Tabs.VTK;
 
 namespace NeuronCAD.Visuals.Windows
 {
@@ -70,7 +73,7 @@ namespace NeuronCAD.Visuals.Windows
         private IViewportInteractionHandler _activeHandler = null!;
 
         /// <summary>Top-level tab enum used to track the current active functional mode.</summary>
-        private enum ActiveTab { Modeling, Simulating, Reporting }
+        private enum ActiveTab { Modeling, Simulating, Reporting, VTK }
         /// <summary>Currently active tab, defaulting to Modeling mode.</summary>
         private ActiveTab _activeTab = ActiveTab.Modeling;
 
@@ -98,6 +101,13 @@ namespace NeuronCAD.Visuals.Windows
         /// <summary>Last full simulation JSON from simulation, used for export/import.</summary>
         private string? _lastFullSimulationJson;
 
+        private Process? _vtkViewerProcess;
+        private string? _vtkSelectedChannel;
+        private readonly Queue<string> _vtkStatusLines = new();
+        private readonly object _vtkTempFileLock = new();
+        private readonly Dictionary<int, List<string>> _vtkTempFilesByProcessId = new();
+        private static readonly string[] VtkHistoryVariables = ["V", "m", "h", "n", "Ca", "mT", "hT"];
+
         /// <summary>
         /// Constructor: initializes XAML components and initializes controllers after the window is loaded.
         /// </summary>
@@ -105,6 +115,7 @@ namespace NeuronCAD.Visuals.Windows
         {
             InitializeComponent();
             Loaded += (s, e) => InitializeControllers();
+            Closed += (s, e) => StopVtkViewerProcess();
         }
 
         /// <summary>
@@ -160,6 +171,8 @@ namespace NeuronCAD.Visuals.Windows
 
             // Update all connection line positions each frame to ensure connections follow entities after movement
             CompositionTarget.Rendering += (s, e) => _scene.ConnectionController.UpdateAll();
+
+            InitializeVtkPanel();
         }
 
         #region Top-level Tab Switching
@@ -185,6 +198,12 @@ namespace NeuronCAD.Visuals.Windows
             SyncTabButtons();
         }
 
+        private void OnTabVTKClick(object sender, RoutedEventArgs e)
+        {
+            if (_activeTab != ActiveTab.VTK) SwitchTab(ActiveTab.VTK);
+            SyncTabButtons();
+        }
+
         /// <summary>
         /// Synchronize the IsChecked state of the three top-level tab ToggleButtons to match _activeTab.
         /// Called by all OnTab*Click handlers.
@@ -194,6 +213,7 @@ namespace NeuronCAD.Visuals.Windows
             TabModeling.IsChecked = _activeTab == ActiveTab.Modeling;
             TabSimulation.IsChecked = _activeTab == ActiveTab.Simulating;
             TabReporting.IsChecked = _activeTab == ActiveTab.Reporting;
+            TabVTK.IsChecked = _activeTab == ActiveTab.VTK;
         }
 
         /// <summary>
@@ -218,8 +238,12 @@ namespace NeuronCAD.Visuals.Windows
             ModelingPanelScroll.Visibility = Visibility.Collapsed;
             SimulatingPanelRoot.Visibility = Visibility.Collapsed;
             ReportingPanelRoot.Visibility = Visibility.Collapsed;
+            VTKPanelRoot.Visibility = Visibility.Collapsed;
             ModelingToolbar.Visibility = Visibility.Collapsed;
             SimulationToolbar.Visibility = Visibility.Collapsed;
+            VTKViewportRoot.Visibility = Visibility.Collapsed;
+            MainViewport.Visibility = Visibility.Visible;
+            OverlayCanvas.Visibility = Visibility.Visible;
             EditPopup.Visibility = Visibility.Collapsed;
             ChannelSelectorPopup.IsOpen = false;
 
@@ -241,6 +265,13 @@ namespace NeuronCAD.Visuals.Windows
                     _activeHandler = _reportingInteraction;
                     _reportingInteraction.Activate();
                     _reportingPanelController.Rebuild();
+                    break;
+                case ActiveTab.VTK:
+                    VTKPanelRoot.Visibility = Visibility.Visible;
+                    VTKViewportRoot.Visibility = Visibility.Visible;
+                    MainViewport.Visibility = Visibility.Collapsed;
+                    OverlayCanvas.Visibility = Visibility.Collapsed;
+                    _activeHandler = _modelingInteraction;
                     break;
             }
         }
@@ -423,9 +454,545 @@ namespace NeuronCAD.Visuals.Windows
             TabModeling.IsEnabled = !locked;
             TabSimulation.IsEnabled = !locked;
             TabReporting.IsEnabled = !locked;
+            TabVTK.IsEnabled = !locked;
             ModelingToolbar.IsEnabled = !locked;
             SimulationToolbar.IsEnabled = !locked;
         }
+
+        private void OnLaunchVTKClick(object sender, RoutedEventArgs e)
+        {
+            LaunchVtkViewer(channel: null, restartRunningViewer: false);
+        }
+
+        private void OnRenderVTKJsonColorsClick(object sender, RoutedEventArgs e)
+        {
+            LaunchVtkViewer(channel: null, restartRunningViewer: true);
+        }
+
+        private void OnStopVTKClick(object sender, RoutedEventArgs e)
+        {
+            StopVtkViewerProcess();
+            VTKStatusText.Text = "VTK viewer stopped.";
+        }
+
+        private void OnReloadVTKChannelsClick(object sender, RoutedEventArgs e)
+        {
+            LoadVtkChannelButtons();
+        }
+
+        private void OnVTKSubTabControlsClick(object sender, RoutedEventArgs e)
+        {
+            VTKSubTabControls.IsChecked = true;
+            VTKSubTabChannels.IsChecked = false;
+            VTKSubTabHistory.IsChecked = false;
+            VTKControlsScroll.Visibility = Visibility.Visible;
+            VTKChannelsScroll.Visibility = Visibility.Collapsed;
+            VTKHistoryScroll.Visibility = Visibility.Collapsed;
+        }
+
+        private void OnVTKSubTabChannelsClick(object sender, RoutedEventArgs e)
+        {
+            VTKSubTabControls.IsChecked = false;
+            VTKSubTabChannels.IsChecked = true;
+            VTKSubTabHistory.IsChecked = false;
+            VTKControlsScroll.Visibility = Visibility.Collapsed;
+            VTKChannelsScroll.Visibility = Visibility.Visible;
+            VTKHistoryScroll.Visibility = Visibility.Collapsed;
+            LoadVtkChannelButtons();
+        }
+
+        private void OnVTKSubTabHistoryClick(object sender, RoutedEventArgs e)
+        {
+            VTKSubTabControls.IsChecked = false;
+            VTKSubTabChannels.IsChecked = false;
+            VTKSubTabHistory.IsChecked = true;
+            VTKControlsScroll.Visibility = Visibility.Collapsed;
+            VTKChannelsScroll.Visibility = Visibility.Collapsed;
+            VTKHistoryScroll.Visibility = Visibility.Visible;
+            RefreshVtkHistoryPanel();
+        }
+
+        private void OnRefreshVTKHistoryClick(object sender, RoutedEventArgs e)
+        {
+            RefreshVtkHistoryPanel();
+        }
+
+        private void OnVTKShadowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (VTKShadowValueText == null)
+                return;
+
+            VTKShadowValueText.Text = e.NewValue.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private void LaunchVtkViewer(string? channel, bool restartRunningViewer)
+        {
+            var createdTempFiles = new List<string>();
+
+            try
+            {
+                if (_vtkViewerProcess is { HasExited: true })
+                    StopVtkViewerProcess();
+
+                if (_vtkViewerProcess is { HasExited: false })
+                {
+                    if (!restartRunningViewer)
+                    {
+                        VTKStatusText.Text = "VTK viewer is already running.";
+                        return;
+                    }
+
+                    StopVtkViewerProcess();
+                }
+
+                IntPtr hwnd = VTKHostControl.HostHwnd;
+                if (hwnd == IntPtr.Zero)
+                    throw new InvalidOperationException("VTK host window handle is not ready.");
+
+                _vtkSelectedChannel = string.IsNullOrWhiteSpace(channel) ? null : channel;
+                string scenePayloadPath = VtkScenePayloadExporter.ExportToTempFile(_scene);
+                createdTempFiles.Add(scenePayloadPath);
+                var hostSize = GetVtkHostPixelSize();
+                _vtkViewerProcess = VtkViewerLauncher.LaunchEmbedded(
+                    hwnd,
+                    scenePayloadPath,
+                    channel: _vtkSelectedChannel,
+                    showConnections: ChkVTKConnections.IsChecked == true,
+                    showDevices: ChkVTKDevices.IsChecked == true,
+                    shadowStrength: SliderVTKShadow.Value,
+                    width: hostSize.Width,
+                    height: hostSize.Height);
+                RegisterVtkTempFiles(_vtkViewerProcess, createdTempFiles);
+                createdTempFiles.Clear();
+                VTKStatusText.Text = "VTK viewer launched; waiting for render...";
+                AttachVtkProcessDiagnostics(_vtkViewerProcess);
+                ScheduleVtkHostAttachAndResize(_vtkViewerProcess);
+            }
+            catch (Exception ex)
+            {
+                VTKStatusText.Text = "VTK launch failed.";
+                MessageBox.Show($"Failed to launch VTK viewer:\n{ex.Message}", "VTK Viewer",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                DeleteTempFiles(createdTempFiles);
+            }
+        }
+
+        private void InitializeVtkPanel()
+        {
+            try
+            {
+                VTKJsonPathText.Text = "Live Helix scene";
+                LoadVtkChannelButtons();
+                RefreshVtkHistoryPanel();
+            }
+            catch (Exception ex)
+            {
+                VTKJsonPathText.Text = "";
+                VTKStatusText.Text = $"VTK panel setup failed: {ex.Message}";
+            }
+        }
+
+        private void LoadVtkChannelButtons()
+        {
+            VTKChannelListContainer.Children.Clear();
+
+            try
+            {
+                VTKJsonPathText.Text = "Live Helix scene";
+                var channels = ReadVtkChannelInfoFromScene();
+
+                if (channels.Count == 0)
+                {
+                    VTKChannelListContainer.Children.Add(new TextBlock
+                    {
+                        Text = "No numeric channel G values found.",
+                        Foreground = new SolidColorBrush(Colors.Gray),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                    return;
+                }
+
+                foreach (var channel in channels)
+                {
+                    var button = new Button
+                    {
+                        Content = $"{channel.Name}    count {channel.Count}    missing {channel.Missing}",
+                        Tag = channel.Name,
+                        ToolTip = $"min {channel.MinG:g4}, max {channel.MaxG:g4}, unique {channel.UniqueCount}",
+                        Background = new SolidColorBrush(Color.FromRgb(62, 62, 66)),
+                        Foreground = Brushes.White,
+                        Padding = new Thickness(10, 7, 10, 7),
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        Margin = new Thickness(0, 0, 0, 6)
+                    };
+
+                    button.Click += OnVTKChannelButtonClick;
+                    VTKChannelListContainer.Children.Add(button);
+                }
+            }
+            catch (Exception ex)
+            {
+                VTKChannelListContainer.Children.Add(new TextBlock
+                {
+                    Text = $"Failed to load channels: {ex.Message}",
+                    Foreground = new SolidColorBrush(Colors.OrangeRed),
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
+        }
+
+        private void OnVTKChannelButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: string channel })
+                LaunchVtkViewer(channel, restartRunningViewer: true);
+        }
+
+        private void RefreshVtkHistoryPanel()
+        {
+            VTKHistoryVariableContainer.Children.Clear();
+
+            bool hasHistory = _scene.LastSimulationData != null &&
+                              _scene.HasCompletedSimulation &&
+                              _scene.LastSimulationData.Compartments.Count > 0;
+
+            VTKHistoryStatusText.Text = hasHistory
+                ? $"History ready: {_scene.LastSimulationData!.Compartments.Count} compartments."
+                : "No simulation history loaded. Run or import simulation data first.";
+
+            foreach (string variable in VtkHistoryVariables)
+            {
+                var button = new Button
+                {
+                    Content = $"Play {variable}",
+                    Tag = variable,
+                    IsEnabled = hasHistory,
+                    Background = new SolidColorBrush(Color.FromRgb(62, 62, 66)),
+                    Foreground = Brushes.White,
+                    Padding = new Thickness(10, 7, 10, 7),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+
+                button.Click += OnVTKHistoryVariableClick;
+                VTKHistoryVariableContainer.Children.Add(button);
+            }
+        }
+
+        private async void OnVTKHistoryVariableClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string variable })
+                return;
+
+            await LaunchVtkHistoryPlaybackAsync(variable);
+        }
+
+        private async Task LaunchVtkHistoryPlaybackAsync(string variable)
+        {
+            var createdTempFiles = new List<string>();
+
+            try
+            {
+                if (_vtkViewerProcess is { HasExited: true })
+                    StopVtkViewerProcess();
+
+                if (_scene.LastSimulationData == null ||
+                    !_scene.HasCompletedSimulation ||
+                    _scene.LastSimulationData.Compartments.Count == 0)
+                {
+                    VTKHistoryStatusText.Text = "No simulation history loaded. Run or import simulation data first.";
+                    return;
+                }
+
+                if (_vtkViewerProcess is { HasExited: false })
+                    StopVtkViewerProcess();
+
+                IntPtr hwnd = VTKHostControl.HostHwnd;
+                if (hwnd == IntPtr.Zero)
+                    throw new InvalidOperationException("VTK host window handle is not ready.");
+
+                string scenePayloadPath = VtkScenePayloadExporter.ExportToTempFile(_scene);
+                createdTempFiles.Add(scenePayloadPath);
+                string historyPath = CreateTempHistoryNpzPath();
+                createdTempFiles.Add(historyPath);
+                await SimulationRunner.CallSaveSimulationDataNpz(historyPath, _currentProjectId, _currentProjectName);
+
+                var hostSize = GetVtkHostPixelSize();
+                _vtkViewerProcess = VtkViewerLauncher.LaunchHistoryPlayback(
+                    hwnd,
+                    scenePayloadPath,
+                    historyPath,
+                    variable,
+                    showConnections: ChkVTKConnections.IsChecked == true,
+                    showDevices: ChkVTKDevices.IsChecked == true,
+                    shadowStrength: SliderVTKShadow.Value,
+                    fps: 20.0,
+                    width: hostSize.Width,
+                    height: hostSize.Height);
+                RegisterVtkTempFiles(_vtkViewerProcess, createdTempFiles);
+                createdTempFiles.Clear();
+
+                VTKStatusText.Text = $"VTK history launched: {variable}.";
+                VTKHistoryStatusText.Text = $"Playing {variable}.";
+                AttachVtkProcessDiagnostics(_vtkViewerProcess);
+                ScheduleVtkHostAttachAndResize(_vtkViewerProcess);
+            }
+            catch (Exception ex)
+            {
+                VTKStatusText.Text = "VTK history launch failed.";
+                VTKHistoryStatusText.Text = ex.Message;
+                MessageBox.Show($"Failed to launch VTK history playback:\n{ex.Message}", "VTK History",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                DeleteTempFiles(createdTempFiles);
+            }
+        }
+
+        private static string CreateTempHistoryNpzPath()
+        {
+            string directory = VtkScenePayloadExporter.PayloadDirectory;
+            Directory.CreateDirectory(directory);
+            return Path.Combine(directory, $"history_{DateTime.Now:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}.npz");
+        }
+
+        private void ScheduleVtkHostAttachAndResize(Process process)
+        {
+            TryAttachAndResizeVtkHost(process);
+
+            foreach (int delayMs in new[] { 100, 250, 500, 900, 1400, 2200, 3500, 5500, 8000, 12000 })
+            {
+                var timer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(delayMs)
+                };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    TryAttachAndResizeVtkHost(process);
+                };
+                timer.Start();
+            }
+        }
+
+        private void TryAttachAndResizeVtkHost(Process process)
+        {
+            try
+            {
+                if (process.HasExited)
+                    return;
+
+                VTKHostControl.AttachProcessMainWindow(process.Id);
+                VTKHostControl.SyncChildWindowsToCurrentSize();
+            }
+            catch
+            {
+                VTKHostControl.SyncChildWindowsToCurrentSize();
+            }
+        }
+
+        private IReadOnlyList<VtkChannelInfo> ReadVtkChannelInfoFromScene()
+        {
+            int entityCount = 0;
+            var valuesByChannel = new Dictionary<string, List<double>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entity in _scene.Entities)
+            {
+                entityCount++;
+                foreach (var pair in entity.Channels)
+                {
+                    if (!valuesByChannel.TryGetValue(pair.Key, out var values))
+                    {
+                        values = new List<double>();
+                        valuesByChannel[pair.Key] = values;
+                    }
+
+                    values.Add(pair.Value.G_ion_channel);
+                }
+            }
+
+            return valuesByChannel
+                .Where(pair => pair.Value.Count > 0)
+                .Select(pair => new VtkChannelInfo(
+                    pair.Key,
+                    pair.Value.Count,
+                    Math.Max(0, entityCount - pair.Value.Count),
+                    pair.Value.Min(),
+                    pair.Value.Max(),
+                    pair.Value.Distinct().Count()))
+                .OrderBy(info => info.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private (int Width, int Height) GetVtkHostPixelSize()
+        {
+            double width = Math.Max(1.0, VTKHostControl.ActualWidth);
+            double height = Math.Max(1.0, VTKHostControl.ActualHeight);
+            var source = PresentationSource.FromVisual(VTKHostControl);
+            if (source?.CompositionTarget != null)
+            {
+                width *= source.CompositionTarget.TransformToDevice.M11;
+                height *= source.CompositionTarget.TransformToDevice.M22;
+            }
+
+            return ((int)Math.Max(1, Math.Round(width)), (int)Math.Max(1, Math.Round(height)));
+        }
+
+        private void AttachVtkProcessDiagnostics(Process process)
+        {
+            _vtkStatusLines.Clear();
+            process.EnableRaisingEvents = true;
+            process.OutputDataReceived += (_, args) => UpdateVtkStatus(args.Data);
+            process.ErrorDataReceived += (_, args) => UpdateVtkStatus(args.Data);
+            process.Exited += (_, _) =>
+            {
+                var tempFiles = TakeVtkTempFiles(process.Id);
+                int exitCode;
+                try
+                {
+                    exitCode = process.ExitCode;
+                }
+                catch
+                {
+                    exitCode = -1;
+                }
+
+                try
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (ReferenceEquals(_vtkViewerProcess, process))
+                            AppendVtkStatusLine($"VTK viewer exited (code {exitCode}).");
+                    });
+                }
+                catch
+                {
+                    // Dispatcher can be unavailable during application shutdown.
+                }
+                finally
+                {
+                    DeleteTempFiles(tempFiles);
+                }
+            };
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+
+        private void UpdateVtkStatus(string? message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            Dispatcher.Invoke(() => AppendVtkStatusLine(message));
+        }
+
+        private void AppendVtkStatusLine(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            string line = message.Trim();
+            _vtkStatusLines.Enqueue(line);
+            while (_vtkStatusLines.Count > 5)
+                _vtkStatusLines.Dequeue();
+
+            VTKStatusText.Text = string.Join(Environment.NewLine, _vtkStatusLines);
+        }
+
+        private void StopVtkViewerProcess()
+        {
+            Process? process = _vtkViewerProcess;
+
+            try
+            {
+                if (process is { HasExited: false })
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(1000);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup during app shutdown.
+            }
+            finally
+            {
+                if (process != null)
+                    DeleteTempFiles(TakeVtkTempFiles(process.Id));
+                else
+                    DeleteTempFiles(TakeAllVtkTempFiles());
+
+                process?.Dispose();
+                _vtkViewerProcess = null;
+            }
+        }
+
+        private void RegisterVtkTempFiles(Process process, IEnumerable<string> paths)
+        {
+            var tempFiles = paths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (tempFiles.Count == 0)
+                return;
+
+            lock (_vtkTempFileLock)
+            {
+                _vtkTempFilesByProcessId[process.Id] = tempFiles;
+            }
+        }
+
+        private IReadOnlyList<string> TakeVtkTempFiles(int processId)
+        {
+            lock (_vtkTempFileLock)
+            {
+                if (_vtkTempFilesByProcessId.TryGetValue(processId, out var tempFiles))
+                {
+                    _vtkTempFilesByProcessId.Remove(processId);
+                    return tempFiles;
+                }
+            }
+
+            return Array.Empty<string>();
+        }
+
+        private IReadOnlyList<string> TakeAllVtkTempFiles()
+        {
+            lock (_vtkTempFileLock)
+            {
+                var tempFiles = _vtkTempFilesByProcessId.Values.SelectMany(paths => paths).ToList();
+                _vtkTempFilesByProcessId.Clear();
+                return tempFiles;
+            }
+        }
+
+        private static void DeleteTempFiles(IEnumerable<string> paths)
+        {
+            foreach (string path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (File.Exists(path))
+                        File.Delete(path);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to delete VTK temp file '{path}': {ex.Message}");
+                }
+            }
+        }
+
+        private sealed record VtkChannelInfo(
+            string Name,
+            int Count,
+            int Missing,
+            double MinG,
+            double MaxG,
+            int UniqueCount);
 
         /// <summary>
         /// Forcefully abort the simulation when the "Abort" button is clicked.
@@ -878,14 +1445,19 @@ namespace NeuronCAD.Visuals.Windows
 
             var dlg = new OpenFileDialog
             {
-                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
+                Filter = "NeuronCAD Project or SWC (*.json;*.swc)|*.json;*.swc|NeuronCAD Project (*.json)|*.json|SWC Morphology (*.swc)|*.swc|All Files (*.*)|*.*",
                 Title = "Open Project"
             };
             if (dlg.ShowDialog() != true) return;
 
             try
             {
-                var project = SaveLoadManager.Load(dlg.FileName);
+                string extension = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+                bool isSwcImport = extension == ".swc";
+                var project = isSwcImport
+                    ? SwcImportManager.LoadAsProjectData(dlg.FileName)
+                    : SaveLoadManager.Load(dlg.FileName);
+
                 SaveLoadManager.ApplyToScene(
                     project,
                     _scene,
@@ -910,7 +1482,7 @@ namespace NeuronCAD.Visuals.Windows
                     _scene.Devices);
                 _scene.HasCompletedSimulation = false;
 
-                _currentProjectPath = dlg.FileName;
+                _currentProjectPath = isSwcImport ? null : dlg.FileName;
                 // Handle legacy files without ProjectId
                 bool migratedLegacyProject = false;
                 if (string.IsNullOrEmpty(project.ProjectId))
@@ -926,16 +1498,21 @@ namespace NeuronCAD.Visuals.Windows
 
                 _currentProjectId = project.ProjectId;
                 _currentProjectName = project.ProjectName;
-                if (migratedLegacyProject)
+                if (migratedLegacyProject && !isSwcImport)
                     SaveLoadManager.SaveProjectData(dlg.FileName, project);
                 ProjectNameLabel.Text = $"Project: {_currentProjectName}";
                 Title = $"NeuronCAD 2026 — {_currentProjectName}";
+                LoadVtkChannelButtons();
+                RefreshVtkHistoryPanel();
+                MainViewport.ZoomExtents(500);
 
                 // Show loaded parameters summary
                 var summary = SaveLoadManager.GetLoadedParamsSummary(project);
+                string loadedLabel = isSwcImport ? "SWC morphology imported" : "Project loaded";
                 MessageBox.Show(
-                    $"Project loaded: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
-                    "Project Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                    $"{loadedLabel}: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
+                    isSwcImport ? "SWC Imported" : "Project Loaded",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 // Switch to Modeling tab to view the loaded results
                 if (_activeTab != ActiveTab.Modeling)
                 {
@@ -1024,7 +1601,10 @@ namespace NeuronCAD.Visuals.Windows
             _simulationInteraction.Deactivate();
 
             foreach (var device in _scene.Devices.ToList())
+            {
                 _scene.HelixViewport.Children.Remove(device.Visual3D);
+                _simulationInteraction.NotifyDeviceRemoved(device);
+            }
             _scene.Devices.Clear();
 
             foreach (var connId in _scene.ConnectionController.ConnectionsById.Keys.ToList())
