@@ -1445,14 +1445,19 @@ namespace NeuronCAD.Visuals.Windows
 
             var dlg = new OpenFileDialog
             {
-                Filter = "NeuronCAD Project (*.json)|*.json|All Files (*.*)|*.*",
+                Filter = "NeuronCAD Project or SWC (*.json;*.swc)|*.json;*.swc|NeuronCAD Project (*.json)|*.json|SWC Morphology (*.swc)|*.swc|All Files (*.*)|*.*",
                 Title = "Open Project"
             };
             if (dlg.ShowDialog() != true) return;
 
             try
             {
-                var project = SaveLoadManager.Load(dlg.FileName);
+                string extension = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+                bool isSwcImport = extension == ".swc";
+                var project = isSwcImport
+                    ? SwcImportManager.LoadAsProjectData(dlg.FileName)
+                    : SaveLoadManager.Load(dlg.FileName);
+
                 SaveLoadManager.ApplyToScene(
                     project,
                     _scene,
@@ -1477,7 +1482,7 @@ namespace NeuronCAD.Visuals.Windows
                     _scene.Devices);
                 _scene.HasCompletedSimulation = false;
 
-                _currentProjectPath = dlg.FileName;
+                _currentProjectPath = isSwcImport ? null : dlg.FileName;
                 // Handle legacy files without ProjectId
                 bool migratedLegacyProject = false;
                 if (string.IsNullOrEmpty(project.ProjectId))
@@ -1493,16 +1498,21 @@ namespace NeuronCAD.Visuals.Windows
 
                 _currentProjectId = project.ProjectId;
                 _currentProjectName = project.ProjectName;
-                if (migratedLegacyProject)
+                if (migratedLegacyProject && !isSwcImport)
                     SaveLoadManager.SaveProjectData(dlg.FileName, project);
                 ProjectNameLabel.Text = $"Project: {_currentProjectName}";
                 Title = $"NeuronCAD 2026 — {_currentProjectName}";
+                LoadVtkChannelButtons();
+                RefreshVtkHistoryPanel();
+                MainViewport.ZoomExtents(500);
 
                 // Show loaded parameters summary
                 var summary = SaveLoadManager.GetLoadedParamsSummary(project);
+                string loadedLabel = isSwcImport ? "SWC morphology imported" : "Project loaded";
                 MessageBox.Show(
-                    $"Project loaded: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
-                    "Project Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                    $"{loadedLabel}: {System.IO.Path.GetFileName(dlg.FileName)}\n\n{summary}",
+                    isSwcImport ? "SWC Imported" : "Project Loaded",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 // Switch to Modeling tab to view the loaded results
                 if (_activeTab != ActiveTab.Modeling)
                 {
@@ -1591,7 +1601,10 @@ namespace NeuronCAD.Visuals.Windows
             _simulationInteraction.Deactivate();
 
             foreach (var device in _scene.Devices.ToList())
+            {
                 _scene.HelixViewport.Children.Remove(device.Visual3D);
+                _simulationInteraction.NotifyDeviceRemoved(device);
+            }
             _scene.Devices.Clear();
 
             foreach (var connId in _scene.ConnectionController.ConnectionsById.Keys.ToList())
